@@ -24,6 +24,7 @@ import { getProfile } from "@/services/user.service";
 import { getWhereAreWeNowStats } from "@/services/stats.service";
 import { listEvents } from "@/services/event.service";
 import { listAchievements } from "@/services/achievement.service";
+import { getMemory, listMemories } from "@/services/memory.service";
 
 const prisma = new PrismaClient();
 
@@ -358,6 +359,68 @@ describe("getWhereAreWeNowStats", () => {
       expect(Object.keys(bucket).sort()).toEqual(["city", "count", "country"]);
     }
   });
+
+  // -------------------------------------------------------------------------
+  // jobFunctions — Blok 7B. `industries` ilə EYNİ üç qatdan keçir: görünürlük +
+  // includeInStats + k-anonimlik.
+  // -------------------------------------------------------------------------
+
+  it("🔴 jobFunctions xanası `includeInStats = false` qeydləri SAYMIR", async () => {
+    const stats = await getWhereAreWeNowStats(alumni);
+    const totalVisible =
+      stats.jobFunctions.visible.reduce((sum, bucket) => sum + bucket.count, 0) +
+      stats.jobFunctions.otherCount;
+
+    const withoutConsent = await prisma.careerEntry.count({
+      where: {
+        isCurrent: true,
+        jobFunction: { not: null },
+        OR: [
+          { userId: alumni.userId },
+          { visibility: "PUBLIC" },
+          { visibility: "UNIVERSITY" },
+          {
+            visibility: "CLASS",
+            user: { memberships: { some: { cohortId: { in: alumni.cohortIds } } } },
+          },
+        ],
+      },
+    });
+
+    const withConsent = await prisma.careerEntry.count({
+      where: {
+        isCurrent: true,
+        includeInStats: true,
+        jobFunction: { not: null },
+        OR: [
+          { userId: alumni.userId },
+          { visibility: "PUBLIC" },
+          { visibility: "UNIVERSITY" },
+          {
+            visibility: "CLASS",
+            user: { memberships: { some: { cohortId: { in: alumni.cohortIds } } } },
+          },
+        ],
+      },
+    });
+
+    // Sanity: razılıq verməyən `jobFunction`-lu qeydlər həqiqətən var.
+    expect(withoutConsent).toBeGreaterThan(withConsent);
+    expect(totalVisible).toBe(withConsent);
+  });
+
+  it("jobFunctions xanası 3 nəfərdən kiçik olanda «Digər»ə yığılır (k-anonimlik)", async () => {
+    const stats = await getWhereAreWeNowStats(alumni);
+
+    for (const bucket of stats.jobFunctions.visible) {
+      expect(bucket.count, bucket.key).toBeGreaterThanOrEqual(3);
+    }
+
+    // Sanity: sahə ümumiyyətlə dolu qayıdır (seed 8 kateqoriyaya paylayıb).
+    const totalBuckets = stats.jobFunctions.visible.length;
+    const hasSuppressed = stats.jobFunctions.otherCount > 0;
+    expect(totalBuckets > 0 || hasSuppressed, "jobFunctions boş qayıtdı").toBe(true);
+  });
 });
 
 // ===========================================================================
@@ -442,6 +505,79 @@ describe("status filtrləri modelə görə fərqlidir", () => {
     for (const item of items) {
       if (item.createdBy.id === alumni.userId) continue;
       expect(["PUBLISHED", "COMPLETED"]).toContain(item.status);
+    }
+  });
+});
+
+// ===========================================================================
+// 7. Blok 7B — "sevimli yer" körpüsü (Memory.guidePlaceId) SIZMIR
+// ===========================================================================
+//
+// 🔴 BU BÖLMƏNİN SUALI: `guidePlaceId`-yə görə filtrləmə görünürlük şərtini
+// YAN KEÇİRMİR. `listMemories`/`getMemory` `guidePlaceId` şərtini
+// `activeVisibleWhere`-in YANINDA (AND-da) qurur — filtr üçüncü bir "arxa
+// qapı" deyil, mövcud şərtin üzərinə əlavə olunan İKİNCİ tələbdir.
+// ===========================================================================
+
+describe("Memory.guidePlaceId — görünürlükdən keçir", () => {
+  it("🔴 CLASS xatirə kənar sinif üzvünə guidePlaceId ilə də SIZMIR", async () => {
+    // Sanity: alumni-nin sinfində, konkret məkana bağlı, CLASS görünürlüklü
+    // xatirə var (seed-in ~40%-i guidePlaceId ilə gəlir).
+    const target = await prisma.memory.findFirstOrThrow({
+      where: {
+        cohortId: { in: alumni.cohortIds },
+        guidePlaceId: { not: null },
+        visibility: "CLASS",
+        status: "ACTIVE",
+        authorId: { not: alumni.userId },
+      },
+      select: { id: true, guidePlaceId: true },
+    });
+
+    // --- Sinif yoldaşı (alumni) GÖRÜR ---
+    const ownList = await listMemories(alumni, {
+      guidePlaceId: target.guidePlaceId!,
+      take: 1000,
+    });
+    expect(ownList.map((m) => m.id)).toContain(target.id);
+    expect(await getMemory(alumni, target.id)).not.toBeNull();
+
+    // --- Kənar sinif üzvü (student) GÖRMÜR — nə birbaşa, nə də filtrlə ---
+    const outsiderList = await listMemories(student, {
+      guidePlaceId: target.guidePlaceId!,
+      take: 1000,
+    });
+    expect(outsiderList.map((m) => m.id)).not.toContain(target.id);
+    expect(await getMemory(student, target.id)).toBeNull();
+  });
+
+  it("anonim viewer guidePlaceId filtri ilə də yalnız PUBLIC xatirələri görür", async () => {
+    // Sanity: PUBLIC olmayan, guidePlaceId-li xatirə mövcuddur.
+    const nonPublic = await prisma.memory.findFirstOrThrow({
+      where: { guidePlaceId: { not: null }, visibility: { not: "PUBLIC" }, status: "ACTIVE" },
+      select: { guidePlaceId: true },
+    });
+
+    const results = await listMemories(ANONYMOUS, {
+      guidePlaceId: nonPublic.guidePlaceId!,
+      take: 1000,
+    });
+
+    for (const item of results) {
+      expect(item.visibility).toBe("PUBLIC");
+    }
+  });
+
+  it("guidePlaceId sahəsi seçilmiş yerlə HƏRFBƏHƏRF uyğun gəlir", async () => {
+    const place = await prisma.guidePlace.findFirstOrThrow({
+      where: { memories: { some: {} } },
+      select: { id: true },
+    });
+
+    const items = await listMemories(alumni, { guidePlaceId: place.id, take: 1000 });
+    expect(items.length).toBeGreaterThan(0);
+    for (const item of items) {
+      expect(item.guidePlaceId).toBe(place.id);
     }
   });
 });

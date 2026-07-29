@@ -27,6 +27,8 @@ export interface MemoryItem {
   visibility: string;
   occurredAt: Date;
   createdAt: Date;
+  /** "Sevimli yer" körpüsü (Blok 7B — M9 ↔ M3). Göstərmə UI-ı Blok 10B/11A-dadır. */
+  guidePlaceId: string | null;
   author: { id: string; firstName: string; lastName: string; avatarUrl: string | null };
   cohort: { id: string; slug: string; displayName: string };
 }
@@ -37,6 +39,8 @@ export interface MemoryFilters {
   type?: MemoryType;
   /** Yerləşdirmə yerinə görə süzgəc — Memory-nin 4 göstərilmə seçimi. */
   surface?: "profile" | "feed" | "timeline" | "yearbook";
+  /** Xankəndi bələdçisindəki konkret məkana bağlı xatirələr (Blok 7B). */
+  guidePlaceId?: string;
   take?: number;
   skip?: number;
 }
@@ -60,6 +64,7 @@ const MEMORY_SELECT = {
   visibility: true,
   occurredAt: true,
   createdAt: true,
+  guidePlaceId: true,
   author: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
   cohort: { select: { id: true, slug: true, displayName: true } },
 } satisfies Prisma.MemorySelect;
@@ -76,6 +81,7 @@ export async function listMemories(
         ...(filters.authorId ? [{ authorId: filters.authorId }] : []),
         ...(filters.type ? [{ type: filters.type }] : []),
         ...(filters.surface ? [{ [SURFACE_FIELD[filters.surface]]: true }] : []),
+        ...(filters.guidePlaceId ? [{ guidePlaceId: filters.guidePlaceId }] : []),
       ],
     },
     orderBy: [{ occurredAt: "desc" }, { id: "desc" }],

@@ -60,6 +60,8 @@ export interface WhereAreWeNowStats {
   respondentCount: number;
   countries: SuppressedBuckets<StatsBucket>;
   industries: SuppressedBuckets<StatsBucket>;
+  /** `CareerEntry.jobFunction` — Blok 7B. `industries` ilə EYNİ üç qatdan keçir. */
+  jobFunctions: SuppressedBuckets<StatsBucket>;
   degrees: SuppressedBuckets<StatsBucket>;
   locations: SuppressedBuckets<LocationBucket>;
 }
@@ -150,35 +152,45 @@ export async function getWhereAreWeNowStats(
 ): Promise<WhereAreWeNowStats> {
   const careerWhere = currentCareerWhere(viewer, filters);
 
-  const [respondents, byCountry, byIndustry, byDegree, locations] = await Promise.all([
-    // Sətir yox, İSTİFADƏÇİ sayı — bir nəfər iki qeydlə iki dəfə sayılmasın.
-    prisma.careerEntry.groupBy({ by: ["userId"], where: careerWhere }),
+  const [respondents, byCountry, byIndustry, byJobFunction, byDegree, locations] =
+    await Promise.all([
+      // Sətir yox, İSTİFADƏÇİ sayı — bir nəfər iki qeydlə iki dəfə sayılmasın.
+      prisma.careerEntry.groupBy({ by: ["userId"], where: careerWhere }),
 
-    prisma.careerEntry.groupBy({
-      by: ["country"],
-      where: { AND: [careerWhere, { country: { not: null } }] },
-      _count: { _all: true },
-    }),
+      prisma.careerEntry.groupBy({
+        by: ["country"],
+        where: { AND: [careerWhere, { country: { not: null } }] },
+        _count: { _all: true },
+      }),
 
-    prisma.careerEntry.groupBy({
-      by: ["industry"],
-      where: { AND: [careerWhere, { industry: { not: null } }] },
-      _count: { _all: true },
-    }),
+      prisma.careerEntry.groupBy({
+        by: ["industry"],
+        where: { AND: [careerWhere, { industry: { not: null } }] },
+        _count: { _all: true },
+      }),
 
-    prisma.educationEntry.groupBy({
-      by: ["degree"],
-      where: educationWhere(viewer, filters),
-      _count: { _all: true },
-    }),
+      // `jobFunction` — `industry` ilə EYNİ nümunə: üç qat (görünürlük +
+      // includeInStats + k-anonimlik) `careerWhere`-dən, `toBuckets`-dən keçir.
+      prisma.careerEntry.groupBy({
+        by: ["jobFunction"],
+        where: { AND: [careerWhere, { jobFunction: { not: null } }] },
+        _count: { _all: true },
+      }),
 
-    listCoarseLocations(viewer, filters),
-  ]);
+      prisma.educationEntry.groupBy({
+        by: ["degree"],
+        where: educationWhere(viewer, filters),
+        _count: { _all: true },
+      }),
+
+      listCoarseLocations(viewer, filters),
+    ]);
 
   return {
     respondentCount: respondents.length,
     countries: toBuckets(byCountry, (row) => row.country),
     industries: toBuckets(byIndustry, (row) => row.industry),
+    jobFunctions: toBuckets(byJobFunction, (row) => row.jobFunction),
     degrees: toBuckets(byDegree, (row) => row.degree),
     locations,
   };

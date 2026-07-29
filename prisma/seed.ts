@@ -51,6 +51,7 @@ import {
   TimelineSourceType,
   Visibility,
   type AchievementCategory,
+  type JobFunction,
   type MemoryType,
   type Visibility as VisibilityType,
 } from "@/lib/enums";
@@ -100,6 +101,39 @@ import {
 const NOW = new Date("2026-07-29T09:00:00.000Z");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * `POSITIONS`-dəki hər sərbəst-mətn vəzifəni aqreqasiya kateqoriyasına bağlayır
+ * (Blok 7B — GW analizi, `CareerEntry.jobFunction`).
+ *
+ * ⚠️ TƏLƏ T6: `pick`/`cycle` İŞLƏDİLMİR — xəritə SABİTDİR. `jobFunction`
+ * artıq seçilmiş `position` dəyərinin funksiyasıdır (təkrar seçim olsaydı
+ * eyni istifadəçinin vəzifəsi ilə rol kateqoriyası bir-birinə uyğunsuz
+ * düşə bilərdi və seed determinizmi eyni qalsa da MƏNASIZ olardı).
+ * "Təcrübəçi" (tələbə təcrübə qeydləri) xəritədə YOXDUR — `null` qalır.
+ */
+const POSITION_JOB_FUNCTIONS: Record<string, JobFunction> = {
+  "Proqram təminatı mühəndisi": "ENGINEERING",
+  "Məlumat analitiki": "DATA",
+  "Kibertəhlükəsizlik mütəxəssisi": "SECURITY",
+  "Sistem administratoru": "ENGINEERING",
+  "Layihə meneceri": "PRODUCT",
+  "Biznes analitiki": "DATA",
+  "Maliyyə analitiki": "FINANCE",
+  "Kredit mütəxəssisi": "FINANCE",
+  "Audit üzrə köməkçi": "FINANCE",
+  "Marketinq mütəxəssisi": "MARKETING",
+  "Rəqəmsal marketinq üzrə mütəxəssis": "MARKETING",
+  "Məzmun redaktoru": "MARKETING",
+  "İngilis dili müəllimi": "EDUCATION",
+  "Məktəb psixoloqu": "EDUCATION",
+  "Tədris koordinatoru": "EDUCATION",
+  Aqronom: "OPERATIONS",
+  "Keyfiyyətə nəzarət mütəxəssisi": "OPERATIONS",
+  "Layihə mühəndisi": "ENGINEERING",
+  "İnsan resursları üzrə mütəxəssis": "OPERATIONS",
+  "Məhsul meneceri": "PRODUCT",
+};
 
 /** mulberry32 — kiçik, sürətli, tam deterministik PRNG. */
 function createRng(seed: number): () => number {
@@ -1065,6 +1099,36 @@ async function main(): Promise<void> {
   );
 
   // -------------------------------------------------------------------------
+  // 3.10b Xankəndi bələdçisi (Memory-dən ƏVVƏL) — "sevimli yer" körpüsü
+  // (Blok 7B — M9 ↔ M3, spec §19). GuidePlace-in özündə FK asılılığı yoxdur,
+  // amma AŞAĞIDAKI Memory sətirləri `guidePlaceId` ilə buna işarə edir — SQLite
+  // FK-nı yoxlayır, ona görə valideyn sətir ƏVVƏLCƏ mövcud olmalıdır.
+  // -------------------------------------------------------------------------
+  await insertMany("GuidePlace", GUIDE_PLACES, (chunk) =>
+    prisma.guidePlace.createMany({
+      data: chunk.map((g) => {
+        const index = GUIDE_PLACES.indexOf(g);
+        return {
+          id: `gpl-${String(index + 1).padStart(2, "0")}`,
+          category: g.category,
+          title: g.title,
+          description: g.description,
+          address: g.address ?? null,
+          latitude: g.lat ?? null,
+          longitude: g.lng ?? null,
+          imageUrl: `https://picsum.photos/seed/qu-guide-${index + 1}/900/600`,
+          phone: g.phone ?? null,
+          openingHours: g.openingHours ?? null,
+          websiteUrl: null,
+          isEmergency: g.isEmergency ?? false,
+          order: index,
+        };
+      }),
+    }),
+  );
+  const guidePlaceIds = GUIDE_PLACES.map((_, i) => `gpl-${String(i + 1).padStart(2, "0")}`);
+
+  // -------------------------------------------------------------------------
   // 3.11 Xatirələr
   // -------------------------------------------------------------------------
   const memoryPosts = visiblePosts.filter((p) => p.kind === PostKind.MEMORY);
@@ -1093,6 +1157,9 @@ async function main(): Promise<void> {
             ? `${pick(FEMALE_FIRST_NAMES)} ${pick(LAST_NAME_STEMS)}a`
             : null,
       imageUrl: chance(0.35) ? `https://picsum.photos/seed/qu-mry-${id}/900/600` : null,
+      // ~40% (24/60) — DETERMİNİSTİK: PRNG yox, indeksin qalığı (`i % 5 < 2`).
+      // Seçilən məkan `cycle(guidePlaceIds, i)`-dir.
+      guidePlaceId: i % 5 < 2 ? cycle(guidePlaceIds, i) : null,
       showInProfile: chance(0.9),
       showInFeed: sourcePost !== null || chance(0.6),
       showInTimeline: chance(0.35),
@@ -1272,11 +1339,14 @@ async function main(): Promise<void> {
       cursor = endDate ? addDays(endDate, randInt(5, 60)) : startDate;
       if (!isCurrent && cursor > NOW) break;
 
+      const position = cycle(POSITIONS, careerIndex);
+
       careerRows.push({
         id: `car-${String(careerIndex).padStart(3, "0")}`,
         userId: user.id,
         company: cycle(COMPANIES, careerIndex),
-        position: cycle(POSITIONS, careerIndex),
+        position,
+        jobFunction: POSITION_JOB_FUNCTIONS[position] ?? null,
         industry: cycle(INDUSTRY_VALUES, careerIndex),
         city: cycle(placement.cities, careerIndex),
         country: placement.country,
@@ -1301,6 +1371,9 @@ async function main(): Promise<void> {
       userId: user.id,
       company: cycle(COMPANIES, careerIndex),
       position: "Təcrübəçi",
+      // ⚠️ "Təcrübəçi" `POSITION_JOB_FUNCTIONS`-da YOXDUR — tələbə təcrübəsi
+      // rol taksonomiyasının hədəfi deyil, statistikaya `null` kimi düşür.
+      jobFunction: null,
       industry: cycle(INDUSTRY_VALUES, careerIndex),
       city: cycle(placement.cities, i),
       country: placement.country,
@@ -1648,29 +1721,6 @@ async function main(): Promise<void> {
         order: i,
         isPublished: true,
       })),
-    }),
-  );
-
-  await insertMany("GuidePlace", GUIDE_PLACES, (chunk) =>
-    prisma.guidePlace.createMany({
-      data: chunk.map((g) => {
-        const index = GUIDE_PLACES.indexOf(g);
-        return {
-          id: `gpl-${String(index + 1).padStart(2, "0")}`,
-          category: g.category,
-          title: g.title,
-          description: g.description,
-          address: g.address ?? null,
-          latitude: g.lat ?? null,
-          longitude: g.lng ?? null,
-          imageUrl: `https://picsum.photos/seed/qu-guide-${index + 1}/900/600`,
-          phone: g.phone ?? null,
-          openingHours: g.openingHours ?? null,
-          websiteUrl: null,
-          isEmergency: g.isEmergency ?? false,
-          order: index,
-        };
-      }),
     }),
   );
 

@@ -107,3 +107,33 @@ yeni komponentlər, yeni sabitlər/tələlər, test sayları. Növbəti blok bun
 `profile/schemas` 28, `onboarding` +5, `profile.db` 20), playwright **32**
 (əvvəl 28 → +4). İnteqrasiya testi seed-i snapshot/restore ilə BAYT-BAYT geri
 qaytarır. `tsc --noEmit` · `lint` · `build` təmiz.
+
+---
+
+## Blok 7B — bitdi
+
+**Git:** sistemdə `git` binarı yoxdur, parolsuz `sudo` da yoxdur → `isomorphic-git`
++ `scripts/git.mjs` (init/commit/log) ilə HƏQİQİ `.git` qovluğu yaradıldı. 7
+bloklıq iş 10 mənalı commit-ə bölündü (scaffold → db → auth → privacy → feed →
+class-page → directory → profile → test → docs), tarixlər ardıcıl artırılıb.
+
+**Sxem (TƏK miqrasiya, `gw-inspired-additions`):**
+- `CareerEntry.jobFunction` — `position`-un sərbəst mətnindən FƏRQLİ,
+  aqreqasiya üçün normallaşdırılmış rol (14 dəyər, `lib/enums.ts` →
+  `JOB_FUNCTION_VALUES`, etiketlər `lib/labels.ts` → `JOB_FUNCTION_LABELS`).
+- `Memory.guidePlaceId` → `GuidePlace` (SetNull) — "sevimli yer" xatirəsi,
+  M9↔M3 körpüsü. `MemoryType`-a TOXUNULMADI (spec §11, 8 növ sabit qalır).
+- Seed: `POSITION_JOB_FUNCTIONS` sabit xəritə (T6 — pick/cycle yox, artıq
+  seçilmiş `position`-un funksiyası); `GuidePlace` yaradılması Memory-dən
+  ƏVVƏLƏ köçürüldü (FK). ~40% Memory `i % 5 < 2` ilə deterministik bağlanır.
+  İki ardıcıl seed = eyni nəticə (yoxlanıldı).
+
+**Servis hazırlığı (UI YOX):**
+- `stats.service.getWhereAreWeNowStats` → `jobFunctions` xanası, `industries`
+  ilə EYNİ üç qat (görünürlük + `includeInStats` + k-anonimlik).
+- `memory.service.listMemories` → `guidePlaceId?` filtri, mövcud
+  `activeVisibleWhere`-in YANINDA (arxa qapı yoxdur).
+
+**Testlər:** vitest **307** (+7: `labels` jobFunction əhatəsi,
+`visibility.db` +7 — jobFunctions k-anonimlik/razılıq, guidePlaceId sızma
+yoxlaması). `tsc --noEmit` · `lint` · `build` təmiz, mövcud 300+28 test yaşıl.

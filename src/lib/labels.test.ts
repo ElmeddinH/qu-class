@@ -20,6 +20,7 @@ import {
   COHORT_ROLE_VALUES,
   DEGREE_VALUES,
   INDUSTRY_VALUES,
+  JOB_FUNCTION_VALUES,
   LANGUAGE_LEVEL_VALUES,
   SUPPORT_OFFER_TYPE_VALUES,
   USER_STAGE_VALUES,
@@ -29,6 +30,7 @@ import {
   COHORT_ROLE_LABELS,
   DEGREE_LABELS,
   INDUSTRY_LABELS,
+  JOB_FUNCTION_LABELS,
   LANGUAGE_LEVEL_HINTS,
   LANGUAGE_LEVEL_LABELS,
   STAGE_LABELS,
@@ -37,6 +39,7 @@ import {
   cohortRoleLabel,
   degreeLabel,
   industryLabel,
+  jobFunctionLabel,
   labelOf,
   languageLevelLabel,
   stageLabel,
@@ -49,6 +52,7 @@ const TABLES: Array<[string, readonly string[], Record<string, string>]> = [
   ["COHORT_ROLE_LABELS", COHORT_ROLE_VALUES, COHORT_ROLE_LABELS],
   ["CLUB_ROLE_LABELS", CLUB_ROLE_VALUES, CLUB_ROLE_LABELS],
   ["INDUSTRY_LABELS", INDUSTRY_VALUES, INDUSTRY_LABELS],
+  ["JOB_FUNCTION_LABELS", JOB_FUNCTION_VALUES, JOB_FUNCTION_LABELS],
   ["DEGREE_LABELS", DEGREE_VALUES, DEGREE_LABELS],
   ["LANGUAGE_LEVEL_LABELS", LANGUAGE_LEVEL_VALUES, LANGUAGE_LEVEL_LABELS],
   ["LANGUAGE_LEVEL_HINTS", LANGUAGE_LEVEL_VALUES, LANGUAGE_LEVEL_HINTS],
@@ -98,6 +102,7 @@ describe("…Label() köməkçiləri", () => {
     expect(cohortRoleLabel("CLASS_MODERATOR")).toBe(COHORT_ROLE_LABELS.CLASS_MODERATOR);
     expect(clubRoleLabel("PRESIDENT")).toBe(CLUB_ROLE_LABELS.PRESIDENT);
     expect(industryLabel("FINANCE")).toBe(INDUSTRY_LABELS.FINANCE);
+    expect(jobFunctionLabel("DATA")).toBe(JOB_FUNCTION_LABELS.DATA);
     expect(degreeLabel("PHD")).toBe(DEGREE_LABELS.PHD);
     expect(supportOfferLabel("MENTORING")).toBe(SUPPORT_OFFER_LABELS.MENTORING);
     expect(languageLevelLabel("NATIVE")).toBe(LANGUAGE_LEVEL_LABELS.NATIVE);
@@ -107,6 +112,7 @@ describe("…Label() köməkçiləri", () => {
     expect(stageLabel("???")).toBe(STAGE_LABELS.STUDENT);
     expect(cohortRoleLabel("???")).toBe(COHORT_ROLE_LABELS.MEMBER);
     expect(industryLabel("???")).toBe(INDUSTRY_LABELS.OTHER);
+    expect(jobFunctionLabel("???")).toBe(JOB_FUNCTION_LABELS.OTHER);
     expect(supportOfferLabel("???")).toBe("Dəstək");
     expect(languageLevelLabel(null)).toBeNull();
   });

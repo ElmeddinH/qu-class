@@ -28,6 +28,7 @@ import type {
   CohortRole,
   Degree,
   Industry,
+  JobFunction,
   LanguageLevel,
   SupportOfferType,
   UserStage,
@@ -76,6 +77,27 @@ export const INDUSTRY_LABELS: Record<Industry, string> = {
   RETAIL: "Pərakəndə ticarət",
   LEGAL: "Hüquq",
   NGO: "QHT",
+  OTHER: "Digər",
+};
+
+/**
+ * `CareerEntry.jobFunction` — Blok 7B (GW analizi). `position`-un sərbəst
+ * mətnindən FƏRQLİ, aqreqasiya üçün normallaşdırılmış rol.
+ */
+export const JOB_FUNCTION_LABELS: Record<JobFunction, string> = {
+  ENGINEERING: "Mühəndislik",
+  DATA: "Data",
+  SECURITY: "Kibertəhlükəsizlik",
+  PRODUCT: "Məhsul",
+  FINANCE: "Maliyyə",
+  MARKETING: "Marketinq",
+  EDUCATION: "Təhsil",
+  HEALTH: "Səhiyyə",
+  RESEARCH: "Elmi tədqiqat",
+  OPERATIONS: "Əməliyyatlar",
+  LEGAL: "Hüquq",
+  PUBLIC_SECTOR: "Dövlət sektoru",
+  ENTREPRENEURSHIP: "Sahibkarlıq",
   OTHER: "Digər",
 };
 
@@ -162,6 +184,10 @@ export function clubRoleLabel(value: string): string {
 
 export function industryLabel(value: string): string {
   return INDUSTRY_LABELS[value as Industry] ?? INDUSTRY_LABELS.OTHER;
+}
+
+export function jobFunctionLabel(value: string): string {
+  return JOB_FUNCTION_LABELS[value as JobFunction] ?? JOB_FUNCTION_LABELS.OTHER;
 }
 
 export function degreeLabel(value: string): string {

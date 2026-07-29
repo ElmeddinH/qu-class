@@ -304,6 +304,36 @@ export const IndustrySchema = z.enum(INDUSTRY_VALUES);
 export type Industry = z.infer<typeof IndustrySchema>;
 export const Industry = asEnum(INDUSTRY_VALUES);
 
+/**
+ * `CareerEntry.jobFunction` — Blok 7B (GW analizi) əlavəsi.
+ *
+ * `CareerEntry.position` sərbəst mətndir ("Kredit mütəxəssisi", "Proqram
+ * təminatı mühəndisi"…) və HEKAYƏ üçün doğru formadır, amma aqreqasiya üçün
+ * yaramır: hər fərdi vəzifə adı ayrıca xana olsaydı k-anonimlik demək olar
+ * hər xananı gizlədərdi ("İndi haradayıq?" paneli boş görünərdi). `jobFunction`
+ * `position`-dan TÖRƏNMİR — istifadəçi statistikaya qoşulmaq istəyəndə ayrıca
+ * seçdiyi sabit kateqoriyadır (bax `services/career.service.ts`).
+ */
+export const JOB_FUNCTION_VALUES = [
+  "ENGINEERING",
+  "DATA",
+  "SECURITY",
+  "PRODUCT",
+  "FINANCE",
+  "MARKETING",
+  "EDUCATION",
+  "HEALTH",
+  "RESEARCH",
+  "OPERATIONS",
+  "LEGAL",
+  "PUBLIC_SECTOR",
+  "ENTREPRENEURSHIP",
+  "OTHER",
+] as const;
+export const JobFunctionSchema = z.enum(JOB_FUNCTION_VALUES);
+export type JobFunction = z.infer<typeof JobFunctionSchema>;
+export const JobFunction = asEnum(JOB_FUNCTION_VALUES);
+
 /** SupportOffer.type — alumni dəstək seçimləri (spec §9). */
 export const SUPPORT_OFFER_TYPE_VALUES = [
   "GUEST_LECTURE",
