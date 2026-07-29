@@ -1,0 +1,177 @@
+// ============================================================================
+// src/lib/labels.ts
+// Enum dəyərlərinin azərbaycanca etiketləri — VAHİD MƏNBƏ (CLAUDE.md §9).
+//
+// 🔴 NİYƏ `lib/`-dədir (TƏLƏ T13 — etiket dublikatı):
+// Blok 7-yə qədər EYNİ etiketlər İKİ yerdə saxlanılırdı —
+// `features/profile/labels.ts` (INDUSTRY_LABELS, DEGREE_LABELS, …) və
+// `features/class-home/catalog.ts` (INDUSTRY_META, DEGREE_META, …). İki cədvəl
+// səssizcə ayrıldı: "Dövlət idarəçiliyi" ↔ "Dövlət sektoru". İstifadəçi eyni
+// enum dəyərini iki səhifədə İKİ FƏRQLİ adla görürdü.
+//
+// `features/*` qovluqları BİR-BİRİNDƏN import etməməlidir (istiqamət həmişə
+// features → lib / shared), ona görə vahid mənbə `lib/`-dədir. Bu fayl SAF-dır:
+// Prisma, React və `features/*` importu YOXDUR — həm serverdə, həm client-də,
+// həm də vahid testdə yüklənir.
+//
+// ⚠️ Hər cədvəl `Record<Enum, string>` tipindədir: `lib/enums.ts`-ə yeni dəyər
+// əlavə olunsa `tsc` MƏHZ BURADA dayanır və etiket səssizcə çatmamış qalmır.
+// Əhatə `src/lib/labels.test.ts`-də də yoxlanılır.
+//
+// ⚠️ DB sütunları `String`-dir (SQLite enum dəstəkləmir), yəni oxu tərəfində
+// naməlum dəyər gələ bilər. Ona görə birbaşa indeksləmə əvəzinə `…Label()`
+// köməkçiləri işlədilir — köhnə/naməlum dəyər UI-nı sındırmır.
+// ============================================================================
+
+import type {
+  ClubRole,
+  CohortRole,
+  Degree,
+  Industry,
+  LanguageLevel,
+  SupportOfferType,
+  UserStage,
+} from "@/lib/enums";
+
+// ---------------------------------------------------------------------------
+// Cədvəllər
+// ---------------------------------------------------------------------------
+
+/** Mərhələ adı. ⚠️ Mənbə `resolveStage(cohort)`-dur, `User.stage` keşi DEYİL. */
+export const STAGE_LABELS: Record<UserStage, string> = {
+  INCOMING: "Yeni qəbul",
+  STUDENT: "Tələbə",
+  ALUMNI: "Məzun",
+};
+
+/** `CohortMembership.role` — YALNIZ həmin sinif daxilində keçərlidir (spec §17). */
+export const COHORT_ROLE_LABELS: Record<CohortRole, string> = {
+  MEMBER: "Üzv",
+  CLASS_REPRESENTATIVE: "Sinif nümayəndəsi",
+  EVENT_COORDINATOR: "Tədbir koordinatoru",
+  CLASS_MODERATOR: "Sinif moderatoru",
+};
+
+/** `ClubMembership.role` — cohort rolundan FƏRQLİDİR. */
+export const CLUB_ROLE_LABELS: Record<ClubRole, string> = {
+  MEMBER: "Üzv",
+  BOARD: "İdarə heyəti",
+  PRESIDENT: "Sədr",
+};
+
+/** `User.industry` / `CareerEntry.industry`. */
+export const INDUSTRY_LABELS: Record<Industry, string> = {
+  TECHNOLOGY: "Texnologiya",
+  EDUCATION: "Təhsil",
+  GOVERNMENT: "Dövlət sektoru",
+  FINANCE: "Maliyyə",
+  HEALTH: "Səhiyyə",
+  ENERGY: "Enerji",
+  CONSTRUCTION: "Tikinti",
+  AGRICULTURE: "Kənd təsərrüfatı",
+  MANUFACTURING: "İstehsalat",
+  MEDIA: "Media",
+  TOURISM: "Turizm",
+  LOGISTICS: "Logistika",
+  RETAIL: "Pərakəndə ticarət",
+  LEGAL: "Hüquq",
+  NGO: "QHT",
+  OTHER: "Digər",
+};
+
+/** `EducationEntry.degree` (dördü də) və `Program.degree` (ilk üçü). */
+export const DEGREE_LABELS: Record<Degree, string> = {
+  BACHELOR: "Bakalavr",
+  MASTER: "Magistr",
+  PHD: "Doktorantura",
+  CERTIFICATE: "Sertifikat",
+};
+
+/**
+ * `UserTag.level` — yalnız `type = LANGUAGE` taqları üçün.
+ * ⚠️ Etiketlər QISA saxlanılır: dil çipi profildə «İngilis dili (B2)» kimi
+ * göstərilir, uzun izah çipi sıradan çıxarardı. İzahlı forma
+ * `LANGUAGE_LEVEL_HINTS`-dədir və yalnız seçicidə işlədilir.
+ */
+export const LANGUAGE_LEVEL_LABELS: Record<LanguageLevel, string> = {
+  A1: "A1",
+  A2: "A2",
+  B1: "B1",
+  B2: "B2",
+  C1: "C1",
+  C2: "C2",
+  NATIVE: "Ana dili",
+};
+
+/** Seçicidə göstərilən izahlı forma — «B2 — yuxarı orta». */
+export const LANGUAGE_LEVEL_HINTS: Record<LanguageLevel, string> = {
+  A1: "A1 — başlanğıc",
+  A2: "A2 — ilkin",
+  B1: "B1 — orta",
+  B2: "B2 — yuxarı orta",
+  C1: "C1 — irəli",
+  C2: "C2 — mükəmməl",
+  NATIVE: "Ana dili",
+};
+
+/** `SupportOffer.type` — məzunun 7 dəstək təklifi (spec §9). */
+export const SUPPORT_OFFER_LABELS: Record<SupportOfferType, string> = {
+  GUEST_LECTURE: "Qonaq mühazirəsi",
+  CAREER_TALK: "Karyera söhbəti",
+  INTERNSHIP: "Təcrübə imkanı",
+  JOB_SHARING: "İş elanı paylaşımı",
+  MENTORING: "Mentorluq",
+  STARTUP_COLLAB: "Startap əməkdaşlığı",
+  EVENT_PARTICIPATION: "Tədbirdə iştirak",
+};
+
+// ---------------------------------------------------------------------------
+// Oxu köməkçiləri — naməlum dəyər UI-nı sındırmır
+// ---------------------------------------------------------------------------
+
+/**
+ * Naməlum dəyəri etiketə çevirir: cədvəldə varsa tərcümə, yoxsa XAM dəyər.
+ * `null` / boş sətir → `null` (çağıran tərəf sahəni ümumiyyətlə göstərmir).
+ */
+export function labelOf<T extends string>(
+  labels: Record<T, string>,
+  value: string | null | undefined,
+): string | null {
+  if (!value) return null;
+  return (labels as Record<string, string>)[value] ?? value;
+}
+
+/**
+ * ⚠️ Aşağıdaki dörd köməkçi `labelOf`-dan FƏRQLİ davranır: naməlum dəyəri xam
+ * göstərmək əvəzinə TƏHLÜKƏSİZ DEFOLTA düşür. Səbəb sahənin mənasındadır —
+ * "MEMBER" / "OTHER" mənalı ehtiyat dəyərdir, `"???"` isə kartda zibil kimi
+ * görünərdi. `degreeLabel` bunun əksinədir: dərəcə üçün mənalı defolt yoxdur,
+ * ona görə xam dəyər saxlanılır.
+ */
+export function stageLabel(value: string): string {
+  return STAGE_LABELS[value as UserStage] ?? STAGE_LABELS.STUDENT;
+}
+
+export function cohortRoleLabel(value: string): string {
+  return COHORT_ROLE_LABELS[value as CohortRole] ?? COHORT_ROLE_LABELS.MEMBER;
+}
+
+export function clubRoleLabel(value: string): string {
+  return CLUB_ROLE_LABELS[value as ClubRole] ?? CLUB_ROLE_LABELS.MEMBER;
+}
+
+export function industryLabel(value: string): string {
+  return INDUSTRY_LABELS[value as Industry] ?? INDUSTRY_LABELS.OTHER;
+}
+
+export function degreeLabel(value: string): string {
+  return labelOf(DEGREE_LABELS, value) ?? value;
+}
+
+export function languageLevelLabel(value: string | null | undefined): string | null {
+  return labelOf(LANGUAGE_LEVEL_LABELS, value);
+}
+
+export function supportOfferLabel(value: string): string {
+  return SUPPORT_OFFER_LABELS[value as SupportOfferType] ?? "Dəstək";
+}
