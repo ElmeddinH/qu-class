@@ -1,0 +1,789 @@
+// ============================================================================
+// QU CLASS — Prisma Schema
+// ----------------------------------------------------------------------------
+// DİQQƏT: provider = "sqlite" (lokal inkişaf üçün, sıfır konfiqurasiya).
+// SQLite `enum` və skalyar massiv (String[]) DƏSTƏKLƏMİR. Buna görə bütün
+// enum-lar `String` kimi saxlanılır və dəyərlər Zod ilə validasiya olunur
+// (bax: src/lib/enums.ts). Bu qərar qəsdəndir — gələcəkdə PostgreSQL-ə keçmək
+// üçün YALNIZ aşağıdakı `provider` sətrini dəyişmək kifayət edir, sxemi
+// yenidən yazmağa ehtiyac qalmır.
+//
+// PostgreSQL-ə keçid:
+//   provider = "postgresql"
+//   DATABASE_URL="postgresql://user:pass@host:5432/quclass"
+//   npx prisma migrate dev --name init-postgres
+//
+// ⚠️ VERSİYA: bu sxem Prisma 6.x üçündür. Prisma 7-də `datasource.url`
+// sxem faylında dəstəklənmir (P1012) və `prisma-client-js` generator adı
+// dəyişib. PLAN.md §8-də `prisma@^6` pinlənib — ona riayət et.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// 1. AUTH & USER
+// ============================================================================
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique // universitet e-poçtu — @qu.edu.az doğrulaması (src/lib/constants.ts)
+  passwordHash String
+  emailVerified DateTime?
+
+  // Sistem rolu (cohort daxilindəki roldan FƏRQLİDİR — bax CohortMembership.role)
+  systemRole String @default("USER") // USER | UNIVERSITY_ADMIN
+
+  // Həyat dövrü mərhələsi — Incoming → Student → Alumni
+  stage String @default("INCOMING") // INCOMING | STUDENT | ALUMNI
+
+  // --- Əsas profil ---
+  firstName String
+  lastName  String
+  avatarUrl String?
+  coverUrl  String?
+
+  hometown       String? // doğma şəhər / region
+  currentCity    String?
+  currentCountry String?
+
+  phone         String? // DEFAULT: PRIVATE
+  personalEmail String? // DEFAULT: PRIVATE
+
+  // --- Hekayə sahələri (My Class Story) ---
+  bio           String? // "Mənim haqqımda"
+  learningGoals String? // "Universitetdə nə öyrənmək istəyirəm?"
+  askMeAbout    String? // "Mənə hansı mövzularda müraciət edə bilərsiniz?"
+  expectations  String? // "Universitet həyatından gözləntilərim"
+
+  // --- Alumni sahələri (stage = ALUMNI olduqda doldurulur) ---
+  currentCompany  String?
+  currentPosition String?
+  industry        String?
+  futurePlans     String?
+  openToSupport   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lastSeenAt DateTime?
+
+  // --- Əlaqələr ---
+  memberships     CohortMembership[]
+  fieldVisibility FieldVisibility[]
+  tags            UserTag[]
+  posts           Post[]             @relation("PostAuthor")
+  comments        Comment[]
+  reactions       Reaction[]
+  memories        Memory[]
+  achievements    Achievement[]      @relation("AchievementOwner")
+  verifiedAchievements Achievement[] @relation("AchievementVerifier")
+  careerEntries   CareerEntry[]
+  educationEntries EducationEntry[]
+  supportOffers   SupportOffer[]
+  clubMemberships ClubMembership[]
+  createdEvents   Event[]            @relation("EventCreator")
+  contactEvents   Event[]            @relation("EventContact")
+  rsvps           EventRSVP[]
+  notifications   Notification[]     @relation("NotificationRecipient")
+  actorNotifications Notification[]  @relation("NotificationActor")
+  reportsFiled    Report[]           @relation("ReportReporter")
+  reportsResolved Report[]           @relation("ReportResolver")
+  auditLogs       AuditLog[]
+
+  @@index([stage])
+  @@index([currentCountry, currentCity])
+  @@index([industry])
+}
+
+// Qeyd: Auth.js JWT strategiyası işlədilir (PLAN.md §3.2), buna görə
+// `Session` / `Account` / `VerificationToken` cədvəlləri YOXDUR.
+// Database-session adapterinə keçsən üçünü də birlikdə əlavə et.
+// `User.emailVerified` gələcək e-poçt təsdiqi üçün ehtiyatda saxlanılıb —
+// v1-də istifadə olunmur.
+
+// ============================================================================
+// 2. AKADEMİK STRUKTUR & COHORT (spec §18)
+// ============================================================================
+
+model Faculty {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  nameEn   String?
+  slug     String    @unique
+  description String?
+  programs Program[]
+  cohorts  Cohort[]
+  events   Event[]
+}
+
+model Program {
+  id        String   @id @default(cuid())
+  name      String // "İngilis dili müəllimliyi"
+  nameEn    String?
+  slug      String
+  degree    String   @default("BACHELOR") // BACHELOR | MASTER | PHD
+  facultyId String
+  faculty   Faculty  @relation(fields: [facultyId], references: [id], onDelete: Cascade)
+  cohorts   Cohort[]
+
+  @@unique([facultyId, slug])
+}
+
+/// Class Page = Cohort. İlkin vahid: ixtisas + qəbul ili.
+/// scope UNIVERSITY / FACULTY cohort-ları üçün programId/facultyId null ola bilər.
+model Cohort {
+  id    String @id @default(cuid())
+  scope String @default("PROGRAM") // PROGRAM | FACULTY | UNIVERSITY
+
+  facultyId String?
+  faculty   Faculty? @relation(fields: [facultyId], references: [id])
+  programId String?
+  program   Program? @relation(fields: [programId], references: [id])
+
+  admissionYear  Int
+  graduationYear Int
+
+  /// Mərhələ keçidi üçün dəqiq tarixlər (src/lib/stage.ts → resolveStage).
+  /// admissionYear/graduationYear yalnız etiket və filtr üçündür.
+  academicStartsAt DateTime // dərslərin başlanma tarixi → INCOMING bitir
+  graduatesAt      DateTime // məzuniyyət mərasimi → ALUMNI başlayır
+
+  /// Göstərilən ad: "İnformatika — Class of 2030"
+  displayName String
+  slug        String  @unique
+  coverUrl    String?
+  welcomeMessage String?
+
+  createdAt DateTime @default(now())
+
+  members      CohortMembership[]
+  posts        Post[]
+  timeline     TimelineEntry[]
+  achievements Achievement[]
+  events       Event[]
+  memories     Memory[]
+
+  /// Qeyd: SQL-də NULL-lar bir-birindən fərqli sayılır, buna görə bu şərt
+  /// scope=UNIVERSITY (facultyId və programId null) halında dublikatın
+  /// qarşısını ALMIR. Əsl qoruyucu yuxarıdakı `slug @unique`-dir —
+  /// cohort yaradarkən slug-ı deterministik generasiya et.
+  @@unique([scope, facultyId, programId, admissionYear])
+  @@index([admissionYear, graduationYear])
+}
+
+model CohortMembership {
+  id       String @id @default(cuid())
+  userId   String
+  cohortId String
+
+  /// Cohort daxilindəki rol (spec §17)
+  role String @default("MEMBER") // MEMBER | CLASS_REPRESENTATIVE | EVENT_COORDINATOR | CLASS_MODERATOR
+
+  joinedAt DateTime @default(now())
+  isPrimary Boolean @default(true) // istifadəçinin əsas class-ı
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cohort Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cohortId])
+  @@index([cohortId, role])
+}
+
+// ============================================================================
+// 3. MƏXFİLİK & GÖRÜNÜRLÜK (spec §5) — sistemin ürəyi
+// ============================================================================
+
+/// Hər profil sahəsi üçün ayrıca görünürlük səviyyəsi.
+/// field: "avatarUrl" | "hometown" | "interests" | "languages" | "currentCompany"
+///        | "currentCity" | "phone" | "personalEmail" | "careerHistory" | ...
+/// level: PUBLIC | UNIVERSITY | CLASS | PRIVATE
+model FieldVisibility {
+  id     String @id @default(cuid())
+  userId String
+  field  String
+  level  String @default("CLASS")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, field])
+  @@index([userId])
+}
+
+// ============================================================================
+// 4. TAQLAR (maraqlar, hobbilər, bacarıqlar, dillər)
+// ============================================================================
+
+model Tag {
+  id    String @id @default(cuid())
+  type  String // INTEREST | HOBBY | SKILL | LANGUAGE
+  name  String
+  slug  String
+  users UserTag[]
+
+  @@unique([type, slug])
+  @@index([type])
+}
+
+model UserTag {
+  userId String
+  tagId  String
+  level  String? // dil bacarığı üçün: A1..C2 | NATIVE
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([userId, tagId])
+  @@index([tagId])
+}
+
+// ============================================================================
+// 5. CLASS FEED (spec §6)
+// ============================================================================
+
+model Post {
+  id       String @id @default(cuid())
+  authorId String
+  cohortId String
+
+  /// Məcburi kateqoriya (spec §6 — 12 kateqoriya)
+  /// FIRST_DAY | ORIENTATION | EVENT_PHOTOS | ACADEMIC_ACHIEVEMENT |
+  /// SOCIAL_ACHIEVEMENT | TRIPS | EXAM_PERIOD | INTERNSHIP | CLUB_ACTIVITY |
+  /// COMPETITION | CAPSTONE | GENERAL
+  category String
+
+  /// TEXT | PHOTO | ALBUM | VIDEO | LINK | EVENT | ACHIEVEMENT | MEMORY
+  kind String @default("TEXT")
+
+  body     String?
+  linkUrl  String?
+  linkTitle String?
+  linkImage String?
+
+  /// kind = "EVENT" olduqda hansı tədbirə istinad edir
+  referencedEventId String?
+
+  /// PUBLIC | UNIVERSITY | CLASS | PRIVATE
+  visibility String @default("CLASS")
+
+  /// spec §7 — Feed → Timeline / Achievements axını
+  showOnTimeline     Boolean @default(false)
+  showInAchievements Boolean @default(false)
+
+  /// Timeline-da yerləşdirmə tarixi (istifadəçi keçmiş tarix seçə bilər)
+  occurredAt DateTime @default(now())
+
+  /// ACTIVE | PENDING_REVIEW | HIDDEN | DELETED
+  status String @default("ACTIVE")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  author       User            @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  cohort       Cohort          @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  referencedEvent Event?       @relation("PostReferencedEvent", fields: [referencedEventId], references: [id], onDelete: SetNull)
+  media        MediaAsset[]
+  comments     Comment[]
+  reactions    Reaction[]
+  timelineEntry TimelineEntry?
+  achievement  Achievement?
+  memory       Memory?
+
+  @@index([cohortId, createdAt])
+  @@index([cohortId, category])
+  @@index([authorId])
+  @@index([status])
+}
+
+model MediaAsset {
+  id     String @id @default(cuid())
+  postId String?
+  eventId String?
+
+  url       String
+  thumbUrl  String?
+  type      String // IMAGE | VIDEO | FILE
+  mimeType  String?
+  sizeBytes Int?
+  width     Int?
+  height    Int?
+  caption   String?
+  order     Int     @default(0)
+
+  createdAt DateTime @default(now())
+
+  post  Post?  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  event Event? @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([postId])
+  @@index([eventId])
+}
+
+model Comment {
+  id       String @id @default(cuid())
+  postId   String
+  authorId String
+  body     String
+  parentId String?
+
+  status    String   @default("ACTIVE") // ACTIVE | HIDDEN | DELETED
+  createdAt DateTime @default(now())
+
+  post     Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author   User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies  Comment[] @relation("CommentReplies")
+
+  @@index([postId, createdAt])
+}
+
+model Reaction {
+  postId String
+  userId String
+  type   String @default("LIKE") // LIKE | CELEBRATE | SUPPORT | LOVE
+
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+}
+
+// ============================================================================
+// 6. CLASS TIMELINE (spec §10) — Feed-dən törəmə (derived)
+// ============================================================================
+
+/// Timeline əl ilə doldurulmur. Post/Achievement/Event yaradılarkən icazə
+/// verilirsə, burada bir sətir yaranır. Mənbə silinərsə onDelete: Cascade ilə
+/// Timeline-dan da avtomatik çıxır (spec §7 tələbi).
+model TimelineEntry {
+  id       String @id @default(cuid())
+  cohortId String
+
+  sourceType String // POST | ACHIEVEMENT | EVENT | SYSTEM
+  postId        String? @unique
+  achievementId String? @unique
+  eventId       String? @unique
+
+  title      String
+  summary    String?
+  category   String
+  occurredAt DateTime
+  academicYear String // "2026-2027" — filtr üçün hesablanıb saxlanılır
+
+  /// Mənbənin məxfiliyi burada da təkrarlanır ki, sorğu tək cədvəldən getsin
+  visibility String @default("CLASS")
+
+  isSystemMilestone Boolean @default(false) // "Qəbul nəticələri", "Məzuniyyət" və s.
+
+  createdAt DateTime @default(now())
+
+  cohort      Cohort       @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  post        Post?        @relation(fields: [postId], references: [id], onDelete: Cascade)
+  achievement Achievement? @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  event       Event?       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([cohortId, occurredAt])
+  @@index([cohortId, academicYear])
+  @@index([category])
+}
+
+// ============================================================================
+// 7. SHARE MEMORIES (spec §11)
+// ============================================================================
+
+model Memory {
+  id       String @id @default(cuid())
+  authorId String
+  cohortId String
+  postId   String? @unique // Feed-də də paylaşılıbsa
+
+  /// SHORT_MEMORY | UNIVERSITY_STORY | THANKS_TEACHER | THANKS_CLASSMATE |
+  /// UNFORGETTABLE_LESSON | MEMORABLE_EVENT | WHAT_UNI_GAVE_ME | MESSAGE_TO_QU
+  type String
+
+  title       String
+  body        String
+  dedicatedTo String? // müəllim / sinif yoldaşı adı
+  imageUrl    String?
+
+  /// Ayrıca göstərilmə seçimləri (spec §11 tələbi)
+  showInProfile  Boolean @default(true)
+  showInFeed     Boolean @default(true)
+  showInTimeline Boolean @default(false)
+  showInYearbook Boolean @default(false)
+
+  visibility String   @default("CLASS")
+  status     String   @default("ACTIVE")
+  occurredAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  author User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  cohort Cohort @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  post   Post?  @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  @@index([cohortId, createdAt])
+  @@index([type])
+}
+
+// ============================================================================
+// 8. CLASS ACHIEVEMENTS (spec §12)
+// ============================================================================
+
+model Achievement {
+  id       String @id @default(cuid())
+  ownerId  String
+  cohortId String
+  postId   String? @unique
+
+  /// AWARD | STARTUP | PUBLICATION | GRANT | INTERNATIONAL_PROGRAM | SPORTS |
+  /// VOLUNTEERING | CAREER | SOCIAL_PROJECT | COMPETITION | PATENT | REPRESENTATION
+  category String
+
+  title       String
+  description String?
+  organization String?
+  proofUrl    String?
+  imageUrl    String?
+  awardedAt   DateTime
+
+  /// SUBMITTED | VERIFIED | FEATURED | ARCHIVED
+  status String @default("SUBMITTED")
+
+  visibility   String    @default("CLASS")
+  verifiedById String?
+  verifiedAt   DateTime?
+  verifyNote   String?
+
+  createdAt DateTime @default(now())
+
+  owner        User           @relation("AchievementOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  verifiedBy   User?          @relation("AchievementVerifier", fields: [verifiedById], references: [id])
+  cohort       Cohort         @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  post         Post?          @relation(fields: [postId], references: [id], onDelete: SetNull)
+  timelineEntry TimelineEntry?
+
+  @@index([cohortId, status])
+  @@index([category])
+}
+
+// ============================================================================
+// 9. WHERE ARE WE NOW (spec §13) — karyera & təhsil
+// ============================================================================
+
+model CareerEntry {
+  id       String  @id @default(cuid())
+  userId   String
+  company  String
+  position String
+  industry String? // TECHNOLOGY | EDUCATION | GOVERNMENT | FINANCE | HEALTH | ...
+  city     String?
+  country  String?
+  startDate DateTime
+  endDate   DateTime?
+  isCurrent Boolean  @default(false)
+  description String?
+
+  /// Bu qeydin aqreqasiya (xəritə/statistika) üçün istifadəsinə razılıq
+  includeInStats Boolean @default(false)
+  visibility     String  @default("CLASS")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([industry])
+  @@index([country, city])
+}
+
+model EducationEntry {
+  id          String @id @default(cuid())
+  userId      String
+  institution String
+  degree      String // BACHELOR | MASTER | PHD | CERTIFICATE
+  field       String?
+  country     String?
+  startYear   Int
+  endYear     Int?
+  isCurrent   Boolean @default(false)
+
+  includeInStats Boolean @default(false)
+  visibility     String  @default("CLASS")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Alumni dəstək seçimləri (spec §9)
+model SupportOffer {
+  id     String @id @default(cuid())
+  userId String
+
+  /// GUEST_LECTURE | CAREER_TALK | INTERNSHIP | JOB_SHARING | MENTORING |
+  /// STARTUP_COLLAB | EVENT_PARTICIPATION
+  type String
+
+  note String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+}
+
+// ============================================================================
+// 10. TƏLƏBƏ KLUBLARI
+// ============================================================================
+
+model Club {
+  id          String @id @default(cuid())
+  name        String @unique
+  slug        String @unique
+  description String?
+  logoUrl     String?
+  category    String? // ACADEMIC | SPORTS | ARTS | SOCIAL | TECH
+
+  members ClubMembership[]
+  events  Event[]
+}
+
+model ClubMembership {
+  userId String
+  clubId String
+  role   String   @default("MEMBER") // MEMBER | BOARD | PRESIDENT
+  joinedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  club Club @relation(fields: [clubId], references: [id], onDelete: Cascade)
+
+  @@id([userId, clubId])
+}
+
+// ============================================================================
+// 11. EVENTS & REUNION COORDINATOR (spec §14, §15)
+// ============================================================================
+
+model Event {
+  id        String  @id @default(cuid())
+  cohortId  String?
+  clubId    String?
+  facultyId String? // scope = FACULTY olduqda hansı fakültə (Upcoming Events filtri)
+
+  /// Təşkilatçı səviyyəsi — UNIVERSITY | FACULTY | CLUB | CLASS | REUNION
+  scope String @default("CLASS")
+
+  /// Tədbir NÖVÜ — Upcoming Events filtri (spesifikasiya §15).
+  /// `scope` təşkilatçı səviyyəsidir, `category` isə tədbirin xarakteri —
+  /// ikisi ORTOQONALDIR, dəyər siyahıları kəsişməməlidir.
+  /// MEETING | TRIP | SEMINAR | WORKSHOP | CEREMONY | COMPETITION |
+  /// SOCIAL | CAREER | OTHER
+  /// Qeyd: reunion `scope = "REUNION"` ilə işarələnir, category ilə YOX.
+  category String @default("OTHER")
+
+  title       String
+  description String?
+  agenda      String? // Markdown proqram
+
+  startsAt DateTime
+  endsAt   DateTime?
+  location String?
+  onlineUrl String?
+  isOnline Boolean @default(false)
+
+  capacity            Int?
+  registrationDeadline DateTime?
+
+  coverUrl String?
+
+  createdById String
+  contactId   String?
+
+  /// PUBLIC | UNIVERSITY | CLASS | PRIVATE
+  visibility String @default("CLASS")
+
+  /// DRAFT | PUBLISHED | CANCELLED | COMPLETED
+  status String @default("PUBLISHED")
+
+  /// Tədbirdən sonra
+  summary        String?
+  attendeeCount  Int?
+  addedToTimeline Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cohort    Cohort?     @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  club      Club?       @relation(fields: [clubId], references: [id], onDelete: SetNull)
+  faculty   Faculty?    @relation(fields: [facultyId], references: [id], onDelete: SetNull)
+  createdBy User        @relation("EventCreator", fields: [createdById], references: [id])
+  contact   User?       @relation("EventContact", fields: [contactId], references: [id])
+  rsvps     EventRSVP[]
+  media     MediaAsset[]
+  timelineEntry TimelineEntry?
+  referencingPosts Post[] @relation("PostReferencedEvent")
+
+  @@index([cohortId, startsAt])
+  @@index([scope, startsAt])
+  @@index([category, startsAt])
+  @@index([facultyId])
+  @@index([status])
+}
+
+model EventRSVP {
+  id      String @id @default(cuid())
+  eventId String
+  userId  String
+
+  /// INVITED | ACCEPTED | DECLINED | REGISTERED | WAITLISTED | ATTENDED | NO_SHOW
+  status String @default("INVITED")
+
+  registeredAt DateTime?
+  checkedInAt  DateTime?
+
+  /// Tədbirdən sonra rəy
+  rating   Int?
+  feedback String?
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([eventId, status])
+}
+
+// ============================================================================
+// 12. NOTIFICATIONS (spec §15)
+// ============================================================================
+
+model Notification {
+  id          String @id @default(cuid())
+  recipientId String
+  actorId     String?
+
+  /// POST_LIKE | POST_COMMENT | NEW_MEMBER | EVENT_INVITE | EVENT_REMINDER |
+  /// ACHIEVEMENT_VERIFIED | MODERATION_RESULT | MENTION | SYSTEM
+  type String
+
+  entityType String? // POST | EVENT | ACHIEVEMENT | USER
+  entityId   String?
+
+  title String
+  body  String?
+  url   String?
+
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  recipient User  @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor     User? @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([recipientId, readAt, createdAt])
+}
+
+// ============================================================================
+// 13. MODERASİYA & ADMİNİSTRASİYA (spec §17)
+// ============================================================================
+
+model Report {
+  id         String @id @default(cuid())
+  reporterId String
+
+  entityType String // POST | COMMENT | MEMORY | ACHIEVEMENT | USER | EVENT
+  entityId   String
+
+  /// SPAM | HARASSMENT | INAPPROPRIATE | MISINFORMATION | PRIVACY | OTHER
+  reason  String
+  details String?
+
+  /// OPEN | IN_REVIEW | RESOLVED | REJECTED
+  status String @default("OPEN")
+
+  resolvedById String?
+  resolvedAt   DateTime?
+  resolution   String?
+
+  createdAt DateTime @default(now())
+
+  reporter   User  @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolvedBy User? @relation("ReportResolver", fields: [resolvedById], references: [id])
+
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+}
+
+model AuditLog {
+  id      String @id @default(cuid())
+  actorId String?
+
+  action     String // CREATE | UPDATE | DELETE | VERIFY | MODERATE | ROLE_CHANGE
+  entityType String
+  entityId   String
+  metadata   String? // JSON string
+
+  createdAt DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// 14. PUBLIC CONTENT — Welcome Page (spec §2) & Xankəndi Bələdçisi (spec §3)
+// ============================================================================
+
+/// Welcome Page və universitet məlumat səhifələri üçün sadə CMS
+model ContentPage {
+  id     String @id @default(cuid())
+  slug   String @unique // "about" | "history" | "campus-life" | "student-services"
+  title  String
+  excerpt String?
+  body   String // Markdown
+  coverUrl String?
+  section String  @default("UNIVERSITY") // UNIVERSITY | CAMPUS | SERVICES | NEWCOMERS
+  order   Int     @default(0)
+  isPublished Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  @@index([section, order])
+}
+
+model Faq {
+  id       String  @id @default(cuid())
+  question String
+  answer   String
+  category String  @default("GENERAL") // GENERAL | ADMISSION | CAMPUS | PLATFORM
+  order    Int     @default(0)
+  isPublished Boolean @default(true)
+
+  @@index([category, order])
+}
+
+/// Xankəndi Bələdçisi (spec §3)
+model GuidePlace {
+  id String @id @default(cuid())
+
+  /// HISTORY | LANDMARK | TRANSPORT | ROUTE_TO_UNI | MARKET | SERVICE |
+  /// HEALTH | CULTURE | LEISURE | SAFETY | TIP
+  category String
+
+  title       String
+  description String
+  address     String?
+  latitude    Float?
+  longitude   Float?
+  imageUrl    String?
+  phone       String?
+  openingHours String?
+  websiteUrl  String?
+  isEmergency Boolean @default(false)
+  order       Int     @default(0)
+
+  @@index([category, order])
+}
