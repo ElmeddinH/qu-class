@@ -1,0 +1,104 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "qu-class"
+      },
+      "problemMatcher": {
+        "owner": "nextjs",
+        "source": "next",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": [
+          {
+            "regexp": "^\\s*(?:⨯|✗|×)?\\s*\\.?/?(\\S+\\.(?:tsx?|jsx?|mjs|css)):(\\d+):(\\d+)\\s*$",
+            "file": 1,
+            "line": 2,
+            "column": 3
+          },
+          {
+            "regexp": "^\\s*(.*)$",
+            "message": 1
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "(?:▲\\s*Next\\.js|✓\\s*Starting|Starting\\.\\.\\.|- Local:)",
+          "endsPattern": "Ready in\\s+\\d+"
+        }
+      }
+    },
+    {
+      "label": "dev:debug",
+      "type": "shell",
+      "command": "npm run dev:debug",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "qu-class"
+      },
+      "problemMatcher": {
+        "owner": "nextjs",
+        "source": "next",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": [
+          {
+            "regexp": "^\\s*(?:⨯|✗|×)?\\s*\\.?/?(\\S+\\.(?:tsx?|jsx?|mjs|css)):(\\d+):(\\d+)\\s*$",
+            "file": 1,
+            "line": 2,
+            "column": 3
+          },
+          {
+            "regexp": "^\\s*(.*)$",
+            "message": 1
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "(?:▲\\s*Next\\.js|Starting\\.\\.\\.|Debugger listening on)",
+          "endsPattern": "Ready in\\s+\\d+"
+        }
+      }
+    },
+    {
+      "label": "typecheck",
+      "type": "shell",
+      "command": "npx tsc --noEmit",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [
+        "$tsc"
+      ],
+      "group": "test"
+    },
+    {
+      "label": "seed",
+      "type": "shell",
+      "command": "npm run db:seed",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

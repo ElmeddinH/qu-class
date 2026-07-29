@@ -1,0 +1,83 @@
+{
+  // ============================================================================
+  // F5 → dev server qalxır → brauzer açılır.
+  //
+  // ⚠️ Burada QƏSDƏN `preLaunchTask` + background `problemMatcher` İŞLƏDİLMİR.
+  // Səbəb: o üsulda VS Code task-ın "bitməsini" `endsPattern`-in çıxışa uyğun
+  // gəlməsindən bilir. `next dev` TTY-də ANSI rəng kodları yazır
+  // (`\e[32m\e[1m✓\e[22m\e[39m Ready in 1497ms`), pattern tutmasa VS Code
+  // preLaunchTask-ı SONSUZ gözləyir — F5 basılır, heç nə olmur, xəta da yoxdur.
+  //
+  // Əvəzinə `serverReadyAction` işlədilir (Next.js sənədlərindəki rəsmi üsul):
+  // VS Code prosesin çıxışında `pattern`-i görən kimi brauzeri açır. Üstəlik
+  // server debug sessiyasının UŞAĞIDIR — Shift+F5 onu da öldürür, yəni portda
+  // "zombi" `next-server` qalmır.
+  // ============================================================================
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // ⭐ DEFAULT — F5 bunu işə salır.
+      "name": "QU CLASS: işə sal (F5)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "serverReadyAction": {
+        // ⚠️ Ünvan `/`-dir, `/kuds` DEYİL: Blok 2-dən sonra `/kuds` `(app)`
+        // qrupundadır və auth tələb edir — F5 səni `/login`-ə atardı və
+        // "proqram işləmir" təsiri yaranardı. `/` ictimaidir.
+        "action": "openExternally",
+        // Anker yoxdur → ANSI kodlarından asılı deyil.
+        "pattern": "Ready in \\d+",
+        "uriFormat": "http://localhost:3000/"
+      }
+    },
+    {
+      "name": "QU CLASS: işə sal → /kuds (auth tələb edir)",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "Ready in \\d+",
+        // Giriş etməmisənsə `/login?callbackUrl=%2Fkuds`-a düşəcəksən —
+        // seed hesabı: rep@qu.edu.az / Test1234!
+        "uriFormat": "http://localhost:3000/kuds"
+      }
+    },
+    {
+      // Client kodunda breakpoint lazımdırsa bunu seç (Chrome debug sessiyası).
+      "name": "QU CLASS: dev + Chrome debug",
+      "type": "node",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "serverReadyAction": {
+        "action": "debugWithChrome",
+        "pattern": "Ready in \\d+",
+        "uriFormat": "http://localhost:3000/",
+        "webRoot": "${workspaceFolder}",
+        "killOnServerStop": true
+      }
+    },
+    {
+      // Server Component / Server Action / route handler debug-ı.
+      // Əvvəlcə `npm run dev:debug` işlət, sonra bunu qoş.
+      "name": "Next.js: server-side debug (attach 9229)",
+      "type": "node",
+      "request": "attach",
+      "port": 9229,
+      "cwd": "${workspaceFolder}",
+      "restart": true,
+      "skipFiles": ["<node_internals>/**", "**/node_modules/**"],
+      "sourceMaps": true
+    }
+  ]
+}
