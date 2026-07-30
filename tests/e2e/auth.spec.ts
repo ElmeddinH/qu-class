@@ -11,13 +11,21 @@
 //   · `/` və `/kuds` ünvanları route qruplarından sonra da işləyir
 // ============================================================================
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Browser, type Page } from "@playwright/test";
 import { PrismaClient } from "@prisma/client";
+import { hashSync } from "bcryptjs";
+import { loadEnvConfig } from "@next/env";
+import { encode } from "next-auth/jwt";
 
+import { SESSION_COOKIE_NAME } from "@/auth.config";
 import { CohortScope, Visibility } from "@/lib/enums";
 import { CONTROLLED_PROFILE_FIELDS, DEFAULT_PRIVATE_FIELDS } from "@/lib/visibility";
 
 const prisma = new PrismaClient();
+
+// `next start` `.env`-i özü oxuyur, test PROSESİ isə yox — `AUTH_SECRET`
+// olmadan aşağıdaki sessiya kukisi serverin gözlədiyi açarla imzalanmazdı.
+loadEnvConfig(process.cwd());
 
 const SEED_PASSWORD = "Test1234!";
 
@@ -46,6 +54,58 @@ async function login(page: Page, email: string, password = SEED_PASSWORD) {
   await page.getByLabel("Universitet e-poçtu").fill(email);
   await page.getByLabel("Şifrə", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Daxil ol" }).click();
+}
+
+/**
+ * Yönləndirmə zəncirini ÖLÇÜR: `page.goto()` yalnız SON cavabı verir, dövrənin
+ * uzunluğunu isə `redirectedFrom()` zənciri göstərir.
+ */
+function redirectChainOf(response: Awaited<ReturnType<Page["goto"]>>): string[] {
+  const chain: string[] = [];
+  let request = response?.request() ?? null;
+  while (request) {
+    chain.unshift(request.url());
+    request = request.redirectedFrom();
+  }
+  return chain;
+}
+
+/**
+ * Serverin qəbul etdiyi, amma DB-də KARŞILIĞI OLMAYAN sessiya kukisi.
+ *
+ * Məhz bu vəziyyət 2026-07-30-da "ağ ekran"a səbəb oldu: baza yenidən seed
+ * ediləndə brauzerdəki kuka keçərli qaldı, içindəki `userId` isə itdi.
+ * Kuka `AUTH_SECRET` ilə real şəkildə imzalanır — server onu öz kukisi kimi
+ * qəbul edir, yəni test saxta yol yox, ƏSL vəziyyəti yaradır.
+ */
+async function staleSessionCookie(): Promise<string> {
+  return encode({
+    token: {
+      userId: "usr-silinmis-hesab",
+      sub: "usr-silinmis-hesab",
+      systemRole: "USER",
+    },
+    secret: process.env.AUTH_SECRET!,
+    // Auth.js duz kimi KUKA ADINI işlədir — ad ilə duz ayrılsa token açılmaz.
+    salt: SESSION_COOKIE_NAME,
+    maxAge: 60 * 60,
+  });
+}
+
+/** Verilmiş sessiya kukisi ilə TƏMİZ kontekst (T16: hər hesab öz konteksti). */
+async function contextWithSession(browser: Browser, token: string) {
+  const context = await browser.newContext();
+  await context.addCookies([
+    {
+      name: SESSION_COOKIE_NAME,
+      value: token,
+      domain: "127.0.0.1",
+      path: "/",
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  return context;
 }
 
 test.afterAll(async () => {
@@ -239,4 +299,145 @@ test("qeydiyyat: universitet domeni olmayan e-poçt qəbul edilmir", async ({ pa
   await page.getByRole("button", { name: "Qeydiyyatdan keç" }).click();
 
   await expect(page.getByText("@qu.edu.az ilə bitməlidir")).toBeVisible();
+});
+
+// ---------------------------------------------------------------------------
+// 5. 🔴 YÖNLƏNDİRMƏ DÖVRƏSİ (2026-07-30 nasazlığının qoruyucusu)
+//
+// Nasazlıq: `/login` və `/register` ağ ekran verirdi. Səbəb sonsuz DÖVRƏ idi —
+//   /login --(middleware: kuka var)--------------> /home
+//   /home  --(layout: userId DB-də yoxdur)-------> /login
+// Aşağıdaki testlər dövrənin hər iki ucunu ayrıca bağlayır.
+// ---------------------------------------------------------------------------
+
+test("🔴 TƏMİZ kontekstdə /login və /register açılır", async ({ browser }) => {
+  // ⚠️ T16: kukisiz, tamamilə təmiz kontekst — mövcud sessiya nəticəni gizlədə bilər.
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+
+    const login = await page.goto("/login");
+    expect(login?.status(), "/login açılmalıdır").toBe(200);
+    expect(redirectChainOf(login), "kukisiz /login yönləndirilməməlidir").toHaveLength(1);
+    await expect(page.getByRole("heading", { level: 1, name: "Daxil ol" })).toBeVisible();
+
+    const register = await page.goto("/register");
+    expect(register?.status(), "/register açılmalıdır").toBe(200);
+    expect(redirectChainOf(register)).toHaveLength(1);
+    await expect(page.getByRole("heading", { level: 1, name: "Qeydiyyat" })).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
+test("🔴 giriş etmiş istifadəçi /login-ə girəndə sinif səhifəsinə düşür (dövrə yox)", async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    const slug = await primaryCohortSlugOf("rep@qu.edu.az");
+
+    await login(page, "rep@qu.edu.az");
+    await page.waitForURL(`**/class/${slug}`);
+
+    // Giriş etmiş halda birbaşa /login-ə cəhd: /login → /home → /class/<slug>.
+    const response = await page.goto("/login");
+    const chain = redirectChainOf(response);
+
+    expect(response?.status()).toBe(200);
+    await expect(page).toHaveURL(new RegExp(`/class/${slug}$`));
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+
+    // Dövrə olsaydı zəncir eyni ünvanları təkrarlayardı və uzanardı.
+    expect(chain.length, `zəncir: ${chain.join(" → ")}`).toBeLessThanOrEqual(3);
+    expect(new Set(chain).size, `təkrarlanan ünvan: ${chain.join(" → ")}`).toBe(
+      chain.length,
+    );
+  } finally {
+    await context.close();
+  }
+});
+
+test("🔴 köhnəlmiş sessiya kukisi dövrə yox, təmiz /login verir", async ({ browser }) => {
+  const context = await contextWithSession(browser, await staleSessionCookie());
+  try {
+    const page = await context.newPage();
+
+    // Düzəlişdən əvvəl bu sətir `ERR_TOO_MANY_REDIRECTS` ilə bitirdi.
+    const response = await page.goto("/login");
+    const chain = redirectChainOf(response);
+
+    expect(response?.status(), `zəncir: ${chain.join(" → ")}`).toBe(200);
+    await expect(page).toHaveURL(/\/login\?expired=1$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Daxil ol" })).toBeVisible();
+    // ⚠️ `getByRole("alert")` təkbaşına iki elementə düşür — Next.js öz
+    // `__next-route-announcer__` elementini də `role="alert"` ilə qoyur.
+    await expect(
+      page.getByRole("alert").filter({ hasText: "Sessiyanız etibarsız oldu" }),
+    ).toBeVisible();
+
+    // /login → /home → /api/session/expired → /login?expired=1
+    expect(chain.length, `zəncir: ${chain.join(" → ")}`).toBeLessThanOrEqual(4);
+
+    // 🔴 Dövrəni məhz bu kəsir: kuka silinib, ikinci cəhd yönləndirilmir.
+    const cookies = await context.cookies();
+    expect(cookies.find((c) => c.name === SESSION_COOKIE_NAME)?.value ?? "").toBe("");
+
+    const second = await page.goto("/login");
+    expect(redirectChainOf(second)).toHaveLength(1);
+  } finally {
+    await context.close();
+  }
+});
+
+test("🔴 köhnəlmiş kuka ilə qorunan səhifə də /login-də dayanır", async ({ browser }) => {
+  const context = await contextWithSession(browser, await staleSessionCookie());
+  try {
+    const page = await context.newPage();
+
+    const response = await page.goto("/home");
+    const chain = redirectChainOf(response);
+
+    expect(response?.status(), `zəncir: ${chain.join(" → ")}`).toBe(200);
+    await expect(page).toHaveURL(/\/login\?expired=1$/);
+    expect(chain.length, `zəncir: ${chain.join(" → ")}`).toBeLessThanOrEqual(4);
+  } finally {
+    await context.close();
+  }
+});
+
+test("🔴 cohort-suz istifadəçi /home-da qalır, dövrəyə düşmür", async ({ browser }) => {
+  // Seed-dəki hər istifadəçinin cohort-u var → bu hal üçün istifadəçi burada
+  // yaradılır və test özündən sonra təmizləyir (qeydiyyat testi ilə eyni üslub).
+  const stamp = Date.now().toString(36);
+  const email = `test.cohortsuz.${stamp}@qu.edu.az`;
+
+  await prisma.user.create({
+    data: {
+      email,
+      passwordHash: hashSync(SEED_PASSWORD, 10),
+      firstName: "Cohortsuz",
+      lastName: "İstifadəçi",
+    },
+  });
+
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+
+    await login(page, email);
+
+    // /home yönləndirmir — izahlı ekran göstərir (PLAN.md §7).
+    await page.waitForURL("**/home");
+    await expect(page.getByText("Sinif səhifəniz hələ təyin olunmayıb")).toBeVisible();
+
+    // Səhifənin yenidən açılışı da dövrəyə düşmür.
+    const response = await page.goto("/home");
+    expect(response?.status()).toBe(200);
+    expect(redirectChainOf(response)).toHaveLength(1);
+  } finally {
+    await context.close();
+    await prisma.user.deleteMany({ where: { email } });
+  }
 });

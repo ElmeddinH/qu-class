@@ -517,3 +517,33 @@ təzə seed ilə identikdir).
 - Rate limit yalnız login-dədir (qeydiyyat və axtarış açıqdır).
 - `ApiMeta` sabit sxemdir: xronologiyanın `academicYears` siyahısı v1-də
   qaytarılmır (UI-da filtr paneli üçün lazımdır, API-də deyil).
+
+---
+
+## Düzəliş — auth yönləndirmə dövrəsi (2026-07-30)
+
+**Səbəb:** sessiya kukisi KEÇƏRLİ idi, içindəki `userId` isə bazada YOX (baza
+yenidən seed edildi, brauzerdəki kuka qaldı). Dövrənin iki ucu:
+`/login` --(middleware: kuka var → giriş edib)--> `/home`
+--(`(app)/layout.tsx`: `getSessionUser()` `null` → `redirect(LOGIN_PATH)`)-->
+`/login`. Kuka yerində qaldığı üçün zəncir heç vaxt bitmirdi → `ERR_TOO_MANY_
+REDIRECTS` = ağ ekran. **Blok 9-un regressiyası DEYİL** — hər iki sətir Blok 2-dən
+(`32f3203`) bəri belədir, sadəcə "hesabı silinmiş istifadəçi" halı ilk dəfə indi
+yarandı.
+
+**Düzəliş:** `src/app/api/session/expired/route.ts` — sessiya kukisini SİLİB
+`/login?expired=1`-ə göndərən route handler (kukanı yalnız route handler dəyişə
+bilir; nisbi `Location` — mütləq URL hostu dəyişir və kuka başqa anbarda qalır).
+Layout-lar (`(app)`, `(admin)`) artıq `LOGIN_PATH`-ə yox, ona yönləndirir.
+Route icazə məntiqi TƏK yerə yığıldı: `routes.ts` → `resolveRouteAccess()` +
+`routeRedirectTarget()`; `auth.config.ts` yalnız tərcüməçidir.
+
+**Qoruyucu testlər:** `routes.test.ts` — cədvəl testi (14 yol × 3 viewer),
+DÖVRƏ testi (hər hədəfin ÖZÜ yenidən yönləndirilmir — maksimum 1 keçid) və
+layout-ların qaçış yolunu işlətdiyini yoxlayan statik yoxlama; `auth.spec.ts` —
+5 yeni ssenari (təmiz kontekstdə `/login`/`/register`, giriş etmiş istifadəçi,
+köhnəlmiş kuka × 2, cohort-suz istifadəçi). Hər ikisi köhnə kodda QIRILIR
+(yoxlanıldı). Vitest **817** (791→+26) · Playwright **89** (84→+5).
+
+**Yan düzəliş:** `/login` və `/register` səhifələrində `<h1>` yox idi (CardTitle
+`div` render edir) — semantika düzəldildi, vizual görünüş dəyişmədi.

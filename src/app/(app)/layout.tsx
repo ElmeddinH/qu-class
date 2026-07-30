@@ -5,7 +5,7 @@ import { Providers } from "@/app/providers";
 import { AppShell } from "@/layouts/AppShell";
 import { getPrimaryCohort, getSessionUser, requireUser } from "@/lib/auth";
 import { SystemRole } from "@/lib/enums";
-import { LOGIN_PATH } from "@/lib/routes";
+import { SESSION_EXPIRED_PATH } from "@/lib/routes";
 
 /**
  * `(app)` route qrupu — giriş TƏLƏB OLUNUR.
@@ -21,9 +21,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const [user, cohort] = await Promise.all([getSessionUser(), getPrimaryCohort()]);
 
-  // Sessiya token-i keçərlidir, amma istifadəçi DB-də yoxdur (silinib) →
-  // token köhnəlib, yenidən giriş tələb olunur.
-  if (!user) redirect(LOGIN_PATH);
+  // 🔴 Sessiya token-i keçərlidir, amma istifadəçi DB-də yoxdur (hesab
+  // silinib / baza yenidən seed edilib) → kuka təmizlənməlidir.
+  //
+  // ⚠️ BURADA `redirect(LOGIN_PATH)` YAZMA — kuka yerində qaldığı üçün
+  // middleware onu dərhal `/home`-a qaytarır və brauzer iki ünvan arasında
+  // sonsuz dövrəyə düşür (ağ ekran). `SESSION_EXPIRED_PATH` əvvəlcə kukanı
+  // silir, sonra `/login`-ə göndərir — bax `src/lib/routes.ts`.
+  if (!user) redirect(SESSION_EXPIRED_PATH);
 
   return (
     <Providers>

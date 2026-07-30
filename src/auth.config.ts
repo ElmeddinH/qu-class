@@ -18,14 +18,7 @@
 import type { NextAuthConfig } from "next-auth";
 
 import { SystemRole } from "@/lib/enums";
-import {
-  AFTER_LOGIN_PATH,
-  CALLBACK_URL_PARAM,
-  LOGIN_PATH,
-  isAdminRoute,
-  isAuthRoute,
-  isProtectedRoute,
-} from "@/lib/routes";
+import { LOGIN_PATH, routeRedirectTarget, type ViewerKind } from "@/lib/routes";
 
 /**
  * HTTPS altında işləyirikmi? Auth.js-in `useSecureCookies` qərarı ilə eyni
@@ -82,37 +75,36 @@ export const authConfig = {
     /**
      * Middleware-in icazə qərarı. `auth` — cari sessiya (və ya null).
      *
+     * 🔴 BURADA MƏNTİQ YOXDUR — YALNIZ TƏRCÜMƏ. Qərarı `src/lib/routes.ts` →
+     * `routeRedirectTarget()` verir. Səbəb: siyahı iki yerdə saxlanılanda
+     * (middleware + səhifə/layout) onlar vaxtla ayrılır və yönləndirmə
+     * dövrəsi yaranır. Yollarla bağlı hər dəyişiklik `routes.ts`-ə yazılır və
+     * `routes.test.ts`-dəki DÖVRƏ testi onu avtomatik yoxlayır.
+     *
      * ⚠️ Burada YALNIZ token-dəki məlumat mövcuddur: userId + systemRole.
      * `cohortIds` / `moderatedCohortIds` DB-dən gəlir və Edge-də əlçatan
      * deyil — cohort səviyyəli yoxlama server komponentində
      * `requireCohortRole()` ilə aparılır.
+     *
+     * ⚠️ TOKEN DB-Nİ ƏKS ETDİRMƏYƏ BİLƏR: imza keçərli olsa da `userId`
+     * silinmiş ola bilər. Edge-də bunu bilmək mümkün deyil — həmin halı
+     * `(app)` layout-u tutur və sessiya kukisini təmizləyən
+     * `SESSION_EXPIRED_PATH`-ə göndərir (bax `src/lib/routes.ts`).
      */
     authorized({ auth, request }) {
       const { pathname, search } = request.nextUrl;
       const user = auth?.user;
 
-      // Giriş etmiş istifadəçi /login və /register-də işi yoxdur.
-      if (user && isAuthRoute(pathname)) {
-        return Response.redirect(new URL(AFTER_LOGIN_PATH, request.nextUrl));
-      }
+      const viewerKind: ViewerKind = !user
+        ? "ANONYMOUS"
+        : user.systemRole === SystemRole.UNIVERSITY_ADMIN
+          ? "ADMIN"
+          : "USER";
 
-      if (!isProtectedRoute(pathname)) return true;
+      const target = routeRedirectTarget(pathname, search, viewerKind);
+      if (!target) return true;
 
-      if (!user) {
-        const url = new URL(LOGIN_PATH, request.nextUrl);
-        url.searchParams.set(CALLBACK_URL_PARAM, `${pathname}${search}`);
-        return Response.redirect(url);
-      }
-
-      // (admin)/* — sistem rolu tələb olunur. Girişi olan, amma admin olmayan
-      // istifadəçini /login-ə atmaq mənasızdır (o, artıq giriş edib) → əsas
-      // səhifəyə yönləndirilir. Server tərəfdə `requireAdmin()` eyni yoxlamanı
-      // təkrarlayır və 403 verir (ikiqat qoruma).
-      if (isAdminRoute(pathname) && user.systemRole !== SystemRole.UNIVERSITY_ADMIN) {
-        return Response.redirect(new URL(AFTER_LOGIN_PATH, request.nextUrl));
-      }
-
-      return true;
+      return Response.redirect(new URL(target, request.nextUrl));
     },
 
     /**

@@ -54,6 +54,30 @@ export const AFTER_LOGOUT_PATH = "/";
 /** `?callbackUrl=` — girişdən sonra qayıdılacaq ünvanın sorğu açarı. */
 export const CALLBACK_URL_PARAM = "callbackUrl";
 
+/**
+ * 🔴 SESSİYA QAÇIŞ YOLU — YÖNLƏNDİRMƏ DÖVRƏSİNİN QARŞISINI ALIR.
+ *
+ * Kuka KEÇƏRLİDİR (imza düzgündür), amma içindəki `userId` DB-də YOXDUR
+ * (hesab silinib, baza yenidən seed edilib). Bu halda `(app)` / `(admin)`
+ * layout-u səhifəni render edə bilmir və istifadəçini çıxarmalıdır — amma
+ * birbaşa `/login`-ə atmaq SONSUZ DÖVRƏ yaradır:
+ *
+ *   /login --(middleware: kuka var → giriş edib)--> /home
+ *   /home  --(layout: DB-də istifadəçi yoxdur)-----> /login   ← dövrə
+ *
+ * Dövrənin səbəbi kukanın YERİNDƏ QALMASIDIR. Ona görə çıxış bu route
+ * handler-dən keçir: o, əvvəlcə sessiya kukisini SİLİR, sonra `/login`-ə
+ * yönləndirir — ikinci keçiddə middleware artıq "anonim" görür və dayanır.
+ *
+ * ⚠️ Bu yol HEÇ VAXT qorunan siyahıya salınmamalıdır (bax `routes.test.ts` →
+ * "qaçış yolu" testi): qorunsaydı middleware onu da /login-ə atardı və dövrə
+ * geri qayıdardı.
+ */
+export const SESSION_EXPIRED_PATH = "/api/session/expired";
+
+/** `?expired=1` — `/login`-də "sessiyanız etibarsız oldu" bildirişinin açarı. */
+export const SESSION_EXPIRED_PARAM = "expired";
+
 function matchesPrefix(pathname: string, prefixes: readonly string[]): boolean {
   return prefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
@@ -81,6 +105,91 @@ export function isAuthRoute(pathname: string): boolean {
 /** Ən azı autentifikasiya tələb edən istənilən yol. */
 export function isProtectedRoute(pathname: string): boolean {
   return isAppRoute(pathname) || isAdminRoute(pathname);
+}
+
+// ---------------------------------------------------------------------------
+// İcazə qərarı — VAHİD MƏNBƏ
+//
+// 🔴 Middleware ÖZ siyahısını saxlamır: `auth.config.ts` → `authorized()`
+// yalnız bu iki SAF funksiyanı çağırır. Siyahı iki yerdə saxlanılsaydı
+// (middleware + səhifə) onlar vaxtla ayrılar və məhz yönləndirmə dövrəsi
+// yaranardı — bir tərəf "bu yol açıqdır", digəri "qorunur" deyərdi.
+// ---------------------------------------------------------------------------
+
+/**
+ * Sorğunu edən tərəf — Edge-də TOKEN-dən bilinən qədəri.
+ * Cohort səviyyəli rollar (`CLASS_MODERATOR` və s.) BURADA YOXDUR: onlar
+ * DB-dən gəlir və middleware-də əlçatan deyil (bax `src/auth.config.ts`).
+ */
+export type ViewerKind = "ANONYMOUS" | "USER" | "ADMIN";
+
+/**
+ * Yolun həmin ziyarətçi üçün ÖDƏNİLMƏMİŞ tələbi.
+ *   · `PUBLIC`         — tələb yoxdur, sorğu keçir
+ *   · `REQUIRE_AUTH`   — giriş lazımdır (anonim ziyarətçi qorunan yolda)
+ *   · `REQUIRE_ADMIN`  — giriş var, amma sistem admini deyil
+ *   · `REDIRECT_HOME`  — giriş edən istifadəçinin auth səhifəsində işi yoxdur
+ */
+export type RouteAccess = "PUBLIC" | "REQUIRE_AUTH" | "REQUIRE_ADMIN" | "REDIRECT_HOME";
+
+/**
+ * ⚠️ ŞƏRTLƏRİN SIRASI DAVRANIŞIN ÖZÜDÜR:
+ *   1. Dəqiq ictimai yol istisnası (`isAppRoute` içində, `===` ilə) prefiks
+ *      yoxlamasından ƏVVƏL — `/events` ictimai, `/events/<id>` qorunan.
+ *   2. Auth səhifəsi qaydası prefiks yoxlamasından ƏVVƏL — `/login`
+ *      qorunan siyahıda deyil, yəni sıra pozulsa qayda heç işə düşməzdi.
+ *   3. Qorunmayan hər şey dərhal keçir — qalan yoxlamalar yalnız qorunan
+ *      yollara aiddir.
+ */
+export function resolveRouteAccess(
+  pathname: string,
+  viewerKind: ViewerKind,
+): RouteAccess {
+  const authenticated = viewerKind !== "ANONYMOUS";
+
+  if (authenticated && isAuthRoute(pathname)) return "REDIRECT_HOME";
+
+  if (!isProtectedRoute(pathname)) return "PUBLIC";
+
+  if (!authenticated) return "REQUIRE_AUTH";
+
+  if (isAdminRoute(pathname) && viewerKind !== "ADMIN") return "REQUIRE_ADMIN";
+
+  return "PUBLIC";
+}
+
+/**
+ * Yönləndirmə hədəfi — icazə varsa `null`.
+ *
+ * 🔴 HƏDƏF HƏMİŞƏ "SON DAYANACAQ" OLMALIDIR: hədəfin özü üçün bu funksiya
+ * `null` qaytarmalıdır, yoxsa brauzer iki ünvan arasında ilişir. Qayda
+ * `routes.test.ts`-dəki DÖVRƏ testi ilə hər yol üçün maşınla yoxlanılır.
+ *
+ * @param search `?`-lə başlayan sorğu sətri (`URL.search` kimi) və ya boş sətir.
+ */
+export function routeRedirectTarget(
+  pathname: string,
+  search: string,
+  viewerKind: ViewerKind,
+): string | null {
+  switch (resolveRouteAccess(pathname, viewerKind)) {
+    case "PUBLIC":
+      return null;
+
+    case "REQUIRE_AUTH": {
+      // Girişdən sonra istifadəçi getmək istədiyi yerə qayıtsın.
+      const params = new URLSearchParams({
+        [CALLBACK_URL_PARAM]: `${pathname}${search}`,
+      });
+      return `${LOGIN_PATH}?${params.toString()}`;
+    }
+
+    // Admin olmayanı `/login`-ə atmaq mənasızdır (o, artıq giriş edib) →
+    // hədəf HƏR İKİ halda `(app)` içindədir, auth səhifəsi DEYİL.
+    case "REQUIRE_ADMIN":
+    case "REDIRECT_HOME":
+      return AFTER_LOGIN_PATH;
+  }
 }
 
 /**

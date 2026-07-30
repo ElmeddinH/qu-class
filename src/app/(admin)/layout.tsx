@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AdminShell } from "@/layouts/AdminShell";
 import { getSessionUser, requireAdmin } from "@/lib/auth";
-import { LOGIN_PATH } from "@/lib/routes";
+import { SESSION_EXPIRED_PATH } from "@/lib/routes";
 
 /**
  * `(admin)` route qrupu — `UNIVERSITY_ADMIN` TƏLƏB OLUNUR.
@@ -16,8 +16,10 @@ import { LOGIN_PATH } from "@/lib/routes";
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   await requireAdmin();
 
+  // Eyni tələ `(app)` layout-undadır: `/login`-ə birbaşa yönləndirmə kukanı
+  // yerində saxlayır və middleware ilə dövrə yaradır (bax `src/lib/routes.ts`).
   const user = await getSessionUser();
-  if (!user) redirect(LOGIN_PATH);
+  if (!user) redirect(SESSION_EXPIRED_PATH);
 
   return (
     <AdminShell

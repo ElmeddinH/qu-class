@@ -29,7 +29,12 @@ export default async function RegisterPage() {
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 py-12">
       <Card>
         <CardHeader>
-          <CardTitle>Qeydiyyat</CardTitle>
+          {/* Səhifənin YEGANƏ `<h1>`-i — `CardTitle` div render edir (shadcn
+              primitivi toxunulmazdır), başlıq onun içindədir: stillər miras
+              qalır, yalnız semantika düzəlir. Bax `(public)/login/page.tsx`. */}
+          <CardTitle>
+            <h1>Qeydiyyat</h1>
+          </CardTitle>
           <CardDescription>
             Sinif səhifənizə qoşulmaq üçün fakültə, ixtisas və qəbul ilinizi seçin.
           </CardDescription>
