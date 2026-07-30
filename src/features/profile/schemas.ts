@@ -56,7 +56,8 @@ const nameField = (label: string) =>
 
 /**
  * Profil şəkli: HƏM `/api/upload` cavabı (`/uploads/…` nisbi yolu), HƏM də
- * xarici ünvan (seed `dicebear` avatarları) qəbul edilir.
+ * xarici ünvan qəbul edilir (istifadəçi hazır şəkil linki yapışdıra bilər —
+ * seed artıq profil şəkli yaratmır).
  *
  * ⚠️ `..` açıq şəkildə rədd olunur — `/uploads/../..` kimi yol qaçışı
  * `next/image` və statik server üçün mənasız fayl arayışına çevrilərdi.

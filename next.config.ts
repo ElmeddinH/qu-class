@@ -9,12 +9,9 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
-      {
-        // Avatarlar — DiceBear API (xarici şəkil yükləmə yoxdur, bax prisma/seed.ts)
-        protocol: "https",
-        hostname: "api.dicebear.com",
-        pathname: "/**",
-      },
+      // ⚠️ `api.dicebear.com` SİLİNDİ — seed artıq profil şəkli yaratmır və
+      // avatarlar onsuz da `next/image` ilə render olunmurdu (Radix
+      // `AvatarImage` adi `<img>`-dir), yəni bu icazə ölü konfiq idi.
       {
         // Kart / cover şəkilləri — seed məzmunu üçün deterministik placeholder
         protocol: "https",

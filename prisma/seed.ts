@@ -167,6 +167,24 @@ function chance(probability: number): boolean {
   return rng() < probability;
 }
 
+/**
+ * 🔴 PRNG ADDIMINI YERİNDƏ SAXLAYIR, NƏTİCƏNİ ATIR.
+ *
+ * Bütün təsadüfilik TƏK bir mulberry32 axınından gəlir. Artıq lazım olmayan
+ * bir `chance()` çağırışını sadəcə SİLSƏK axın bir addım sürüşür və ondan
+ * sonrakı HƏR ŞEY (ad, e-poçt, telefon, bio, məxfilik səviyyələri,
+ * paylaşımlar…) tamam başqa dəyər alır — yəni bütün seed dəyişir.
+ *
+ * ⚠️ Çağırışın SIRASI da vacibdir: `chance(0.4)`-ü obyekt literalından
+ * çıxarmaq da kifayət edir ki, o, `chance(0.9)` ilə yerini dəyişsin və eyni
+ * sürüşmə baş versin. Ona görə çağırış MƏHZ öz yerində qalır, nəticəsi isə
+ * bu funksiya ilə atılır.
+ */
+function keepRandomStep(consumed: unknown): null {
+  void consumed; // dəyər QƏSDƏN atılır — məqsəd yalnız addımın işlənməsidir
+  return null;
+}
+
 function shuffled<T>(items: readonly T[]): T[] {
   const copy = [...items];
   for (let i = copy.length - 1; i > 0; i -= 1) {
@@ -474,8 +492,12 @@ async function main(): Promise<void> {
       stage,
       firstName,
       lastName,
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(`${firstName}-${lastName}-${id}`)}`,
-      coverUrl: chance(0.4) ? `https://picsum.photos/seed/qu-cover-${id}/1200/300` : null,
+      // 🔴 PROFİL ŞƏKİLLƏRİ SEED-Ə YAZILMIR (avatar + örtük). UI onsuz da
+      // düzgün davranır: avatar yerinə ad-soyadın baş hərfləri
+      // (`MemberIdentity`), örtük yerinə KUDS qradiyenti (`StoryHeader`).
+      // Sahələr sxemdə QALIR — istifadəçi `/me/edit`-dən öz şəklini yükləyə bilər.
+      avatarUrl: null,
+      coverUrl: keepRandomStep(chance(0.4)),
       hometown: homeCity,
       currentCity,
       currentCountry,
