@@ -1457,3 +1457,106 @@ POST siyahısı 5 → **6**.
   qeydiyyat formasından (eyni e-poçtla) keçməlidir. `UNSET_PASSWORD_HASH`
   müqaviləsi hazırdır; axının özü Blok 12/13 işidir.
 - **`/admin/stats` cohort filtri daşımır** — universitet miqyası sabitdir.
+
+---
+
+## Blok 11C — bitdi (git push açılması + tarixçə sızma auditi)
+
+Yeni məhsul funksiyası YOXDUR — bu blok yalnız repozitoriya və təhlükəsizlik
+işidir. Nəticə: 27 commit-lik tarixçə push üçün **sıfır tapıntı** ilə təsdiqləndi
+və push aləti hazırdır (push-un ÖZÜ hələ işlədilməyib — token istifadəçidədir).
+
+### Yeni fayllar
+
+| Fayl | Nə edir |
+|---|---|
+| `scripts/git-config.mjs` | `fs` / `REPO_ROOT` / `DEFAULT_AUTHOR` — hər üç git skriptinin ORTAQ konfiqi |
+| `scripts/git-audit.mjs` | şəbəkəsiz, yalnız-oxu sızma auditi (`npm run git:audit`) |
+| `scripts/git-push.mjs` | PAT ilə push + uzaqdan təsdiq (`npm run git:push`) |
+| `docs/git-audit-report.md` | auditin törəmə hesabatı (maskalanmış) |
+
+`scripts/git.mjs` yalnız konfiqi ORTAQ modula köçürmək üçün toxunuldu — davranışı
+dəyişməyib (`node scripts/git.mjs log` → 27 commit).
+
+### Auditin əsas prinsipi
+
+🔴 **İşçi ağaca baxmaq SƏHVDİR.** `.gitignore` yalnız GƏLƏCƏK commit-ləri süzür;
+bir dəfə commit olunmuş `.env` tarixçədə ƏBƏDİ qalır. Ona görə audit
+`git.log({ depth: Infinity })` → hər commit üçün `git.walk(git.TREE({ ref }))`
+ilə **BÜTÜN 27 ağacı** gəzir: 547 unikal yol, 694 unikal blob.
+
+Blob məzmunu **oid-ə görə bir dəfə** oxunur (eyni fayl onlarla commit-də
+təkrarlanır) — tam audit 0.5 saniyə çəkir.
+
+Yoxlanan beş şey: qadağan yollar · məzmun (sirr şablonları) · ölçü (50/100 MB) ·
+`.gitignore` uyğunluğu (hər iki istiqamətdə) · müəllif kimliyi.
+
+### İlk işlətmədə 7 tapıntı çıxdı — hamısı SKANERİN səhvi idi
+
+Sənəd nümunələri sirr kimi bildirilmişdi. Düzəliş **sənədə deyil, skanerə**
+edildi:
+
+1. **Dırnaqlı dəyər bütöv tutulmalıdır.** `[^\s]+` şablonu
+   `AUTH_SECRET="<npx auth secret ilə yarat>"` sətrindən yalnız `<npx` qoparırdı;
+   ağ siyahıdakı `<...>` placeholder şablonuna uyğun gəlmirdi.
+2. **Nümunə bağlantı sətri** (`postgresql://user:pass@host:5432/db`) və
+   **shell əvəzləməsi** (`AUTH_SECRET="'$(openssl rand -base64 32)'"`) ağ
+   siyahıya alındı — ikincisi sabit dəyər deyil, işlədildikdə generasiya olunur.
+
+### 🔴 «0 tapıntı» iki mənalıdır — ona görə öz-yoxlama var
+
+Sıfır nəticə həm «tarixçə təmizdir», həm də «skaner sınıqdır» deməkdir; ikincisi
+daha təhlükəlidir, çünki YAŞIL görünür. `npm run git:audit -- --self-test`
+süni fikstürlərlə hər qaydanın işə düşdüyünü və ağ siyahının onları udmadığını
+sübut edir: **18 məzmun + 20 yol fikstürü, hamısı keçir.**
+
+### Nəticə
+
+```
+commit 27 · unikal yol 547 · unikal blob 694 · izlənən fayl 544
+ən böyük blob 421.8 KB (package-lock.json) — 50 MB həddindən çox-çox aşağı
+migrations 4 fayl ✓ · .env.example izlənir ✓
+müəllif: Elmeddin Heydarov <heydarovelmeddin2@gmail.com> ×27 (VAHİD)
+🔴 blok 0 · ⚠️ xəbərdarlıq 0
+```
+
+`.env`, `dev.db`, `public/uploads/`, `.next/`, `node_modules/` tarixçənin heç bir
+nöqtəsində YOXDUR. Müəllif kimliyi 27 commit-də eynidir və e-poçt real GitHub
+hesabına bağlanandır → `git-rewrite-author.mjs` **lazım olmadı və yazılmadı**.
+
+### Yol boyu tapılan tələlər
+
+- **T33 — müəllif e-poçtu töhfə qrafikini müəyyən edir.** GitHub commit-i
+  qrafikə yalnız e-poçt hesaba bağlı olduqda yazır, Holberton isə məhz commit
+  tarixçəsinə baxır. Placeholder (`user@example.com`, boş, `noreply`) qalarsa
+  iş «başqasının» görünür. Düzəliş yalnız push-DAN ƏVVƏL ucuzdur: sonra hər
+  commit-in SHA-sı dəyişir. Audit bunu hər işlətmədə yoxlayır.
+- **T34 — uzaq repo BOŞ yaradılmalıdır** (README / `.gitignore` / lisenziya
+  SEÇİLMƏDƏN). Əks halda uzaqda bizim tarixçədə olmayan commit yaranır, push
+  `non-fast-forward` ilə rədd olunur, `--force` isə həmin commit-i silir.
+- **T35 — PAT icazələri.** classic → `repo` scope; fine-grained → məhz bu repo
+  seçilmiş + `Contents: Read and write`. **401 = icazə/expiry problemi, kod
+  problemi deyil.**
+- **T36 — 403 `push protection` = tarixçədə REAL sirr var.** Bypass linkinə
+  basma; auditə qayıt, sirri çıxar və dəyəri **ROTASİYA ET** — cəhd zamanı o
+  dəyər artıq şəbəkəyə çıxıb sayılır.
+- **T37 — `git.walk` map-ində `null` QAYTARMA.** `_walk` mənbəyində
+  `if (parent !== null) { iterate(...) }` — yəni `null` alt qovluğa enməyi
+  DAYANDIRIR. Qovluqlar üçün `undefined` qaytarılmalıdır, əks halda audit
+  yalnız kök qovluğu görər və «təmiz» deyər.
+- **T38 — `onAuthFailure` həm MƏCBURİDİR, həm də səbəbi GİZLƏDİR.** Onsuz
+  isomorphic-git eyni etimadnamə ilə sonsuz təkrar cəhd edir; `{ cancel: true }`
+  ilə isə `UserCanceledError("The operation was canceled.")` atılır — 401
+  mesajda HEÇ GÖRÜNMÜR. `git-push.mjs` bu xətanı açıq şəkildə tərcümə edir.
+- **T39 — skanerin ÖZÜ öz grep-inə düşməməlidir.** DoD `grep -rn "gh"+"p_"`
+  axtarır; token prefiksləri qaydalarda parçalanmış (`${GH}p_`) qurulur.
+  Eyni səbəbdən `AD = dəyər` şablonları `\s*=\s*` ayırıcısı ilə yazılır — belə
+  olanda regexp ÖZ MƏNBƏYİNƏ uyğun gəlmir, əks halda skript commit olunan kimi
+  növbəti audit özünü «sızma» sayardı.
+
+### Dayanma nöqtəsi
+
+Push **qəsdən işlədilməyib**: PAT istifadəçidədir və token bu terminalda
+interaktiv oxuna bilməz. `npm run git:push` hazırdır və işə düşməzdən əvvəl
+auditi AYRI PROSES kimi çağırır — yəni tapıntı varsa şəbəkəyə çıxmadan dayanır
+(sıra: AUDİT → PUSH, tərsinə heç vaxt).

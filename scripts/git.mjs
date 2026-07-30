@@ -25,21 +25,15 @@
 // tarixçə "bir dəqiqədə N commit" kimi görünər (iş axınını əks etdirmir).
 // ============================================================================
 
-import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import git from "isomorphic-git";
 import ignoreLib from "ignore";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, "..");
-
-const DEFAULT_AUTHOR = {
-  name: "Elmeddin Heydarov",
-  email: "heydarovelmeddin2@gmail.com",
-};
+// `fs` / `REPO_ROOT` / `DEFAULT_AUTHOR` ORTAQ konfiqdən gəlir — `git-audit.mjs`
+// və `git-push.mjs` eyni dəyərləri işlədir (bax `scripts/git-config.mjs`).
+import { fs, REPO_ROOT, DEFAULT_AUTHOR } from "./git-config.mjs";
 
 function parseFlags(argv) {
   const flags = {};
@@ -246,13 +240,19 @@ async function cmdLog() {
  *
  * Remote `.git/config`-də saxlanılır (`--url` bir dəfə verilir, sonrakı
  * çağırışlarda lazım deyil) — nəticə real `git remote add origin` ilə eynidir.
+ *
+ * ⚠️ SADƏ variantdır: audit qapısı və push-dan sonrakı təsdiq YOXDUR.
+ * Əsl push üçün `npm run git:push` (`scripts/git-push.mjs`) işlət.
  */
 async function cmdPush(flags) {
   const token = process.env.GITHUB_TOKEN;
   if (!token) {
+    // ⚠️ Nümunədə token ƏMR SƏTRİNƏ yazılmır: `VAR=dəyər əmr` forması bash
+    // tarixçəsinə düşür. `read -rs` isə tokeni ekrana da, tarixçəyə də vermir.
     throw new Error(
       "GITHUB_TOKEN mühit dəyişəni boşdur. İstifadə:\n" +
-        "  GITHUB_TOKEN=ghp_xxx node scripts/git.mjs push --url https://github.com/user/repo.git",
+        '  read -rsp "PAT: " GITHUB_TOKEN && export GITHUB_TOKEN\n' +
+        "  node scripts/git.mjs push --url https://github.com/user/repo.git",
     );
   }
 
