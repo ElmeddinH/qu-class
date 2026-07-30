@@ -538,7 +538,7 @@ Layout-lar (`(app)`, `(admin)`) artıq `LOGIN_PATH`-ə yox, ona yönləndirir.
 Route icazə məntiqi TƏK yerə yığıldı: `routes.ts` → `resolveRouteAccess()` +
 `routeRedirectTarget()`; `auth.config.ts` yalnız tərcüməçidir.
 
-**Qoruyucu testlər:** `routes.test.ts` — cədvəl testi (14 yol × 3 viewer),
+**Qoruyucu testlər:** `routes.test.ts` — cədvəl testi (19 yol × 3 viewer),
 DÖVRƏ testi (hər hədəfin ÖZÜ yenidən yönləndirilmir — maksimum 1 keçid) və
 layout-ların qaçış yolunu işlətdiyini yoxlayan statik yoxlama; `auth.spec.ts` —
 5 yeni ssenari (təmiz kontekstdə `/login`/`/register`, giriş etmiş istifadəçi,
@@ -547,3 +547,28 @@ köhnəlmiş kuka × 2, cohort-suz istifadəçi). Hər ikisi köhnə kodda QIRIL
 
 **Yan düzəliş:** `/login` və `/register` səhifələrində `<h1>` yox idi (CardTitle
 `div` render edir) — semantika düzəldildi, vizual görünüş dəyişmədi.
+
+### Dövrə cədvəli Blok 9S səthini DƏ əhatə edir
+
+Düzəliş 9S-dən sonra gəldiyi üçün cədvəl əvvəlcə yalnız səhifə yollarını
+tuturdu. İndi `/api/v1` səthi də oradadır və dövrə testi (hər yol × 3 viewer)
+onların üzərindən DƏ keçir:
+
+| Yol | Niyə cədvəldə |
+|---|---|
+| `/docs` | Swagger UI — sənəd auth arxasında deyil |
+| `/api/v1/health` | ictimai REST endpoint-i |
+| `/api/v1/auth/login` | ⚠️ `/login` auth prefiksinə OXŞAYIR; prefiks məntiqi səhvən tutsaydı giriş etmiş müştəri üçün `REDIRECT_HOME` çıxar və REST login sınardı |
+| `/api/v1/cohorts/<slug>/posts` | kuka MƏCBURİ endpoint — icazə guard-dadır, route-da yox |
+| `/api/v1/search` | sərhəd: `/search` QORUNAN prefiksdir, bu ondan asılı deyil |
+
+🔴 **Hamısı üç viewer üçün də `PUBLIC` gözləyir və bu, "qorunmur" demək
+DEYİL.** `resolveRouteAccess` yalnız MIDDLEWARE-in qərarıdır; v1-in
+autentifikasiyası `lib/api/guard.ts` → `withUser`-dədir və 401 **JSON**
+qaytarır. Cədvəl məhz `/api`-nin `APP_ROUTE_PREFIXES`-ə əlavə edilməsini
+bloklayır — əlavə edilsəydi cavab 307 + `/login`-in HTML-i olar, Swagger UI
+«Try it out» JSON əvəzinə səhifə göstərərdi. Davranışın o biri ucu e2e-də
+bərkidilib (`api.spec.ts`: `content-type: application/json` VƏ gövdə
+`<!DOCTYPE html>` EHTİVA ETMİR).
+
+Vitest **820** (817→+3).

@@ -1,6 +1,7 @@
 // ============================================================================
 // src/lib/routes.test.ts
-// Route qorunması — xüsusən `/events` bölünməsi (Blok 9).
+// Route qorunması — `/events` bölünməsi (Blok 9) və `/api/v1` + `/docs`
+// səthi (Blok 9S).
 //
 // 🔴 NİYƏ MƏHZ BU TESTLƏR: `/events` İKİ route qrupuna bölünüb —
 // `(public)/events` (ictimai siyahı) və `(app)/events/[id]` (detal + panel).
@@ -107,6 +108,7 @@ const ACCESS_TABLE: ReadonlyArray<{
   { path: "/", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
   { path: "/login", anonymous: "PUBLIC", user: "REDIRECT_HOME", admin: "REDIRECT_HOME" },
   { path: "/register", anonymous: "PUBLIC", user: "REDIRECT_HOME", admin: "REDIRECT_HOME" },
+  // Swagger UI (Blok 9S) — sənəd auth arxasında DEYİL.
   { path: "/docs", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
   // `/events` — ictimai siyahı, `/events/<id>` — tədbir detalı (qorunur).
   { path: "/events", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
@@ -119,8 +121,25 @@ const ACCESS_TABLE: ReadonlyArray<{
   // Auth.js-in öz endpoint-i middleware matcher-indən kənardadır, amma məntiq
   // yenə də "açıq" deməlidir — sessiya heç vaxt öz-özünü qorumamalıdır.
   { path: "/api/auth/session", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
-  // REST qatı öz qapısını işlədir (401 JSON) — middleware yönləndirməməlidir.
+  // 🔴 REST qatı (Blok 9S) ÖZ qapısını işlədir — `lib/api/guard.ts` → `withUser`
+  // 401 JSON qaytarır. Middleware bura QARIŞMAMALIDIR: qarışsaydı cavab 307 +
+  // `/login`-in HTML-i olardı və Swagger UI «Try it out» JSON əvəzinə səhifə
+  // göstərərdi. Aşağıdaki dörd sətir `/api`-nin `APP_ROUTE_PREFIXES`-ə
+  // əlavə edilməsini maşınla bloklayır.
   { path: "/api/v1/health", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  // ⚠️ `/login` auth prefiksidir, bu isə REST login endpoint-idir. Prefiks
+  // məntiqi səhvən tutsaydı, giriş etmiş müştəri üçün REDIRECT_HOME çıxardı və
+  // `POST /api/v1/auth/login` sınardı.
+  { path: "/api/v1/auth/login", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  // Kuka MƏCBURİ olan v1 endpoint-i — icazə yoxlaması guard-dadır, route-da yox.
+  {
+    path: "/api/v1/cohorts/sec2023/posts",
+    anonymous: "PUBLIC",
+    user: "PUBLIC",
+    admin: "PUBLIC",
+  },
+  // Sərhəd: `/search` QORUNAN prefiksdir, `/api/v1/search` isə ondan asılı deyil.
+  { path: "/api/v1/search", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
   // Sərhəd: `/eventsomething` `/events` prefiksi DEYİL.
   { path: "/eventsomething", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
   // 🔴 Qaçış yolu — aşağıdaki ayrıca bloka bax.
