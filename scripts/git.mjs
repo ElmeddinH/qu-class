@@ -129,6 +129,37 @@ async function collectFiles(target, matcher) {
   return results;
 }
 
+/**
+ * İndeksdə OLAN, amma diskdə ARTIQ OLMAYAN yolları tapır (silinmiş / KÖÇÜRÜLMÜŞ
+ * fayllar).
+ *
+ * 🔴 NİYƏ LAZIMDIR: `git.add` yalnız MÖVCUD faylı yazır. Blok 10A-da
+ * `features/events/manage/PrintButton.tsx` → `components/shared/PrintButton.tsx`
+ * köçürüldü; köhnə yol indeksdə qaldığı üçün repo diskdə olmayan faylı
+ * saxlayırdı (`git status` = «deleted», işçi ağac TƏMİZ DEYİL). `git.remove`
+ * onu indeksdən çıxarır.
+ *
+ * Yalnız `--`-dan sonra verilən yolların ALTINDAKI sətirlərə baxılır — commit
+ * əhatəsi genişlənmir.
+ */
+async function collectDeleted(targets) {
+  const scopes = targets.map((target) =>
+    path.relative(REPO_ROOT, path.resolve(REPO_ROOT, target)).split(path.sep).join("/"),
+  );
+
+  const tracked = await git.listFiles({ fs, dir: REPO_ROOT });
+  const deleted = [];
+
+  for (const file of tracked) {
+    const inScope = scopes.some((scope) => file === scope || file.startsWith(`${scope}/`));
+    if (!inScope) continue;
+
+    if (!fs.existsSync(path.join(REPO_ROOT, file))) deleted.push(file);
+  }
+
+  return deleted;
+}
+
 async function cmdInit() {
   const gitDir = path.join(REPO_ROOT, ".git");
   if (fs.existsSync(gitDir)) {
@@ -154,12 +185,20 @@ async function cmdCommit(flags, positional) {
     for (const file of files) fileSet.add(file);
   }
 
-  if (fileSet.size === 0) {
+  // Silinmiş / köçürülmüş fayllar — bax `collectDeleted`.
+  const deleted = await collectDeleted(positional);
+
+  if (fileSet.size === 0 && deleted.length === 0) {
     throw new Error("Stage ediləcək fayl tapılmadı (hamısı .gitignore ilə xaric olundu?).");
   }
 
   for (const file of fileSet) {
     await git.add({ fs, dir: REPO_ROOT, filepath: file });
+  }
+
+  for (const file of deleted) {
+    await git.remove({ fs, dir: REPO_ROOT, filepath: file });
+    console.log(`− ${file}`);
   }
 
   const timestamp = flags.date
@@ -184,7 +223,10 @@ async function cmdCommit(flags, positional) {
     author,
   });
 
-  console.log(`✓ ${oid.slice(0, 7)}  ${flags.message}  (${fileSet.size} fayl)`);
+  console.log(
+    `✓ ${oid.slice(0, 7)}  ${flags.message}  ` +
+      `(${fileSet.size} fayl${deleted.length > 0 ? `, ${deleted.length} silinmiş` : ""})`,
+  );
 }
 
 async function cmdLog() {
