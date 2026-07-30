@@ -1554,6 +1554,24 @@ hesabına bağlanandır → `git-rewrite-author.mjs` **lazım olmadı və yazıl
   olanda regexp ÖZ MƏNBƏYİNƏ uyğun gəlmir, əks halda skript commit olunan kimi
   növbəti audit özünü «sızma» sayardı.
 
+### 🔴 Auditdən kənar, amma push-u dəyərsizləşdirən tapıntı
+
+`package-lock.json` **izlənirdi, lakin köhnə idi**: commit olunmuş versiyada
+`world-atlas` ümumiyyətlə yox idi, `topojson-client` isə kök asılılıqlar
+siyahısında görünmürdü (hər ikisi Blok 10B-nin xəritəsi üçün lazımdır).
+Nəticə: təzə klonda `npm ci` **«lock file out of sync»** ilə dayanardı — yəni
+repo push olunsa da, açan adam layihəni QURA BİLMƏZDİ.
+
+Səbəb: `git.mjs` yalnız AÇIQ verilən yolları stage edir; əvvəlki bloklarda
+`package.json` verilib, `package-lock.json` isə verilməyib. Diskdəki lock artıq
+düzgün idi (17:15-də quraşdırma zamanı yenilənmişdi) — sadəcə commit edilməmişdi.
+Yoxlanıldı: `package.json`-dakı 51 asılılığın hamısının lock-da girişi var və
+heç bir versiya aralığı fərqlənmir.
+
+⚠️ `docs/git-audit-report.md` TÖRƏMƏ fayldır — hər `npm run git:audit`
+işlətməsində yenidən yazılır, ona görə auditdən sonra işçi ağacda «dəyişilmiş»
+görünməsi normaldır (hesabat özünü ehtiva edən commit-i saya bilmir).
+
 ### Dayanma nöqtəsi
 
 Push **qəsdən işlədilməyib**: PAT istifadəçidədir və token bu terminalda
