@@ -50,7 +50,7 @@ export function StoryHeader({ result }: StoryHeaderProps) {
 
       <div className="flex flex-col gap-4 px-6 pb-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-          <Avatar className="-mt-10 h-20 w-20 rounded-avatar border-4 border-surface bg-surface sm:-mt-12 sm:h-24 sm:w-24">
+          <Avatar className="-mt-8 h-20 w-20 rounded-avatar border-4 border-surface bg-surface sm:-mt-12 sm:h-24 sm:w-24">
             {profile.avatarUrl ? <AvatarImage src={profile.avatarUrl} alt="" /> : null}
             <AvatarFallback className="bg-ku-soft text-h2 font-semibold text-ku-dark">
               {profile.firstName.charAt(0)}

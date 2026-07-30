@@ -142,7 +142,7 @@ export function GuideDirectory({ places, filters }: GuideDirectoryProps) {
           action={{ href: guideHref(), label: "Bütün kateqoriyalar" }}
         />
       ) : (
-        <div className="flex flex-col gap-10">
+        <div className="flex flex-col gap-12">
           {groups.map((group) => (
             <section
               key={group.category}

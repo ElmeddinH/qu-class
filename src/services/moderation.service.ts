@@ -47,6 +47,7 @@ import {
   PostStatus,
   ReportEntityType,
   ReportStatus,
+  Visibility,
   type ReportEntityType as ReportEntityTypeValue,
   type ReportStatus as ReportStatusValue,
 } from "@/lib/enums";
@@ -378,7 +379,7 @@ export async function openModerationReview(
   const guarded: Guarded = {
     ownerId: target.ownerId ?? "",
     cohortId: target.cohortId,
-    visibility: target.visibility ?? "PRIVATE",
+    visibility: target.visibility ?? Visibility.PRIVATE,
   };
   if (!canModerate(admin, guarded)) return { ok: false, reason: "FORBIDDEN" };
 

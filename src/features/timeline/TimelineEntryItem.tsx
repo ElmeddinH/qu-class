@@ -46,7 +46,7 @@ export function TimelineEntryItem({ item, cohortSlug }: TimelineEntryItemProps) 
   const href = sourceHref(item, cohortSlug);
 
   return (
-    <li className="relative pl-10">
+    <li className="relative pl-12">
       {/* Xəttin üzərindəki nöqtə — milestone daha iri və accent rəngdədir. */}
       <span
         className={cn(

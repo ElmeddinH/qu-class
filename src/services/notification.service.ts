@@ -27,6 +27,7 @@
 
 import type { Prisma } from "@prisma/client";
 
+import { AUTHOR_SELECT, toAuthorCardOrNull, type AuthorCard } from "@/lib/author-card";
 import { prisma } from "@/lib/db";
 import type { NotificationType } from "@/lib/enums";
 import { NOTIFICATION_PAGE_SIZE } from "@/lib/notification-filters";
@@ -42,7 +43,13 @@ export interface NotificationItem {
   entityId: string | null;
   readAt: Date | null;
   createdAt: Date;
-  actor: { id: string; firstName: string; lastName: string; avatarUrl: string | null } | null;
+  /**
+   * Bildirişi doğuran şəxs.
+   *
+   * ⚠️ `avatarUrl` İDARƏ OLUNAN sahədir və redaksiyadan keçir (TƏLƏ T40):
+   * şəklini gizlədən adam bildiriş sətrində baş hərfləri ilə görünür.
+   */
+  actor: AuthorCard | null;
 }
 
 export interface NotificationFilters {
@@ -63,7 +70,8 @@ const NOTIFICATION_SELECT = {
   entityId: true,
   readAt: true,
   createdAt: true,
-  actor: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+  // ⚠️ TƏLƏ T40 — xam `avatarUrl: true` YAZMA.
+  actor: { select: AUTHOR_SELECT },
 } satisfies Prisma.NotificationSelect;
 
 /**
@@ -88,7 +96,7 @@ export async function listNotifications(
   viewer: AuthenticatedViewer,
   filters: NotificationFilters = {},
 ): Promise<NotificationItem[]> {
-  return prisma.notification.findMany({
+  const rows = await prisma.notification.findMany({
     where: notificationWhere(viewer, filters),
     // Oxunmamışlar ÖNCƏ deyil — xronoloji sıra bildiriş lentində gözlənilən
     // davranışdır və "oxunmuşu oxunmamış etmək" düyməsi olmadığı üçün sıra
@@ -98,6 +106,8 @@ export async function listNotifications(
     skip: filters.skip ?? 0,
     select: NOTIFICATION_SELECT,
   });
+
+  return rows.map((row) => ({ ...row, actor: toAuthorCardOrNull(row.actor, viewer) }));
 }
 
 /** `listNotifications` ilə EYNİ şərtin sayı — səhifələmə üçün. */

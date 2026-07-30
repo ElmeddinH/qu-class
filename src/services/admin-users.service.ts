@@ -154,14 +154,19 @@ function adminUserWhere(filters: AdminUserFilterState): Prisma.UserWhereInput {
 }
 
 function toAdminUserRow(row: AdminUserDbRow, viewer: Viewer, now: Date): AdminUserRow {
-  // 🔴 Şəhər `redactProfile`-dan KEÇİR: admin olmaq `CLASS` səviyyəli sahəni
-  // görmək demək deyil (bax fayl başlığı).
+  // 🔴 Şəhər VƏ AVATAR `redactProfile`-dan KEÇİR: admin olmaq `CLASS` səviyyəli
+  // sahəni görmək demək deyil (bax fayl başlığı).
+  //
+  // ⚠️ TƏLƏ T40 (Blok 12A) — `avatarUrl` da `CONTROLLED_PROFILE_FIELDS`-dədir.
+  // Əvvəl yalnız `currentCity` redaksiyadan keçirdi, avatar isə xam gedirdi;
+  // eyni funksiyada iki fərqli qayda qalmışdı.
   const profile: ProfileView = {
     id: row.id,
     firstName: row.firstName,
     lastName: row.lastName,
     cohortIds: row.memberships.map((m) => m.cohortId),
     currentCity: row.currentCity,
+    avatarUrl: row.avatarUrl,
   };
   const redacted = redactProfile(profile, viewer, row.fieldVisibility);
 
@@ -170,7 +175,7 @@ function toAdminUserRow(row: AdminUserDbRow, viewer: Viewer, now: Date): AdminUs
     firstName: row.firstName,
     lastName: row.lastName,
     email: row.email,
-    avatarUrl: row.avatarUrl,
+    avatarUrl: (redacted.avatarUrl as string | null | undefined) ?? null,
     systemRole: row.systemRole,
     deactivatedAt: row.deactivatedAt,
     createdAt: row.createdAt,

@@ -2,15 +2,15 @@
 
 `npm run git:audit` (`scripts/git-audit.mjs`) tərəfindən yaradılır. Şəbəkəsiz, yalnız oxu. Tapılan hər dəyər **maskalanır** (ilk 4 simvol + `****`) — hesabatın özü sızma mənbəyinə çevrilməməlidir.
 
-Son işlədilmə: `2026-07-30T19:27:52.413Z`
+Son işlədilmə: `2026-07-30T19:30:03.860Z`
 
 ## Xülasə
 
 | Ölçü | Dəyər |
 | --- | --- |
-| Gəzilən commit | 28 (HEAD-dən kökə, `depth: Infinity`) |
+| Gəzilən commit | 29 (HEAD-dən kökə, `depth: Infinity`) |
 | Tarixçədəki unikal yol | 551 |
-| Tarixçədəki unikal blob | 701 |
+| Tarixçədəki unikal blob | 704 |
 | İndeksdə izlənən fayl | 548 |
 | 🔴 Bloklayan tapıntı | 0 |
 | ⚠️ Xəbərdarlıq | 0 |
@@ -25,16 +25,16 @@ GitHub həddləri: **50 MB** xəbərdarlıq · **100 MB** hard blok.
 
 | # | Ölçü | Yol |
 | --- | --- | --- |
-| 1 | 421.8 KB | `package-lock.json` |
-| 2 | 419.7 KB | `package-lock.json` |
-| 3 | 91.9 KB | `STATE.md` |
-| 4 | 90.7 KB | `prisma/seed-data/content.ts` |
-| 5 | 86.3 KB | `STATE.md` |
-| 6 | 81.2 KB | `prisma/seed-data/content.ts` |
-| 7 | 77.2 KB | `prisma/seed-data/content.ts` |
-| 8 | 67.8 KB | `prisma/seed.ts` |
-| 9 | 66.3 KB | `STATE.md` |
-| 10 | 65.8 KB | `prisma/seed.ts` |
+| 1 | 422.1 KB | `package-lock.json` |
+| 2 | 421.8 KB | `package-lock.json` |
+| 3 | 419.7 KB | `package-lock.json` |
+| 4 | 93.0 KB | `STATE.md` |
+| 5 | 91.9 KB | `STATE.md` |
+| 6 | 90.7 KB | `prisma/seed-data/content.ts` |
+| 7 | 86.3 KB | `STATE.md` |
+| 8 | 81.2 KB | `prisma/seed-data/content.ts` |
+| 9 | 77.2 KB | `prisma/seed-data/content.ts` |
+| 10 | 67.8 KB | `prisma/seed.ts` |
 
 ## `.gitignore` uyğunluğu
 
@@ -49,8 +49,8 @@ Tərsinə təsdiq (bunlar İZLƏNMƏLİDİR):
 
 | Rol | Ad | E-poçt | Commit sayı |
 | --- | --- | --- | --- |
-| author | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 28 |
-| committer | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 28 |
+| author | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 29 |
+| committer | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 29 |
 
 ⚠️ **T33** — GitHub commit-i töhfə qrafikinə yalnız e-poçt hesaba bağlı olduqda yazır. Uyğunsuzluq push-DAN ƏVVƏL düzəldilməlidir: sonrakı düzəliş bütün commit SHA-larını dəyişir.
 

@@ -14,7 +14,9 @@
 import type { Prisma } from "@prisma/client";
 
 import { assertFreshAdmin } from "@/lib/admin-guard";
+import { AUTHOR_SELECT, toAuthorCard, type AuthorCard } from "@/lib/author-card";
 import { prisma } from "@/lib/db";
+import { recordAudit } from "@/services/audit.service";
 import {
   AchievementStatus,
   AuditAction,
@@ -45,7 +47,8 @@ export interface AchievementItem {
   awardedAt: Date;
   status: string;
   visibility: string;
-  owner: { id: string; firstName: string; lastName: string; avatarUrl: string | null };
+  /** ⚠️ `avatarUrl` redaksiyadan keçir — `toAchievementItem()` (TƏLƏ T40). */
+  owner: AuthorCard;
   cohort: { id: string; slug: string; displayName: string };
 }
 
@@ -70,9 +73,24 @@ const ACHIEVEMENT_SELECT = {
   awardedAt: true,
   status: true,
   visibility: true,
-  owner: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+  // ⚠️ TƏLƏ T40 — xam `avatarUrl: true` YAZMA.
+  owner: { select: AUTHOR_SELECT },
   cohort: { select: { id: true, slug: true, displayName: true } },
 } satisfies Prisma.AchievementSelect;
+
+/**
+ * Sətir → nailiyyət kartı.
+ *
+ * ⚠️ TƏK VƏZİFƏSİ sahibin kartını `redactProfile`-dan keçirməkdir (TƏLƏ T40).
+ * Moderasiya növbələrində də tətbiq olunur: moderator nailiyyəti təsdiqləmək
+ * üçün MƏZMUNA baxır, sahibin profil şəklinə yox.
+ */
+function toAchievementItem<R extends { owner: Parameters<typeof toAuthorCard>[0] }>(
+  row: R,
+  viewer: Viewer,
+): Omit<R, "owner"> & { owner: AuthorCard } {
+  return { ...row, owner: toAuthorCard(row.owner, viewer) };
+}
 
 /** Siyahı və sayın ORTAQ şərti — ikisi ayrılsa nəticə ilə rəqəm uyğunsuz olar. */
 function achievementWhere(
@@ -107,13 +125,15 @@ export async function listAchievements(
   viewer: Viewer,
   filters: AchievementFilters = {},
 ): Promise<AchievementItem[]> {
-  return prisma.achievement.findMany({
+  const rows = await prisma.achievement.findMany({
     where: achievementWhere(viewer, filters),
     orderBy: [{ awardedAt: "desc" }, { id: "desc" }],
     take: filters.take ?? ACHIEVEMENT_PAGE_SIZE,
     skip: filters.skip ?? 0,
     select: ACHIEVEMENT_SELECT,
   });
+
+  return rows.map((row) => toAchievementItem(row, viewer));
 }
 
 /**
@@ -147,7 +167,7 @@ export async function searchAchievements(
   );
   if (textWhere === null) return [];
 
-  return prisma.achievement.findMany({
+  const rows = await prisma.achievement.findMany({
     where: {
       AND: [
         visibleWithStatus<Prisma.AchievementWhereInput>(
@@ -162,6 +182,8 @@ export async function searchAchievements(
     take,
     select: ACHIEVEMENT_SELECT,
   });
+
+  return rows.map((row) => toAchievementItem(row, viewer));
 }
 
 /** Tək nailiyyət. Görünmürsə `null` — "yoxdur" və "icazə yoxdur" ayırd edilmir. */
@@ -169,7 +191,7 @@ export async function getAchievement(
   viewer: Viewer,
   achievementId: string,
 ): Promise<AchievementItem | null> {
-  return prisma.achievement.findFirst({
+  const row = await prisma.achievement.findFirst({
     where: {
       AND: [
         { id: achievementId },
@@ -182,6 +204,8 @@ export async function getAchievement(
     },
     select: ACHIEVEMENT_SELECT,
   });
+
+  return row === null ? null : toAchievementItem(row, viewer);
 }
 
 // ---------------------------------------------------------------------------
@@ -204,7 +228,7 @@ export async function listFeaturedAchievements(
   cohortId: string,
   take: number = FEATURED_ACHIEVEMENT_LIMIT,
 ): Promise<AchievementItem[]> {
-  return prisma.achievement.findMany({
+  const rows = await prisma.achievement.findMany({
     where: {
       AND: [
         { cohortId },
@@ -220,6 +244,8 @@ export async function listFeaturedAchievements(
     take,
     select: ACHIEVEMENT_SELECT,
   });
+
+  return rows.map((row) => toAchievementItem(row, viewer));
 }
 
 export interface AchievementStats {
@@ -319,12 +345,14 @@ export async function listModerationQueue(
 ): Promise<ModerationQueueItem[]> {
   if (!canModerateCohort(viewer, cohortId)) throw new ModerationForbiddenError(cohortId);
 
-  return prisma.achievement.findMany({
+  const rows = await prisma.achievement.findMany({
     where: { cohortId, status: AchievementStatus.SUBMITTED },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     take,
     select: { ...ACHIEVEMENT_SELECT, createdAt: true },
   });
+
+  return rows.map((row) => toAchievementItem(row, viewer));
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +392,7 @@ export async function listUniversityModerationQueue(
 ): Promise<UniversityQueueItem[]> {
   await assertFreshAdmin(viewer);
 
-  return prisma.achievement.findMany({
+  const rows = await prisma.achievement.findMany({
     where: {
       status: AchievementStatus.SUBMITTED,
       ...(filters.cohortId ? { cohortId: filters.cohortId } : {}),
@@ -373,6 +401,8 @@ export async function listUniversityModerationQueue(
     take,
     select: { ...ACHIEVEMENT_SELECT, createdAt: true, cohortId: true },
   });
+
+  return rows.map((row) => toAchievementItem(row, viewer));
 }
 
 /** Universitet miqyasında təsdiq gözləyən nailiyyət sayı. */
@@ -473,21 +503,25 @@ async function applyModeration(
       },
     });
 
-    await tx.auditLog.create({
-      data: {
-        actorId: viewer.userId,
-        // Təsdiq / seçilmiş → VERIFY; rədd → MODERATE (enum-da "REJECT" yoxdur).
-        action: decision === "ARCHIVED" ? AuditAction.MODERATE : AuditAction.VERIFY,
-        entityType: NotificationEntityType.ACHIEVEMENT,
-        entityId: achievement.id,
-        metadata: JSON.stringify({
-          operation: notice.audit,
-          from: achievement.status,
-          to: decision,
-          cohortId: achievement.cohortId,
-          ownerId: achievement.ownerId,
-          note,
-        }),
+    // ⚠️ TƏLƏ T42 — `recordAudit()` yeganə yazma yoludur: ağ siyahı
+    // (`safeAuditMetadata`) yalnız orada tətbiq olunur.
+    //
+    // ⚠️ Moderatorun qeydi `note` yox, `reason` açarı ilə yazılır — ağ siyahıda
+    // sərbəst mətn üçün MƏHZ o slot var (`AUDIT_METADATA_KEYS`). Ad dəyişikliyi
+    // məlumat itkisi deyil: qeyd sahibə onsuz da bildirişlə çatdırılır (aşağı).
+    await recordAudit(tx, {
+      actorId: viewer.userId,
+      // Təsdiq / seçilmiş → VERIFY; rədd → MODERATE (enum-da "REJECT" yoxdur).
+      action: decision === "ARCHIVED" ? AuditAction.MODERATE : AuditAction.VERIFY,
+      entityType: NotificationEntityType.ACHIEVEMENT,
+      entityId: achievement.id,
+      metadata: {
+        operation: notice.audit,
+        from: achievement.status,
+        to: decision,
+        cohortId: achievement.cohortId,
+        ownerId: achievement.ownerId,
+        reason: note,
       },
     });
 

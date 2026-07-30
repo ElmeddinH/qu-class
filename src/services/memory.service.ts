@@ -37,8 +37,10 @@
 
 import type { Prisma } from "@prisma/client";
 
+import { AUTHOR_SELECT, toAuthorCard, type AuthorCard } from "@/lib/author-card";
 import { prisma } from "@/lib/db";
 import {
+  AuditAction,
   ContentStatus,
   MediaType,
   PostCategory,
@@ -49,6 +51,7 @@ import {
 } from "@/lib/enums";
 import { activeVisibleWhere, canModerate, type Viewer } from "@/lib/visibility";
 import type { AuthenticatedViewer } from "@/lib/viewer";
+import { recordAudit } from "@/services/audit.service";
 import { buildTimelineEntry } from "@/features/feed/fanout";
 
 export interface MemoryItem {
@@ -69,7 +72,8 @@ export interface MemoryItem {
   showInFeed: boolean;
   showInTimeline: boolean;
   showInYearbook: boolean;
-  author: { id: string; firstName: string; lastName: string; avatarUrl: string | null };
+  /** ⚠️ `avatarUrl` redaksiyadan keçir — `toMemoryItem()` (TƏLƏ T40). */
+  author: AuthorCard;
   cohort: { id: string; slug: string; displayName: string };
   guidePlace: { id: string; title: string; category: string } | null;
 }
@@ -113,10 +117,23 @@ const MEMORY_SELECT = {
   showInFeed: true,
   showInTimeline: true,
   showInYearbook: true,
-  author: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+  // ⚠️ TƏLƏ T40 — xam `avatarUrl: true` YAZMA.
+  author: { select: AUTHOR_SELECT },
   cohort: { select: { id: true, slug: true, displayName: true } },
   guidePlace: { select: { id: true, title: true, category: true } },
 } satisfies Prisma.MemorySelect;
+
+type MemoryRow = Prisma.MemoryGetPayload<{ select: typeof MEMORY_SELECT }>;
+
+/**
+ * Sətir → xatirə kartı.
+ *
+ * ⚠️ TƏK VƏZİFƏSİ müəllif kartını `redactProfile`-dan keçirməkdir (TƏLƏ T40).
+ * Qalan sahələr olduğu kimi ötürülür — `MEMORY_SELECT` onsuz da ağ siyahıdır.
+ */
+function toMemoryItem(row: MemoryRow, viewer: Viewer): MemoryItem {
+  return { ...row, author: toAuthorCard(row.author, viewer) };
+}
 
 /**
  * Görünürlük + `DELETED` qoruyucusu (Post-dakı `visiblePostWhere` ilə eyni).
@@ -162,13 +179,15 @@ export async function listMemories(
   viewer: Viewer,
   filters: MemoryFilters = {},
 ): Promise<MemoryItem[]> {
-  return prisma.memory.findMany({
+  const rows = await prisma.memory.findMany({
     where: memoryWhere(viewer, filters),
     orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
     take: filters.take ?? MEMORY_PAGE_SIZE,
     skip: filters.skip ?? 0,
     select: MEMORY_SELECT,
   });
+
+  return rows.map((row) => toMemoryItem(row, viewer));
 }
 
 /** Səhifələmə üçün ümumi say — EYNİ görünürlük şərtindən keçir. */
@@ -181,12 +200,14 @@ export async function countMemories(
 
 /** Tək xatirə. Görünmürsə `null`. */
 export async function getMemory(viewer: Viewer, memoryId: string): Promise<MemoryItem | null> {
-  return prisma.memory.findFirst({
+  const row = await prisma.memory.findFirst({
     where: {
       AND: [{ id: memoryId }, visibleMemoryWhere(viewer)],
     },
     select: MEMORY_SELECT,
   });
+
+  return row === null ? null : toMemoryItem(row, viewer);
 }
 
 // ---------------------------------------------------------------------------
@@ -207,13 +228,15 @@ export async function listYearbook(
   viewer: Viewer,
   cohortId: string,
 ): Promise<MemoryItem[]> {
-  return prisma.memory.findMany({
+  const rows = await prisma.memory.findMany({
     where: {
       AND: [visibleMemoryWhere(viewer), { cohortId }, { showInYearbook: true }],
     },
     orderBy: [{ occurredAt: "asc" }, { id: "asc" }],
     select: MEMORY_SELECT,
   });
+
+  return rows.map((row) => toMemoryItem(row, viewer));
 }
 
 // ---------------------------------------------------------------------------
@@ -229,7 +252,8 @@ export interface PlaceMemoryItem {
   imageUrl: string | null;
   occurredAt: Date;
   visibility: string;
-  author: { id: string; firstName: string; lastName: string; avatarUrl: string | null };
+  /** ⚠️ Redaksiyadan keçmiş kart — bələdçi səhifəsi İCTİMAİDİR (TƏLƏ T40). */
+  author: AuthorCard;
   cohort: { id: string; slug: string; displayName: string };
 }
 
@@ -250,7 +274,7 @@ export async function listMemoriesForPlace(
   guidePlaceId: string,
   take: number = PLACE_MEMORY_LIMIT,
 ): Promise<PlaceMemoryItem[]> {
-  return prisma.memory.findMany({
+  const rows = await prisma.memory.findMany({
     where: {
       AND: [visibleMemoryWhere(viewer), { guidePlaceId }],
     },
@@ -264,10 +288,13 @@ export async function listMemoriesForPlace(
       imageUrl: true,
       occurredAt: true,
       visibility: true,
-      author: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      // ⚠️ TƏLƏ T40 — bu səth ANONİM ziyarətçiyə açıqdır.
+      author: { select: AUTHOR_SELECT },
       cohort: { select: { id: true, slug: true, displayName: true } },
     },
   });
+
+  return rows.map((row) => ({ ...row, author: toAuthorCard(row.author, viewer) }));
 }
 
 /** Məkana bağlı GÖRÜNƏN xatirə sayı — "hamısı" linkinin yanındakı rəqəm. */
@@ -617,7 +644,33 @@ export async function deleteMemory(
 
   if (!isOwner && !moderates) return { ok: false, reason: "FORBIDDEN" };
 
+  // 🔴 TƏLƏ T41 — moderasiya yolu ilə silinirsə AuditLog MƏCBURİDİR.
+  // `canModerate()` qapısı ilə iz EYNİ funksiyada olmalıdır (lib/visibility.ts:
+  // «Hər çağırışda AuditLog yaz»); `deletePost` / `deleteComment` eyni qaydanı
+  // tətbiq edir. Sahibin öz silməsi moderasiya DEYİL — sətir yazılmır.
+  const isModerating = !isOwner && moderates;
+
   await prisma.$transaction(async (tx) => {
+    if (isModerating) {
+      // İZ ƏVVƏL, məzmun sonra — `openModerationReview` ilə eyni sıra.
+      // ⚠️ Metadata MƏTN DAŞIMIR: `recordAudit` ağ siyahısı (`safeAuditMetadata`)
+      // yalnız id / enum açarlarını buraxır, xatirənin gövdəsi jurnala düşmür.
+      await recordAudit(tx, {
+        actorId: viewer.userId,
+        action: AuditAction.MODERATE,
+        entityType: "MEMORY",
+        entityId: memoryId,
+        metadata: {
+          operation: "deleteMemory",
+          ownerId: memory.authorId,
+          cohortId: memory.cohortId,
+          // Bağlı post da silinir (aşağı) — iki səth arasındakı əlaqə jurnalda
+          // görünməlidir, əks halda post `deletePost`-un izi olmadan yox olur.
+          ...(memory.postId === null ? {} : { postId: memory.postId }),
+        },
+      });
+    }
+
     await tx.memory.update({
       where: { id: memoryId },
       data: { status: ContentStatus.DELETED },
@@ -640,8 +693,11 @@ export async function getMemoryDraft(
   viewer: AuthenticatedViewer,
   memoryId: string,
 ): Promise<MemoryItem | null> {
-  return prisma.memory.findFirst({
+  const row = await prisma.memory.findFirst({
     where: { id: memoryId, authorId: viewer.userId, status: ContentStatus.ACTIVE },
     select: MEMORY_SELECT,
   });
+
+  // Sahib öz qaralamasına baxır — `redactProfile` sahibə onsuz da toxunmur.
+  return row === null ? null : toMemoryItem(row, viewer);
 }

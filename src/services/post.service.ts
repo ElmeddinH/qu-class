@@ -16,6 +16,7 @@
 
 import type { Prisma } from "@prisma/client";
 
+import { AUTHOR_SELECT, toAuthorCard, type AuthorCard } from "@/lib/author-card";
 import { prisma } from "@/lib/db";
 import {
   AchievementStatus,
@@ -32,6 +33,7 @@ import {
   type Visibility as VisibilityType,
 } from "@/lib/enums";
 import { tokenizedContains } from "@/lib/text-search";
+import { recordAudit } from "@/services/audit.service";
 import {
   activeVisibleWhere,
   canModerate,
@@ -49,12 +51,12 @@ import {
 // Oxu tipləri
 // ---------------------------------------------------------------------------
 
-export interface FeedAuthor {
-  id: string;
-  firstName: string;
-  lastName: string;
-  avatarUrl: string | null;
-}
+/**
+ * ⚠️ `avatarUrl` İDARƏ OLUNAN sahədir — kart `toAuthorCard()`-dan keçir
+ * (`lib/author-card.ts`, TƏLƏ T40). Şəkli gizlədən müəllif lentdə baş
+ * hərfləri ilə görünür.
+ */
+export type FeedAuthor = AuthorCard;
 
 export interface FeedMedia {
   id: string;
@@ -141,7 +143,8 @@ const FEED_SELECT = {
   showInAchievements: true,
   authorId: true,
   cohortId: true,
-  author: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+  // ⚠️ TƏLƏ T40 — xam `avatarUrl: true` YAZMA; kart redaksiyadan keçməlidir.
+  author: { select: AUTHOR_SELECT },
   cohort: { select: { id: true, slug: true, displayName: true } },
   media: {
     select: {
@@ -200,12 +203,14 @@ function toFeedPost(
   viewer: Viewer,
   reactionCounts: Record<string, number>,
 ): FeedPost {
-  const { _count, reactions, authorId, cohortId, ...rest } = row;
+  const { _count, reactions, authorId, cohortId, author, ...rest } = row;
 
   const isOwner = viewer.kind === "USER" && viewer.userId === authorId;
 
   return {
     ...rest,
+    // TƏLƏ T40 — sahə-səviyyə redaksiyası burada tətbiq olunur.
+    author: toAuthorCard(author, viewer),
     commentCount: _count.comments,
     reactionCount: _count.reactions,
     reactionCounts,
@@ -386,7 +391,8 @@ export async function listComments(viewer: Viewer, postId: string): Promise<Feed
       createdAt: true,
       parentId: true,
       authorId: true,
-      author: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      // ⚠️ TƏLƏ T40 — şərh müəllifinin şəkli də redaksiyadan keçir.
+      author: { select: AUTHOR_SELECT },
       post: { select: { cohortId: true, visibility: true } },
     },
   });
@@ -398,7 +404,7 @@ export async function listComments(viewer: Viewer, postId: string): Promise<Feed
       body: row.body,
       createdAt: row.createdAt,
       parentId: row.parentId,
-      author: row.author,
+      author: toAuthorCard(row.author, viewer),
       isOwner,
       canModerate:
         !isOwner &&
@@ -850,41 +856,43 @@ export async function deletePost(
 
   if (!isOwner && !isModerating) return { ok: false, reason: "FORBIDDEN" };
 
-  await prisma.$transaction([
-    prisma.post.update({
+  // ⚠️ TƏLƏ T42 — audit sətri `recordAudit()` ilə yazılır, `prisma.auditLog
+  // .create` ilə DEYİL: ağ siyahı (`safeAuditMetadata`) yalnız orada tətbiq
+  // olunur. `recordAudit` `async`-dir, ona görə transaksiya MASSİV formasından
+  // İNTERAKTİV formaya keçirilib — davranış eynidir (hamısı bir transaksiyada).
+  await prisma.$transaction(async (tx) => {
+    if (isModerating) {
+      // İZ ƏVVƏL, məzmun sonra — `openModerationReview` ilə eyni sıra.
+      await recordAudit(tx, {
+        actorId: viewer.userId,
+        action: AuditAction.MODERATE,
+        entityType: NotificationEntityType.POST,
+        entityId: post.id,
+        metadata: {
+          operation: "deletePost",
+          authorId: post.authorId,
+          cohortId: post.cohortId,
+          category: post.category,
+        },
+      });
+    }
+
+    await tx.post.update({
       where: { id: post.id },
       data: { status: PostStatus.DELETED },
-    }),
-    prisma.timelineEntry.deleteMany({ where: { postId: post.id } }),
-    prisma.achievement.updateMany({
+    });
+    await tx.timelineEntry.deleteMany({ where: { postId: post.id } });
+    await tx.achievement.updateMany({
       where: { postId: post.id },
       data: { status: AchievementStatus.ARCHIVED },
-    }),
+    });
     // Xatirə də soft-delete olur — `Memory.status` ayrı sütundur və
     // `Memory.postId` `onDelete: SetNull` olduğu üçün cascade onu toxunmur.
-    prisma.memory.updateMany({
+    await tx.memory.updateMany({
       where: { postId: post.id },
       data: { status: ContentStatus.DELETED },
-    }),
-    ...(isModerating
-      ? [
-          prisma.auditLog.create({
-            data: {
-              actorId: viewer.userId,
-              action: AuditAction.MODERATE,
-              entityType: NotificationEntityType.POST,
-              entityId: post.id,
-              metadata: JSON.stringify({
-                operation: "deletePost",
-                authorId: post.authorId,
-                cohortId: post.cohortId,
-                category: post.category,
-              }),
-            },
-          }),
-        ]
-      : []),
-  ]);
+    });
+  });
 
   return { ok: true, value: null };
 }
@@ -1066,29 +1074,27 @@ export async function deleteComment(
 
   if (!isOwner && !isModerating) return { ok: false, reason: "FORBIDDEN" };
 
-  await prisma.$transaction([
-    prisma.comment.update({
+  // ⚠️ TƏLƏ T42 — bax `deletePost`-dakı qeyd.
+  await prisma.$transaction(async (tx) => {
+    if (isModerating) {
+      await recordAudit(tx, {
+        actorId: viewer.userId,
+        action: AuditAction.MODERATE,
+        entityType: "COMMENT",
+        entityId: comment.id,
+        metadata: {
+          operation: "deleteComment",
+          authorId: comment.authorId,
+          postId: comment.postId,
+        },
+      });
+    }
+
+    await tx.comment.update({
       where: { id: comment.id },
       data: { status: ContentStatus.DELETED },
-    }),
-    ...(isModerating
-      ? [
-          prisma.auditLog.create({
-            data: {
-              actorId: viewer.userId,
-              action: AuditAction.MODERATE,
-              entityType: "COMMENT",
-              entityId: comment.id,
-              metadata: JSON.stringify({
-                operation: "deleteComment",
-                authorId: comment.authorId,
-                postId: comment.postId,
-              }),
-            },
-          }),
-        ]
-      : []),
-  ]);
+    });
+  });
 
   return { ok: true, value: null };
 }

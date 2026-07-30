@@ -33,7 +33,7 @@
 // buraxılır — dəqiq ünvan və koordinat heç vaxt.
 // ============================================================================
 
-import type { Prisma } from "@prisma/client";
+import type { Prisma, PrismaClient } from "@prisma/client";
 
 import {
   aggregateCareerStats,
@@ -53,6 +53,14 @@ import {
   type ControlledField,
   type Viewer,
 } from "@/lib/visibility";
+
+/**
+ * Transaksiya klienti — `prisma.$transaction(async (tx) => …)` içindəki obyekt.
+ *
+ * Aqreqasiya köməkçiləri `prisma`-nı BİRBAŞA tutmur, klienti arqument kimi
+ * alır: yalnız belə olanda hər üç oxunuş EYNİ snapshot-a düşür (TƏLƏ T43).
+ */
+type StatsClient = Prisma.TransactionClient | PrismaClient;
 
 export interface StatsFilters {
   /** Yalnız bu sinfin üzvləri. Verilməzsə bütün universitet. */
@@ -152,30 +160,31 @@ function educationWhere(
  * diplomlu adam üç dəfə sayılıb cəm invariantını sındırardı.
  */
 async function fetchCareerStatsRows(
+  client: StatsClient,
   viewer: Viewer,
   filters: StatsFilters,
 ): Promise<CareerStatsRow[]> {
-  const [careerRows, educationRows] = await Promise.all([
-    prisma.careerEntry.findMany({
-      where: currentCareerWhere(viewer, filters),
-      select: {
-        userId: true,
-        city: true,
-        country: true,
-        company: true,
-        industry: true,
-        jobFunction: true,
-      },
-      // Deterministik sıra: eyni məlumat üçün eyni çıxış (test müqayisələri).
-      orderBy: { id: "asc" },
-    }),
+  // ⚠️ ARDICIL, `Promise.all` DEYİL (TƏLƏ T43): interaktiv transaksiyada
+  // paralel sorğular eyni bağlantını paylaşmır və snapshot zəmanəti itir.
+  const careerRows = await client.careerEntry.findMany({
+    where: currentCareerWhere(viewer, filters),
+    select: {
+      userId: true,
+      city: true,
+      country: true,
+      company: true,
+      industry: true,
+      jobFunction: true,
+    },
+    // Deterministik sıra: eyni məlumat üçün eyni çıxış (test müqayisələri).
+    orderBy: { id: "asc" },
+  });
 
-    prisma.educationEntry.findMany({
-      where: educationWhere(viewer, filters),
-      select: { userId: true, degree: true },
-      orderBy: { id: "asc" },
-    }),
-  ]);
+  const educationRows = await client.educationEntry.findMany({
+    where: educationWhere(viewer, filters),
+    select: { userId: true, degree: true },
+    orderBy: { id: "asc" },
+  });
 
   const degreesByUser = new Map<string, string[]>();
   for (const row of educationRows) {
@@ -209,27 +218,28 @@ async function fetchCareerStatsRows(
  * alardı — bu, gizli sətrin MÖVCUDLUĞUNU sızdırır.
  */
 async function countConsentedMembers(
+  client: StatsClient,
   viewer: Viewer,
   filters: StatsFilters,
 ): Promise<number> {
-  const [career, education] = await Promise.all([
-    prisma.careerEntry.groupBy({
-      by: ["userId"],
-      where: {
-        AND: [
-          statsConsentWhere,
-          visibilityWhereForUserOwned<Prisma.CareerEntryWhereInput>(viewer),
-          ...(filters.cohortId
-            ? [{ user: { memberships: { some: { cohortId: filters.cohortId } } } }]
-            : []),
-        ],
-      },
-    }),
-    prisma.educationEntry.groupBy({
-      by: ["userId"],
-      where: educationWhere(viewer, filters),
-    }),
-  ]);
+  // ⚠️ ARDICIL (TƏLƏ T43) — bax `fetchCareerStatsRows`-dakı qeyd.
+  const career = await client.careerEntry.groupBy({
+    by: ["userId"],
+    where: {
+      AND: [
+        statsConsentWhere,
+        visibilityWhereForUserOwned<Prisma.CareerEntryWhereInput>(viewer),
+        ...(filters.cohortId
+          ? [{ user: { memberships: { some: { cohortId: filters.cohortId } } } }]
+          : []),
+      ],
+    },
+  });
+
+  const education = await client.educationEntry.groupBy({
+    by: ["userId"],
+    where: educationWhere(viewer, filters),
+  });
 
   return new Set([...career, ...education].map((row) => row.userId)).size;
 }
@@ -248,13 +258,25 @@ export async function getCareerOutcomeStats(
   viewer: Viewer,
   filters: CareerOutcomeFilters = {},
 ): Promise<WhereAreWeNow> {
-  const [rows, totalConsented, memberCount] = await Promise.all([
-    fetchCareerStatsRows(viewer, filters),
-    countConsentedMembers(viewer, filters),
-    filters.cohortId === undefined
-      ? Promise.resolve(undefined)
-      : prisma.cohortMembership.count({ where: { cohortId: filters.cohortId } }),
-  ]);
+  // 🔴 TƏLƏ T43 — ÜÇ OXUNUŞ DA EYNİ SNAPSHOT-DAN.
+  //
+  // Əvvəl bunlar `Promise.all` ilə üç MÜSTƏQİL sorğu kimi gedirdi. Aralarında
+  // bir istifadəçi `includeInStats`-ı söndürsəydi, `respondentCount` (sətirlərdən)
+  // ilə `totalConsented` (ayrı sayğacdan) uyğunsuz cütlük verərdi — «6 nəfərdən
+  // 7-si razılıq verib». Bu, ölçülə bilən siqnaldır: iki yükləmə arasında
+  // razılığını geri götürən KONKRET şəxsin mövcudluğu şəffaflıq zolağından
+  // oxunur. Layihənin qaydası (`admin-users.service.ts` → rol dəyişikliyi)
+  // sayımı TRANSAKSİYA İÇİNDƏ tələb edir; burada da eynidir.
+  const { rows, totalConsented, memberCount } = await prisma.$transaction(
+    async (tx) => ({
+      rows: await fetchCareerStatsRows(tx, viewer, filters),
+      totalConsented: await countConsentedMembers(tx, viewer, filters),
+      memberCount:
+        filters.cohortId === undefined
+          ? undefined
+          : await tx.cohortMembership.count({ where: { cohortId: filters.cohortId } }),
+    }),
+  );
 
   return aggregateCareerStats(rows, {
     totalConsented,

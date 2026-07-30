@@ -34,7 +34,9 @@
 
 import type { Prisma } from "@prisma/client";
 
+import { AUTHOR_SELECT, toAuthorCard, toAuthorCardOrNull, type AuthorCard } from "@/lib/author-card";
 import { prisma } from "@/lib/db";
+import { recordAudit } from "@/services/audit.service";
 import {
   AuditAction,
   EVENT_MANAGER_ROLES,
@@ -91,7 +93,8 @@ export interface EventItem {
   coverUrl: string | null;
   visibility: string;
   status: string;
-  createdBy: { id: string; firstName: string; lastName: string; avatarUrl: string | null };
+  /** ⚠️ `avatarUrl` redaksiyadan keçir — `toEventItem()` (TƏLƏ T40). */
+  createdBy: AuthorCard;
   cohort: { id: string; slug: string; displayName: string } | null;
   faculty: { id: string; name: string } | null;
   club: { id: string; name: string; slug: string } | null;
@@ -161,7 +164,8 @@ const EVENT_SELECT = {
   coverUrl: true,
   visibility: true,
   status: true,
-  createdBy: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+  // ⚠️ TƏLƏ T40 — xam `avatarUrl: true` YAZMA.
+  createdBy: { select: AUTHOR_SELECT },
   cohort: { select: { id: true, slug: true, displayName: true } },
   faculty: { select: { id: true, name: true } },
   club: { select: { id: true, name: true, slug: true } },
@@ -182,7 +186,7 @@ type EventRow = Prisma.EventGetPayload<{ select: typeof EVENT_SELECT }>;
  * səssizcə client payload-una düşərdi. Açıq siyahı yeni sütunun sızmasının
  * qarşısını alır.
  */
-function toEventItem(row: EventRow): EventItem {
+function toEventItem(row: EventRow, viewer: Viewer): EventItem {
   return {
     id: row.id,
     scope: row.scope,
@@ -199,7 +203,8 @@ function toEventItem(row: EventRow): EventItem {
     coverUrl: row.coverUrl,
     visibility: row.visibility,
     status: row.status,
-    createdBy: row.createdBy,
+    // TƏLƏ T40 — sahə-səviyyə redaksiyası.
+    createdBy: toAuthorCard(row.createdBy, viewer),
     cohort: row.cohort,
     faculty: row.faculty,
     club: row.club,
@@ -261,7 +266,7 @@ export async function listEvents(
     select: EVENT_SELECT,
   });
 
-  return rows.map(toEventItem);
+  return rows.map((row) => toEventItem(row, viewer));
 }
 
 /** `listEvents` ilə EYNİ şərtin sayı — səhifələmə üçün. */
@@ -307,7 +312,7 @@ export async function searchEvents(
     select: EVENT_SELECT,
   });
 
-  return rows.map(toEventItem);
+  return rows.map((row) => toEventItem(row, viewer));
 }
 
 /** Tək tədbir. Görünmürsə `null`. */
@@ -326,7 +331,7 @@ export async function getEvent(viewer: Viewer, eventId: string): Promise<EventIt
     select: EVENT_SELECT,
   });
 
-  return row ? toEventItem(row) : null;
+  return row ? toEventItem(row, viewer) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -453,7 +458,8 @@ export interface EventDetail extends EventItem {
   /** Markdown proqram (spec §14 sahə 8). */
   agenda: string | null;
   /** Əlaqələndirici şəxs (spec §14 sahə 9). */
-  contact: { id: string; firstName: string; lastName: string; avatarUrl: string | null } | null;
+  /** ⚠️ `avatarUrl` redaksiyadan keçir (TƏLƏ T40). */
+  contact: AuthorCard | null;
   /** Tədbirdən sonrakı yekun mətni. */
   summary: string | null;
   addedToTimeline: boolean;
@@ -510,7 +516,8 @@ export async function getEventDetail(
       addedToTimeline: true,
       createdById: true,
       cohortId: true,
-      contact: { select: { id: true, firstName: true, lastName: true, avatarUrl: true } },
+      // ⚠️ TƏLƏ T40 — əlaqələndirici də adi oxu yoludur.
+      contact: { select: AUTHOR_SELECT },
       media: {
         orderBy: [{ order: "asc" }, { createdAt: "asc" }],
         select: {
@@ -565,11 +572,11 @@ export async function getEventDetail(
   const finished = row.startsAt.getTime() < now.getTime();
 
   return {
-    ...toEventItem(row),
+    ...toEventItem(row, viewer),
     agenda: row.agenda,
     summary: row.summary,
     addedToTimeline: row.addedToTimeline,
-    contact: row.contact,
+    contact: toAuthorCardOrNull(row.contact, viewer),
     photos: row.media,
     breakdown,
     viewerRsvp,
@@ -781,19 +788,18 @@ export async function createEvent(
       select: { id: true, cohort: { select: { slug: true } } },
     });
 
-    await tx.auditLog.create({
-      data: {
-        actorId: viewer.userId,
-        action: AuditAction.CREATE,
-        entityType: NotificationEntityType.EVENT,
-        entityId: event.id,
-        metadata: JSON.stringify({
-          operation: "createEvent",
-          cohortId: data.cohortId,
-          scope: data.scope,
-          category: data.category,
-          visibility: data.visibility,
-        }),
+    // ⚠️ TƏLƏ T42 — `recordAudit()` yeganə yazma yoludur (ağ siyahı orada).
+    await recordAudit(tx, {
+      actorId: viewer.userId,
+      action: AuditAction.CREATE,
+      entityType: NotificationEntityType.EVENT,
+      entityId: event.id,
+      metadata: {
+        operation: "createEvent",
+        cohortId: data.cohortId,
+        scope: data.scope,
+        category: data.category,
+        visibility: data.visibility,
       },
     });
 
@@ -1136,17 +1142,16 @@ export async function addEventToTimeline(
       data: { addedToTimeline: true },
     });
 
-    await tx.auditLog.create({
-      data: {
-        actorId: viewer.userId,
-        action: AuditAction.UPDATE,
-        entityType: NotificationEntityType.EVENT,
-        entityId: event.id,
-        metadata: JSON.stringify({
-          operation: "addEventToTimeline",
-          cohortId: event.cohortId,
-          visibility: entry.visibility,
-        }),
+    // ⚠️ TƏLƏ T42.
+    await recordAudit(tx, {
+      actorId: viewer.userId,
+      action: AuditAction.UPDATE,
+      entityType: NotificationEntityType.EVENT,
+      entityId: event.id,
+      metadata: {
+        operation: "addEventToTimeline",
+        cohortId: event.cohortId,
+        visibility: entry.visibility,
       },
     });
   });
@@ -1467,8 +1472,10 @@ export async function notifyAttendees(
 
   if (recipients.length === 0) return { ok: true, value: { sent: 0 } };
 
-  await prisma.$transaction([
-    prisma.notification.createMany({
+  // ⚠️ TƏLƏ T42 — `recordAudit` `async`-dir, ona görə transaksiya MASSİV
+  // formasından İNTERAKTİV formaya keçirilib (davranış eynidir).
+  await prisma.$transaction(async (tx) => {
+    await tx.notification.createMany({
       data: recipients.map((recipient) => ({
         recipientId: recipient.userId,
         actorId: viewer.userId,
@@ -1479,21 +1486,20 @@ export async function notifyAttendees(
         body,
         url: `/events/${eventId}`,
       })),
-    }),
-    prisma.auditLog.create({
-      data: {
-        actorId: viewer.userId,
-        action: AuditAction.UPDATE,
-        entityType: NotificationEntityType.EVENT,
-        entityId: eventId,
-        metadata: JSON.stringify({
-          operation: "notifyAttendees",
-          statuses,
-          recipients: recipients.length,
-        }),
+    });
+
+    await recordAudit(tx, {
+      actorId: viewer.userId,
+      action: AuditAction.UPDATE,
+      entityType: NotificationEntityType.EVENT,
+      entityId: eventId,
+      metadata: {
+        operation: "notifyAttendees",
+        statuses,
+        recipients: recipients.length,
       },
-    }),
-  ]);
+    });
+  });
 
   return { ok: true, value: { sent: recipients.length } };
 }
@@ -1591,7 +1597,7 @@ export async function getEventReport(
   return {
     ok: true,
     value: {
-      event: toEventItem({ ...row, _count: { rsvps: row._count.rsvps } }),
+      event: toEventItem({ ...row, _count: { rsvps: row._count.rsvps } }, viewer),
       agenda: row.agenda,
       summary: row.summary,
       breakdown,

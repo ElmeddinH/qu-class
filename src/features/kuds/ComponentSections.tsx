@@ -63,7 +63,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { VISIBILITY_VALUES } from "@/lib/enums";
+import { VISIBILITY_VALUES, Visibility } from "@/lib/enums";
 import { Caveat, Section, SubHeading } from "./Section";
 
 // ---------------------------------------------------------------------------
@@ -271,7 +271,7 @@ export function FormsSection() {
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="kuds-visibility">Görünürlük</Label>
-            <Select defaultValue="CLASS">
+            <Select defaultValue={Visibility.CLASS}>
               <SelectTrigger id="kuds-visibility">
                 <SelectValue placeholder="Səviyyə seç" />
               </SelectTrigger>
@@ -317,27 +317,27 @@ export function FormsSection() {
 
           <div className="flex flex-col gap-3">
             <SubHeading>Kim görə bilər?</SubHeading>
-            <RadioGroup defaultValue="CLASS" className="flex flex-col gap-3">
+            <RadioGroup defaultValue={Visibility.CLASS} className="flex flex-col gap-3">
               <div className="flex items-center gap-3">
-                <RadioGroupItem value="PUBLIC" id="kuds-public" />
+                <RadioGroupItem value={Visibility.PUBLIC} id="kuds-public" />
                 <Label htmlFor="kuds-public" className="font-normal">
                   Hər kəs
                 </Label>
               </div>
               <div className="flex items-center gap-3">
-                <RadioGroupItem value="UNIVERSITY" id="kuds-university" />
+                <RadioGroupItem value={Visibility.UNIVERSITY} id="kuds-university" />
                 <Label htmlFor="kuds-university" className="font-normal">
                   Universitet
                 </Label>
               </div>
               <div className="flex items-center gap-3">
-                <RadioGroupItem value="CLASS" id="kuds-class" />
+                <RadioGroupItem value={Visibility.CLASS} id="kuds-class" />
                 <Label htmlFor="kuds-class" className="font-normal">
                   Yalnız sinif
                 </Label>
               </div>
               <div className="flex items-center gap-3">
-                <RadioGroupItem value="PRIVATE" id="kuds-private" />
+                <RadioGroupItem value={Visibility.PRIVATE} id="kuds-private" />
                 <Label htmlFor="kuds-private" className="font-normal">
                   Yalnız mən
                 </Label>

@@ -77,4 +77,44 @@ describe("audit.service modulunun ixracları", () => {
     expect(code).not.toMatch(/auditLog\.(delete|deleteMany|update|updateMany|upsert)\s*\(/);
     expect(code).toMatch(/auditLog\.create\s*\(/);
   });
+
+  // ==========================================================================
+  // 🔴 T42 (Blok 12A) — `recordAudit` YEGANƏ yazma yoludur
+  // ==========================================================================
+  //
+  // Ağ siyahı (`safeAuditMetadata`) YALNIZ `recordAudit`-in içindədir. Kimsə
+  // servisdə birbaşa `prisma.auditLog.create({ metadata: JSON.stringify(...) })`
+  // yazsa, süzgəc TƏTBİQ OLUNMUR — və növbəti dəyişiklik oraya `body:
+  // post.body` əlavə etsə, şikayət edilmiş `PRIVATE` paylaşımın MƏTNİ
+  // `/admin/audit` səhifəsində peyda olar (bax fayl başlığındakı «metadata —
+  // AĞ SİYAHI» qeydi).
+  //
+  // Ona görə bütün servis qatı skan olunur: `auditLog.create` YALNIZ
+  // `audit.service.ts`-də ola bilər.
+  it("🔴 T42 — servis qatında BİRBAŞA `auditLog.create` yoxdur", async () => {
+    const { readFile, readdir } = await import("node:fs/promises");
+    const servicesDir = new URL("./", import.meta.url);
+
+    const files = (await readdir(servicesDir)).filter(
+      (name) => name.endsWith(".service.ts") && name !== "audit.service.ts",
+    );
+    expect(files.length, "servis faylı tapılmadı — test səhvən keçməsin").toBeGreaterThan(5);
+
+    const offenders: string[] = [];
+    for (const name of files) {
+      const source = await readFile(new URL(name, servicesDir), "utf8");
+      const code = source
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
+        .join("\n");
+
+      if (/auditLog\.create\s*\(/.test(code)) offenders.push(name);
+    }
+
+    expect(
+      offenders,
+      `birbaşa \`auditLog.create\` çağıran servis(lər): ${offenders.join(", ")} — ` +
+        "`recordAudit(tx, …)` işlət, əks halda `safeAuditMetadata()` ağ siyahısı atlanır",
+    ).toEqual([]);
+  });
 });

@@ -231,6 +231,22 @@ export const AUDIT_METADATA_KEYS = [
   "reason",
   "slug",
   "field",
+  // ── Blok 12A · TƏLƏ T42 ───────────────────────────────────────────────────
+  // Bu altı açar ARTIQ yazılırdı, amma `prisma.auditLog.create` BİRBAŞA
+  // çağırıldığı üçün ağ siyahıdan yan keçirdi (lent / şərh / tədbir /
+  // nailiyyət yolları). Çağırışlar `recordAudit`-ə köçürüldü, açarlar isə
+  // buraya — əks halda süzgəc onları SƏSSİZCƏ atardı və jurnal məlumat itirərdi.
+  //
+  // ⚠️ Hamısı id / enum / SAY-dır. Sərbəst MƏTN (paylaşımın gövdəsi, şərh
+  // mətni, xatirə mətni) bu siyahıya HEÇ VAXT əlavə edilməməlidir — jurnal
+  // `/admin/audit` səhifəsində göstərilir və moderasiya qapısını yan keçərdi.
+  "authorId",
+  "postId",
+  "memoryId",
+  "category",
+  "scope",
+  "statuses",
+  "recipients",
 ] as const;
 
 export type AuditMetadataKey = (typeof AUDIT_METADATA_KEYS)[number];
