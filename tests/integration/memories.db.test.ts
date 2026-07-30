@@ -88,6 +88,8 @@ async function viewerOfUserId(userId: string): Promise<UserViewer> {
 /** PLAN.md §7 test hesabları. */
 let member: UserViewer; // rep@ — İnformasiya təhlükəsizliyi 2027
 let alumni: UserViewer; // alumni@ — Maliyyə 2022 (BAŞQA sinif)
+/** moderator@ — `member` ilə EYNİ sinifdə `CLASS_MODERATOR` (T41 testləri). */
+let moderator: UserViewer;
 let cohortId: string;
 let alumniCohortId: string;
 
@@ -95,9 +97,10 @@ let alumniCohortId: string;
 const createdMemoryIds: string[] = [];
 
 beforeAll(async () => {
-  [member, alumni] = await Promise.all([
+  [member, alumni, moderator] = await Promise.all([
     viewerOf("rep@qu.edu.az"),
     viewerOf("alumni@qu.edu.az"),
+    viewerOf("moderator@qu.edu.az"),
   ]);
 
   cohortId = member.cohortIds[0];
@@ -105,6 +108,8 @@ beforeAll(async () => {
 
   // Sanity: iki hesab FƏRQLİ siniflərdədir — "başqa sinif" testləri bundan asılıdır.
   expect(alumni.cohortIds).not.toContain(cohortId);
+  // Sanity: moderator MƏHZ bu sinfin moderatorudur (T41 testləri bundan asılıdır).
+  expect(moderator.moderatedCohortIds).toContain(cohortId);
 });
 
 afterAll(async () => {
@@ -122,6 +127,8 @@ afterAll(async () => {
       await prisma.post.delete({ where: { id: memory.postId } });
     }
 
+    // T41 testlərinin yaratdığı moderasiya izi — seed determinizmi üçün geri alınır.
+    await prisma.auditLog.deleteMany({ where: { entityId: memoryId } });
     await prisma.memory.deleteMany({ where: { id: memoryId } });
   }
 
@@ -510,6 +517,54 @@ describe("TƏLƏ A — showInFeed / showInTimeline", () => {
       select: { status: true },
     });
     expect(row.status).toBe("DELETED");
+  });
+
+  // =========================================================================
+  // 🔴 T41 (Blok 12A) — `canModerate()` qapısı AuditLog izi TƏLƏB EDİR
+  // =========================================================================
+  //
+  // `deleteMemory` moderatora BAŞQASININ xatirəsini silmək icazəsi verir.
+  // `lib/visibility.ts:147` («Hər çağırışda AuditLog yaz») və
+  // `services/report.service.ts:9` bunu qayda kimi yazır; `deletePost` və
+  // `deleteComment` artıq tətbiq edir. Buradakı iki test həmin qaydanı
+  // xatirə səthində də bərkidir.
+
+  it("🔴 T41 — MODERATOR başqasının xatirəsini silsə AuditLog sətri yaranır", async () => {
+    const memoryId = await createFor(member, { title: "Moderasiya olunacaq xatirə" });
+
+    const before = await prisma.auditLog.count({
+      where: { entityId: memoryId, action: "MODERATE" },
+    });
+    expect(before).toBe(0);
+
+    const result = await deleteMemory(moderator, memoryId);
+    expect(result.ok, JSON.stringify(result)).toBe(true);
+
+    const rows = await prisma.auditLog.findMany({
+      where: { entityId: memoryId, action: "MODERATE" },
+      select: { actorId: true, entityType: true, metadata: true },
+    });
+
+    expect(rows, "moderasiya izi yazılmayıb — moderator izsiz məzmun silir").toHaveLength(1);
+    expect(rows[0].actorId).toBe(moderator.userId);
+    expect(rows[0].entityType).toBe("MEMORY");
+
+    // Metadata müəllifi göstərir (kimin məzmunu silinib) — mətn DAŞIMIR.
+    const metadata = JSON.parse(rows[0].metadata ?? "{}") as Record<string, unknown>;
+    expect(metadata.operation).toBe("deleteMemory");
+    expect(metadata.ownerId).toBe(member.userId);
+    // 🔴 Ağ siyahı: xatirənin MƏTNİ jurnala düşməməlidir.
+    expect(JSON.stringify(metadata)).not.toContain("İnteqrasiya testinin");
+  });
+
+  it("SAHİB öz xatirəsini silsə audit sətri YAZILMIR (moderasiya deyil)", async () => {
+    const memoryId = await createFor(member, { title: "Sahibin sildiyi xatirə" });
+
+    const result = await deleteMemory(member, memoryId);
+    expect(result.ok).toBe(true);
+
+    const count = await prisma.auditLog.count({ where: { entityId: memoryId } });
+    expect(count, "adi silmə moderasiya deyil — jurnal şişirdilməməlidir").toBe(0);
   });
 });
 
