@@ -10,9 +10,16 @@
 //   node scripts/git.mjs init
 //   node scripts/git.mjs commit -m "mesaj" -d "2026-07-26T10:00:00" [-- yol1 yol2 ...]
 //   node scripts/git.mjs log
+//   node scripts/git.mjs push --url https://github.com/<user>/<repo>.git
 //
-// ⚠️ `http` modulu import EDİLMİR — push/clone bizə lazım deyil, paketin
-// şəbəkə hissəsini yükləmək artıq ölçü/asılılıqdır.
+// 🔴 TOKEN ƏMR SƏTRİNDƏ VERİLMİR — `GITHUB_TOKEN` MÜHİT DƏYİŞƏNİNDƏN oxunur.
+// Səbəb: əmr sətri `ps` çıxışında və bash tarixçəsində qalır, yəni token
+// maşındakı hər prosesə görünərdi. `GITHUB_TOKEN=... node scripts/git.mjs push`
+// şəklində verilən dəyər isə yalnız həmin prosesin mühitindədir.
+//
+// ⚠️ `isomorphic-git/http/node` YALNIZ `push` əmrində, TƏNBƏL (`await import`)
+// yüklənir: `init`/`commit`/`log` şəbəkəyə çıxmır və onların yolunda bu modul
+// ümumiyyətlə qiymətləndirilmir.
 // ⚠️ `author.timestamp` SANİYƏLƏ verilir. Vermə sən (ISO sətri) — `-d`
 // bayrağı ilə açıq tarix göndərilməsə bütün commit-lər "indi" anına düşər və
 // tarixçə "bir dəqiqədə N commit" kimi görünər (iş axınını əks etdirmir).
@@ -59,6 +66,10 @@ function parseFlags(argv) {
       flags.authorName = argv[++i];
     } else if (arg === "--author-email") {
       flags.authorEmail = argv[++i];
+    } else if (arg === "--url") {
+      flags.url = argv[++i];
+    } else if (arg === "--force") {
+      flags.force = true;
     } else {
       positional.push(arg);
     }
@@ -188,6 +199,62 @@ async function cmdLog() {
   console.log(`\n${commits.length} commit.`);
 }
 
+/**
+ * `push` — commit-ləri uzaq repoya göndərir.
+ *
+ * Remote `.git/config`-də saxlanılır (`--url` bir dəfə verilir, sonrakı
+ * çağırışlarda lazım deyil) — nəticə real `git remote add origin` ilə eynidir.
+ */
+async function cmdPush(flags) {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token) {
+    throw new Error(
+      "GITHUB_TOKEN mühit dəyişəni boşdur. İstifadə:\n" +
+        "  GITHUB_TOKEN=ghp_xxx node scripts/git.mjs push --url https://github.com/user/repo.git",
+    );
+  }
+
+  const remotes = await git.listRemotes({ fs, dir: REPO_ROOT });
+  const existing = remotes.find((r) => r.remote === "origin");
+
+  let url = flags.url ?? existing?.url;
+  if (!url) throw new Error("Remote ünvanı yoxdur — `--url https://github.com/user/repo.git` ver.");
+
+  if (!existing) {
+    await git.addRemote({ fs, dir: REPO_ROOT, remote: "origin", url });
+  } else if (flags.url && flags.url !== existing.url) {
+    await git.deleteRemote({ fs, dir: REPO_ROOT, remote: "origin" });
+    await git.addRemote({ fs, dir: REPO_ROOT, remote: "origin", url: flags.url });
+    url = flags.url;
+  }
+
+  // Şəbəkə hissəsi yalnız BURADA yüklənir (bax faylın başlığı).
+  const { default: http } = await import("isomorphic-git/http/node/index.js");
+
+  const branch = (await git.currentBranch({ fs, dir: REPO_ROOT })) ?? "main";
+  const commits = await git.log({ fs, dir: REPO_ROOT, depth: 500 });
+
+  console.log(`→ ${url}  (${branch}, ${commits.length} commit)`);
+
+  const result = await git.push({
+    fs,
+    http,
+    dir: REPO_ROOT,
+    remote: "origin",
+    ref: branch,
+    force: Boolean(flags.force),
+    // GitHub PAT: istifadəçi adı kimi token kifayətdir, parol boş qalır.
+    onAuth: () => ({ username: token }),
+    onMessage: (message) => process.stdout.write(`  ${message}`),
+  });
+
+  if (result.ok === false || result.error) {
+    throw new Error(`push rədd edildi: ${result.error ?? "naməlum səbəb"}`);
+  }
+
+  console.log(`✓ göndərildi → ${url.replace(/\.git$/, "")}`);
+}
+
 async function main() {
   const [, , command, ...rest] = process.argv;
   const { flags, positional } = parseFlags(rest);
@@ -202,8 +269,11 @@ async function main() {
     case "log":
       await cmdLog();
       break;
+    case "push":
+      await cmdPush(flags);
+      break;
     default:
-      console.error("İstifadə: node scripts/git.mjs <init|commit|log> ...");
+      console.error("İstifadə: node scripts/git.mjs <init|commit|log|push> ...");
       process.exitCode = 1;
   }
 }
