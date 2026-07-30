@@ -13,7 +13,7 @@ import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
 import { BCRYPT_ROUNDS, normalizeEmail } from "@/lib/constants";
-import { CohortRole, CohortScope, SystemRole } from "@/lib/enums";
+import { CohortRole, CohortScope, SystemRole, SystemRoleSchema } from "@/lib/enums";
 import { resolveStage } from "@/lib/stage";
 import { CONTROLLED_PROFILE_FIELDS, defaultLevelFor } from "@/lib/visibility";
 
@@ -114,4 +114,77 @@ export async function registerUser(
     }
     throw error;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Girişdən SONRAKI xülasə — `POST /api/v1/auth/login` cavabı
+// ---------------------------------------------------------------------------
+
+export interface AuthenticatedSummary {
+  userId: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  systemRole: string;
+  /** `User.stage` keşi — həqiqət mənbəyi cohort tarixləridir. */
+  stage: string;
+  cohortIds: string[];
+  /** `CLASS_MODERATOR` olduğu siniflər. */
+  moderatedCohortIds: string[];
+}
+
+/**
+ * 🔴 NİYƏ BU FUNKSİYA VAR (Blok 9S tələsi).
+ *
+ * `POST /api/v1/auth/login` uğurla `signIn()` çağırdıqdan SONRA cavabda
+ * istifadəçi xülasəsini qaytarmalıdır. İlk yanaşma `getViewer()` idi və
+ * SINDI: Auth.js sessiya kukisini CAVAB başlıqlarına (`Set-Cookie`) yazır,
+ * `auth()` isə SORĞU kukilərini oxuyur. Yəni eyni sorğu daxilində sessiya
+ * hələ "yoxdur" — endpoint 500 verirdi ("sessiya qurulmadı").
+ *
+ * Həll: xülasə DB-dən BİRBAŞA oxunur. Bu, məxfilik qaydasını POZMUR —
+ * `registerUser` ilə eyni səbəb (fayl başlığı): axın autentifikasiyanın ÖZÜDÜR,
+ * `signIn` şifrəni artıq yoxlayıb və oxunan sətir MƏHZ giriş edən istifadəçiyə
+ * aiddir. Buna görə funksiya `Viewer` ALMIR — hələ mövcud deyil.
+ *
+ * ⚠️ Funksiya YALNIZ uğurlu `signIn`-dən SONRA çağırılmalıdır. Onu doğrudan
+ * çağırmaq "e-poçtu ver, profili al" deməkdir və sızma olardı.
+ *
+ * ⚠️ Sahələr `getViewer()`-in qurduğu `Viewer` ilə EYNİ mənbədən gəlir
+ * (`CohortMembership`), yəni iki səth fərqli cavab verə bilməz.
+ */
+export async function getAuthenticatedSummary(
+  rawEmail: string,
+): Promise<AuthenticatedSummary | null> {
+  const email = normalizeEmail(rawEmail);
+
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: {
+      id: true,
+      email: true,
+      firstName: true,
+      lastName: true,
+      systemRole: true,
+      stage: true,
+      memberships: { select: { cohortId: true, role: true } },
+    },
+  });
+
+  if (!user) return null;
+
+  return {
+    userId: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    // Naməlum rol dəyəri qalıbsa ən aşağı səlahiyyət (fail closed) —
+    // `lib/viewer.ts` ilə eyni davranış.
+    systemRole: SystemRoleSchema.catch(SystemRole.USER).parse(user.systemRole),
+    stage: user.stage,
+    cohortIds: user.memberships.map((m) => m.cohortId),
+    moderatedCohortIds: user.memberships
+      .filter((m) => m.role === CohortRole.CLASS_MODERATOR)
+      .map((m) => m.cohortId),
+  };
 }

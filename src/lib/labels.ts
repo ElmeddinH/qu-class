@@ -31,6 +31,8 @@ import type {
   EventCategory,
   EventScope,
   EventStatus,
+  FaqCategory,
+  GuideCategory,
   Industry,
   JobFunction,
   LanguageLevel,
@@ -304,4 +306,45 @@ export function eventStatusLabel(value: string): string {
 
 export function rsvpStatusLabel(value: string): string {
   return RSVP_STATUS_LABELS[value as RsvpStatus] ?? value;
+}
+
+// ---------------------------------------------------------------------------
+// İctimai məzmun — Welcome Page (spec §2) & Xankəndi bələdçisi (spec §3)
+// ---------------------------------------------------------------------------
+
+/** `Faq.category` — açılış səhifəsinin akkordeon rozetləri. */
+export const FAQ_CATEGORY_LABELS: Record<FaqCategory, string> = {
+  GENERAL: "Ümumi",
+  ADMISSION: "Qəbul",
+  CAMPUS: "Kampus",
+  PLATFORM: "Platforma",
+};
+
+/**
+ * `GuidePlace.category` — Xankəndi bələdçisinin 11 kateqoriyası (spec §3).
+ *
+ * ⚠️ Sxemdəki şərh spec-in 10 bəndini 11 dəyərə açır: "marketlər və gündəlik
+ * xidmətlər" ikiyə (`MARKET` / `SERVICE`), "mədəniyyət və istirahət" ikiyə
+ * (`CULTURE` / `LEISURE`) bölünüb; "xəritə" isə kateqoriya deyil, GÖRÜNÜŞDÜR.
+ */
+export const GUIDE_CATEGORY_LABELS: Record<GuideCategory, string> = {
+  HISTORY: "Tarix",
+  LANDMARK: "Görməli yerlər",
+  TRANSPORT: "İctimai nəqliyyat",
+  ROUTE_TO_UNI: "Universitetə gediş",
+  MARKET: "Marketlər",
+  SERVICE: "Gündəlik xidmətlər",
+  HEALTH: "Sağlamlıq",
+  CULTURE: "Mədəniyyət",
+  LEISURE: "İstirahət",
+  SAFETY: "Təhlükəsizlik",
+  TIP: "Məsləhətlər",
+};
+
+export function faqCategoryLabel(value: string): string {
+  return FAQ_CATEGORY_LABELS[value as FaqCategory] ?? FAQ_CATEGORY_LABELS.GENERAL;
+}
+
+export function guideCategoryLabel(value: string): string {
+  return GUIDE_CATEGORY_LABELS[value as GuideCategory] ?? value;
 }

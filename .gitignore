@@ -27,6 +27,11 @@
 # istifadəçi yüklədiyi şəkillər (services/storage.ts) — repoya girmir
 /public/uploads/
 
+# Swagger UI aktivləri — TÖRƏMƏDİR (`npm run docs:assets`, predev/prebuild
+# hook-ları ilə avtomatik qurulur). `swagger-ui-dist` paketindən köçürülür,
+# repoda saxlanılsa versiya yeniləndikdə köhnə fayl qalar.
+/public/swagger/
+
 # debug
 npm-debug.log*
 yarn-debug.log*

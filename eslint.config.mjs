@@ -18,6 +18,12 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      // ⚠️ `public/swagger/` TÖRƏMƏ aktivlərdir (`npm run docs:assets` →
+      // `swagger-ui-dist`-dən köçürülür). Minifikasiya olunmuş 1.5 MB bundle
+      // ESLint-də 165 xəta + 3280 xəbərdarlıq verirdi və `npm run lint`-i
+      // faktiki olaraq işlənməz edirdi. `.gitignore` ESLint-ə təsir ETMİR —
+      // ignore siyahısı ayrıca saxlanılmalıdır.
+      "public/swagger/**",
     ],
   },
 ];

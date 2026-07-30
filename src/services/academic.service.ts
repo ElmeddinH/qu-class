@@ -96,3 +96,33 @@ export async function listRegistrationCatalog(): Promise<FacultyOption[]> {
 
   return sorted;
 }
+
+// ---------------------------------------------------------------------------
+// Struktur rəqəmləri — açılış səhifəsinin "Rəqəmlərlə" zolağı
+// ---------------------------------------------------------------------------
+
+export interface StructureCounts {
+  faculties: number;
+  programs: number;
+  /** Açılmış sinif səhifələrinin sayı (`Cohort`). */
+  cohorts: number;
+}
+
+/**
+ * Açılış səhifəsində göstərilən STRUKTUR rəqəmləri.
+ *
+ * 🔴 BURADA ÜZV SAYI YOXDUR və olmayacaq. Aqreqasiya qaydası (CLAUDE.md
+ * "Məxfilik modeli"): şəxsi və ya sinif səviyyəli sayğac ictimai səhifədə
+ * göstərilmir — 3 nəfərlik sinifdə "üzv sayı: 3" faktı özü fərdi məlumatdır və
+ * `suppressSmallBuckets()` məhz buna qarşıdır. Fakültə / ixtisas / sinif sayı
+ * isə universitetin AÇIQ strukturudur (qeydiyyat forması onsuz da göstərir).
+ */
+export async function getStructureCounts(): Promise<StructureCounts> {
+  const [faculties, programs, cohorts] = await Promise.all([
+    prisma.faculty.count(),
+    prisma.program.count(),
+    prisma.cohort.count(),
+  ]);
+
+  return { faculties, programs, cohorts };
+}

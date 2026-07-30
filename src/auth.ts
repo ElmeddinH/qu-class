@@ -14,14 +14,40 @@
 
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { compareSync } from "bcryptjs";
+import { compareSync, hashSync } from "bcryptjs";
 
 import { authConfig } from "@/auth.config";
 import { prisma } from "@/lib/db";
-import { normalizeEmail } from "@/lib/constants";
+import { BCRYPT_ROUNDS, normalizeEmail } from "@/lib/constants";
 import { SystemRoleSchema } from "@/lib/enums";
 import { syncUserStage } from "@/lib/stage";
 import { credentialsSchema } from "@/features/auth/schemas";
+
+/**
+ * 🔴 VAXT KANALINI BAĞLAYAN SAXTA MÜQAYİSƏ (istifadəçi sayğacı, Blok 9S).
+ *
+ * Mətn eyni olsa da CAVAB MÜDDƏTİ sızdırır: mövcud olmayan e-poçtda funksiya
+ * DB sorğusundan sonra dərhal `null` qaytarırdı (~1 ms), mövcud e-poçtda isə
+ * bcrypt müqayisəsi işləyirdi (~60-100 ms, `BCRYPT_ROUNDS = 10`). Fərq
+ * ölçüləndir — hücumçu e-poçt siyahısını yalnız cavab sürətinə görə süzə bilər
+ * (user enumeration via timing).
+ *
+ * Həll: istifadəçi tapılmasa da bcrypt müqayisəsi İŞLƏDİLİR — sabit, real bir
+ * hash-a qarşı. Nəticə həmişə `false`-dur, məqsəd yalnız EYNİ qiyməti ödəməkdir.
+ *
+ * ⚠️ Hash TƏNBƏL qurulur (`??=`) və keşlənir: modul yüklənəndə hesablasaydıq
+ * hər soyuq başlanğıc əlavə ~80 ms ödəyərdi. İlk uğursuz cəhd hash + compare
+ * ödəyir, sonrakılar yalnız compare.
+ *
+ * ⚠️ `BCRYPT_ROUNDS` EYNİ sabitdəndir — cost factor ayrılsa müddətlər yenidən
+ * fərqlənərdi.
+ */
+let timingEqualizerHash: string | null = null;
+
+function equalizeFailureTiming(password: string): void {
+  timingEqualizerHash ??= hashSync("qu-class-timing-equalizer", BCRYPT_ROUNDS);
+  compareSync(password, timingEqualizerHash);
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -38,7 +64,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       /**
        * `null` qaytarmaq = giriş uğursuz. Səbəbi (istifadəçi yoxdur / şifrə
        * səhvdir) QƏSDƏN ayırd edilmir — əks halda hansı e-poçtun sistemdə
-       * qeydiyyatlı olduğu sızar (user enumeration).
+       * qeydiyyatlı olduğu sızar (user enumeration). Cavab MÜDDƏTİ də
+       * bərabərləşdirilir (bax `equalizeFailureTiming` yuxarıda).
        */
       async authorize(raw) {
         const parsed = credentialsSchema.safeParse(raw);
@@ -49,7 +76,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           where: { email },
           select: { id: true, email: true, passwordHash: true, systemRole: true },
         });
-        if (!user) return null;
+
+        if (!user) {
+          equalizeFailureTiming(parsed.data.password);
+          return null;
+        }
 
         if (!compareSync(parsed.data.password, user.passwordHash)) return null;
 

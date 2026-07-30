@@ -27,10 +27,47 @@ import {
   isProtectedRoute,
 } from "@/lib/routes";
 
+/**
+ * HTTPS altında işləyirikmi? Auth.js-in `useSecureCookies` qərarı ilə eyni
+ * siqnala baxır: konfiqurasiya edilmiş kanonik ünvanın sxemi.
+ */
+const useSecureCookies = (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "")
+  .startsWith("https://");
+
+/**
+ * 🔴 SESSİYA KUKİSİNİN ADI — VAHİD MƏNBƏ.
+ *
+ * OpenAPI sənədindəki `cookieAuth` security scheme (`src/lib/api/openapi.ts`)
+ * bu sabitdən oxuyur. Ad hardcode edilsəydi Swagger UI-daki "Authorize"
+ * pəncərəsi mövcud olmayan kukini göstərərdi və heç kim səhvi görməzdi —
+ * cavab yenə 401 olardı, sadəcə səbəbi yanlış yerdə axtarılardı.
+ *
+ * Aşağıdaki `cookies.sessionToken.name` MƏHZ bu dəyəri işlədir, yəni sabit
+ * sənədin təxmini deyil, Auth.js-in FAKTİKİ konfiqurasiyasıdır. `__Secure-`
+ * prefiksi HTTPS-də məcburidir (kuka yalnız `secure` bayrağı ilə qəbul olunur).
+ */
+export const SESSION_COOKIE_NAME = `${
+  useSecureCookies ? "__Secure-" : ""
+}authjs.session-token`;
+
 export const authConfig = {
   // JWT sessiya — `Session` cədvəli yoxdur (PLAN.md §3.2). Edge-də DB sorğusu
   // etmədən sessiyanı oxumağın yeganə yolu budur.
   session: { strategy: "jwt" },
+
+  // ⚠️ Dəyərlər Auth.js-in DEFAULT-larının eynisidir — məqsəd davranışı
+  // dəyişmək deyil, adı OXUNA BİLƏN sabitə bağlamaqdır (yuxarıdaki qeyd).
+  cookies: {
+    sessionToken: {
+      name: SESSION_COOKIE_NAME,
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: useSecureCookies,
+      },
+    },
+  },
 
   pages: {
     signIn: LOGIN_PATH,

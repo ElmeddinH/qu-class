@@ -35,6 +35,25 @@ export default defineConfig({
     // Alternativ (yazan testi ayrıca layihəyə çıxarmaq) daha mürəkkəbdir;
     // bütün dəst onsuz da ~4 saniyəyə işləyir, ona görə sadə həll seçilib.
     fileParallelism: false,
+
+    // 🔴 `next-auth` VİTE TƏRƏFİNDƏN İŞLƏNMƏLİDİR (Blok 9S).
+    //
+    // `tests/integration/api.db.test.ts` `/api/v1` route handler-lərini BİRBAŞA
+    // çağırır və onların bir hissəsi `@/auth`-a (Auth.js) toxunur. Vitest
+    // `next-auth`-u default olaraq XARİCİ (external) sayır və Node-un öz
+    // resolver-i ilə yükləyir; orada `next-auth/lib/env.js` → `import "next/server"`
+    // sətri SINIR:
+    //   Cannot find module '.../node_modules/next/server' … Did you mean "next/server.js"?
+    // Səbəb: uzantısız daxili import Node ESM-də `package.json` → `exports`
+    // xəritəsi ilə həll olunur, Vitest-in externalized yolu isə onu ötürür.
+    //
+    // Paketi `inline` etmək Vite-in resolver-ini işə salır və `exports` xəritəsi
+    // düzgün oxunur. `@auth/core` də əlavə olunub — `next-auth` onu dartır.
+    server: {
+      deps: {
+        inline: ["next-auth", "@auth/core"],
+      },
+    },
   },
   resolve: {
     alias: {

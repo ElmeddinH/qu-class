@@ -113,6 +113,75 @@ export async function getCohortHeader(
 }
 
 // ---------------------------------------------------------------------------
+// 1b. Viewer-in sinifləri — `/api/v1/cohorts` və naviqasiya
+// ---------------------------------------------------------------------------
+
+export interface ViewerCohort {
+  id: string;
+  slug: string;
+  displayName: string;
+  admissionYear: number;
+  graduationYear: number;
+  facultyName: string | null;
+  programName: string | null;
+  /** Cohort tarixlərindən hesablanır — `User.stage` keşinə güvənilmir. */
+  stage: UserStage;
+  /** Viewer-in bu sinifdəki rolu (`CohortMembership.role`). */
+  role: string;
+  isPrimary: boolean;
+}
+
+/**
+ * Viewer-in ÜZV OLDUĞU siniflər.
+ *
+ * 🔴 `viewer.cohortIds` filtri ilə deyil, ÜZVLÜK ƏLAQƏSİ ilə sorğulanır: rol və
+ * `isPrimary` onsuz da `CohortMembership` sətrindən gəlir və iki mənbəni
+ * (`Viewer` massivi + DB sətri) uyğunlaşdırmağa ehtiyac qalmır.
+ *
+ * Anonim viewer üçün BOŞ massiv — 401 deyil. Səbəb: `/api/v1/cohorts` "mənim
+ * siniflərim" sorğusudur və anonim üçün cavab təbii olaraq boşdur; endpoint
+ * özü `withUser` ilə qorunur, bu funksiya isə müdafiənin ikinci qatıdır.
+ */
+export async function listViewerCohorts(viewer: Viewer): Promise<ViewerCohort[]> {
+  if (viewer.kind !== "USER") return [];
+
+  const memberships = await prisma.cohortMembership.findMany({
+    where: { userId: viewer.userId },
+    orderBy: [{ isPrimary: "desc" }, { joinedAt: "desc" }],
+    select: {
+      role: true,
+      isPrimary: true,
+      cohort: {
+        select: {
+          id: true,
+          slug: true,
+          displayName: true,
+          admissionYear: true,
+          graduationYear: true,
+          academicStartsAt: true,
+          graduatesAt: true,
+          faculty: { select: { name: true } },
+          program: { select: { name: true } },
+        },
+      },
+    },
+  });
+
+  return memberships.map((membership) => ({
+    id: membership.cohort.id,
+    slug: membership.cohort.slug,
+    displayName: membership.cohort.displayName,
+    admissionYear: membership.cohort.admissionYear,
+    graduationYear: membership.cohort.graduationYear,
+    facultyName: membership.cohort.faculty?.name ?? null,
+    programName: membership.cohort.program?.name ?? null,
+    stage: resolveStage(membership.cohort),
+    role: membership.role,
+    isPrimary: membership.isPrimary,
+  }));
+}
+
+// ---------------------------------------------------------------------------
 // 2. Üzv kartları — "Yeni üzvlər" və "Tanışlıq kartları" widget-ləri
 // ---------------------------------------------------------------------------
 
