@@ -229,7 +229,10 @@ async function cmdPush(flags) {
   }
 
   // Şəbəkə hissəsi yalnız BURADA yüklənir (bax faylın başlığı).
-  const { default: http } = await import("isomorphic-git/http/node/index.js");
+  // ⚠️ Yol UZANTISIZ olmalıdır: paketin `exports` xəritəsində açar məhz
+  // `./http/node`-dur, `./http/node/index.js` isə TƏYİN OLUNMAYIB və Node
+  // `ERR_PACKAGE_PATH_NOT_EXPORTED` verir (fayl diskdə mövcud olsa belə).
+  const { default: http } = await import("isomorphic-git/http/node");
 
   const branch = (await git.currentBranch({ fs, dir: REPO_ROOT })) ?? "main";
   const commits = await git.log({ fs, dir: REPO_ROOT, depth: 500 });
