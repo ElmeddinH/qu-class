@@ -20,13 +20,22 @@ import { PUBLIC_NAV } from "./nav";
 function useLinkClass() {
   const pathname = usePathname();
 
-  return (href: string) =>
-    cn(
+  return (href: string) => {
+    // ⚠️ Anchor linki (`/#events`) HEÇ VAXT aktiv işarələnmir. `usePathname()`
+    // hash qaytarmır, yəni bərabərlik onsuz da tutmazdı — amma bu, təsadüf
+    // olmamalıdır: altı linkin hamısı `/`-a baxır, biri "aktiv" seçilsəydi
+    // qalan beşi də eyni haqqa malik olardı. Bölmə seçimi scroll ilə görünür.
+    // Blok 11-də linklər real səhifələrə qayıdanda bu şaxə özü söhnür.
+    const isAnchor = href.startsWith("/#");
+    const active = !isAnchor && (pathname === href || pathname.startsWith(`${href}/`));
+
+    return cn(
       "rounded-btn px-3 py-2 text-small transition-colors",
-      pathname === href || pathname.startsWith(`${href}/`)
+      active
         ? "bg-ku-soft font-medium text-ku-dark"
         : "text-text-secondary hover:bg-muted hover:text-ku-dark",
     );
+  };
 }
 
 /** Masaüstü header naviqasiyası (< 1024px-də gizlidir). */

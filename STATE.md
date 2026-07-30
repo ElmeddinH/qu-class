@@ -282,3 +282,64 @@ qəbul etmir; `#` yenə komponentə düşmür).
 playwright **44** (əvvəl 38 → +6). İnteqrasiya və e2e testlərinin yazdığı hər
 sətir təmizlənir — baza sayları seed-lə bayt-bayt eynidir (event 25, RSVP 459).
 `tsc --noEmit` · `lint` · `build` təmiz.
+
+---
+
+## Blok 9 — əlavə (B2 bəndi + ağ ekran hesabatı)
+
+**1. İctimai naviqasiya artıq 404 vermir.** `PUBLIC_NAV` və `FOOTER_NAV`-dakı
+bütün linklər (`/about`, `/faculties`, `/campus-life`, `/khankendi`, `/faq`,
+`/events`, `/history`, `/mission`, `/newcomers`, `/clubs`, `/services`,
+`/khankendi/*`) açılış səhifəsinin anchor-larına yönəldilib.
+- Vahid mənbə: `layouts/nav.ts` → **`LANDING_SECTIONS`** + `landingAnchor(id)`.
+  `(public)/page.tsx` bölmələri MƏHZ bu massivdən render edir, yəni `id` ilə
+  `href` heç vaxt ayrıla bilməz.
+- **`/events` → `/#events`** (5-ci bölmə «Qarşıdan gələn tədbirlər»).
+  ⚠️ `routes.ts` → `PUBLIC_EXACT_PATHS`-dəki `/events` istisnası SAXLANILIB.
+  **Blok 11-də real `(public)/events/page.tsx` gələndə yalnız `nav.ts`-dəki
+  `href` geri qaytarılacaq** — istisnaya toxunmaq lazım deyil.
+- `PublicShell` footer açarı `href` → `label` oldu: bir neçə link eyni bölməyə
+  baxır və `href` dublikat açar verirdi.
+- `PublicNav` → anchor linki heç vaxt "aktiv" işarələnmir (altı linkin hamısı
+  `/`-a baxır; biri seçilsəydi qalanı da eyni haqqa malik olardı).
+
+**2. Ağ ekran / «səhifə açılmır» — səbəb və həll.**
+**Səbəb tapıldı və TƏKRARLANDI: köhnəlmiş dev server (HMR) vəziyyəti.**
+Blok 9-da ~30 yeni fayl, o cümlədən yeni marşrutlar (`/events/[id]`,
+`/events/[id]/manage`) və kök səviyyəli XÜSUSİ fayllar (`error.tsx`,
+`not-found.tsx`) əlavə olundu. Uzun müddət işləyən `next dev` bunları HMR ilə
+təmiz götürmür: `dev-smoke.spec.ts` həmin serverdə **«Daxil ol»-dan sonra
+`waitForURL` ilə TAXILDI** (istifadəçinin şikayəti ilə eyni simptom), server
+yenidən başladıldıqdan sonra isə ARDICIL ÜÇ dəfə yaşıl keçdi.
+
+**Həll: `npm run dev`-i yenidən başlat** (`predev` 3000 portunu özü boşaldır).
+Şübhə qalarsa `.next/` qovluğunu sil. Bloklar arasında dev serveri yenidən
+başlatmaq qaydaya çevrilməlidir — yeni route qovluğu və kök `error.tsx` /
+`not-found.tsx` faylları isti yenilənmə ilə etibarlı qoşulmur.
+
+Kod tərəfində səhv tapılmadı: 5 seed hesabının hamısı təmiz brauzer
+kontekstində giriş edir, `/home` düzgün yönləndirir, dev logunda xəta yoxdur.
+
+Bununla belə **əsl boşluq tapıldı: layihədə heç bir xəta sərhədi yox idi.**
+Əlavə olundu:
+- `src/app/error.tsx` — seqment sərhədi, `reset()` düyməsi + `digest` kodu.
+- `src/app/global-error.tsx` — ROOT LAYOUT xətası (`error.tsx` onu tuta bilmir).
+  ⚠️ `<html>`/`<body>`-ni özü yazır və stil `style` atributundadır: layout
+  render olunmadığı üçün Tailwind sinifləri etibarlı deyil. CLAUDE.md §2-nin
+  (hardcode rəng yoxdur) YEGANƏ və sənədləşdirilmiş istisnası.
+- `src/app/not-found.tsx` — azərbaycanca 404. Blok 9 `notFound()`-u geniş
+  işlədir (tədbir detalı, koordinator paneli, hesabat), əvvəl Next-in
+  ingiliscə defolt ekranı çıxırdı.
+
+**T26 — `(app)/loading.tsx` ƏLAVƏ ETMƏ.** Qrup səviyyəsində `loading.tsx`
+sınandı və GERİ ÇIXARILDI: o, seqmenti Suspense-ə bükür, cavab başlıqları
+(HTTP 200) səhifə komponentindən ƏVVƏL flush olunur və `notFound()` artıq
+statusu 404-ə dəyişə bilmir. `events.spec.ts` → «adi üzv koordinator panelinə
+DÜŞMÜR» testi məhz bunu tutdu (200 gəldi, 404 gözlənilirdi). Skelet ehtiyacı
+onsuz da ödənilib — `ClassEvents`, `ClassAchievements`, `ClassTimeline` və
+`ClassDirectory` öz `Suspense` sərhədlərini daşıyır.
+
+**Testlər:** playwright **48** (44 → +4: `public-nav.spec.ts` — hər naviqasiya
+linki ya 200 səhifədir, ya da açılışda MÖVCUD anchor; «Tədbirlər» linki ayrıca;
+hər bölmə başlıqla render olunur; naməlum ünvan azərbaycanca 404 verir).
+vitest **540** dəyişməyib. `tsc` · `lint` · `build` təmiz.

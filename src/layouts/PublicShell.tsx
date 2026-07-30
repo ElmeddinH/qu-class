@@ -64,8 +64,12 @@ export function PublicShell({ children }: PublicShellProps) {
                   {section.title}
                 </h2>
                 <ul className="flex flex-col gap-2">
+                  {/* ⚠️ Açar `href` DEYİL, `label`-dır: Blok 11-ə qədər bir
+                      neçə link EYNİ açılış bölməsinə (`/#about`) baxır və
+                      `href` açar kimi təkrarlanardı (React dublikat açar
+                      xəbərdarlığı). Etiketlər sütun daxilində unikaldır. */}
                   {section.items.map((item) => (
-                    <li key={item.href}>
+                    <li key={item.label}>
                       <Link
                         href={item.href}
                         className="text-small text-text-secondary transition-colors hover:text-ku-green"
