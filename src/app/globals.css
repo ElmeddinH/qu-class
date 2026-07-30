@@ -96,6 +96,15 @@
     --map-pin-active: #44766c;     /* ku-green — hover / fokus */
     --map-pin-stroke: #ffffff;
 
+    /* Xankəndi bələdçisinin markerləri (Blok 11A).
+       ⚠️ `--map-pin-*` şkalasından AYRIDIR, çünki məna fərqlidir: orada rəng
+       SAYI bildirir (aqreqasiya), burada isə NÖVÜ (adi məkan / təcili əlaqə).
+       Eyni token-i işlətsək iki fərqli oxunuş bir rəngə düşərdi.
+       `--marker-emergency` `danger-strong`-dur (#B91C1C) — ağ konturla 6.47:1,
+       yəni işarə həm rəngdə, həm ÖLÇÜDƏ fərqlənir (rəng tək kanal deyil). */
+    --marker-place: #44766c;       /* ku-green */
+    --marker-emergency: #b91c1c;   /* danger-strong */
+
     /* --- KUDS §8: Layout sabitləri --- */
     --sidebar-width: 280px;
     --header-height: 72px;

@@ -37,10 +37,12 @@ test("açılış səhifəsi anonim açılır və bir `<h1>` daşıyır", async (
   await expect(headings).toContainText("Sinfin bir yerdə");
 });
 
-test("səkkiz bölmənin başlıqları görünür", async ({ page }) => {
+test("bütün bölmələrin başlıqları görünür", async ({ page }) => {
   await page.goto("/");
 
-  // Naviqasiya hədəfi olan altı bölmə — vahid mənbə `LANDING_SECTIONS`.
+  // Açılış bölmələrinin vahid mənbəyi `LANDING_SECTIONS`-dir. ⚠️ Blok 11A-da
+  // onun ROLU dəyişdi: artıq naviqasiya hədəfi deyil (linklər real səhifələrə
+  // qayıtdı), amma paylaşılmış `/#events` ünvanları hələ də işləməlidir.
   for (const section of LANDING_SECTIONS) {
     await expect(
       page.getByRole("heading", { name: section.title, exact: true }),
@@ -48,11 +50,44 @@ test("səkkiz bölmənin başlıqları görünür", async ({ page }) => {
     ).toBeVisible();
   }
 
-  // Naviqasiya hədəfi OLMAYAN iki bölmə (`nav.ts`-də link yoxdur).
+  // Naviqasiya hədəfi OLMAYAN bölmələr (`nav.ts`-də link yoxdur).
   await expect(page.getByRole("heading", { name: "Rəqəmlərlə" })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Sinif səhifən səni gözləyir" }),
   ).toBeVisible();
+});
+
+test("Blok 11A — üç CANLI bölmə seed məlumatı ilə render olunur", async ({ page }) => {
+  // ⚠️ Bu üç bölmə BOŞ HALDA GİZLƏNİR, ona görə test əvvəlcə seed-də uyğun
+  // PUBLIC məzmunun olduğunu SÜBUT edir — əks halda "görünmür" nəticəsi
+  // yalançı yaşıl olardı.
+  const [publicMemories, publicPosts, quotes] = await Promise.all([
+    prisma.memory.count({ where: { visibility: "PUBLIC", status: "ACTIVE" } }),
+    prisma.post.count({ where: { visibility: "PUBLIC", status: "ACTIVE" } }),
+    prisma.memory.count({
+      where: {
+        visibility: "PUBLIC",
+        status: "ACTIVE",
+        type: { in: ["MESSAGE_TO_QU", "WHAT_UNI_GAVE_ME"] },
+      },
+    }),
+  ]);
+
+  await page.goto("/");
+
+  if (publicMemories > 0) {
+    await expect(
+      page.getByRole("heading", { name: "İcmamızdan hekayələr" }),
+    ).toBeVisible();
+  }
+  if (publicPosts > 0) {
+    await expect(page.getByRole("heading", { name: "Son xəbərlər" })).toBeVisible();
+  }
+  if (quotes > 0) {
+    await expect(page.getByRole("heading", { name: "Məzunlarımız deyir" })).toBeVisible();
+    // Sitat FİQURDUR (`<figure>` + `<blockquote>`) — semantika vacibdir.
+    await expect(page.locator("figure blockquote")).toHaveCount(1);
+  }
 });
 
 test("hər bölmə `aria-labelledby` ilə başlığına bağlanıb", async ({ page }) => {
@@ -88,23 +123,49 @@ test("başlıq iyerarxiyası pozulmur: h1-dən sonra h3 yoxdur", async ({ page }
 // 2. 🔴 SIZMA — anonim ziyarətçi sinif məzmunu görmür
 // ---------------------------------------------------------------------------
 
+/**
+ * 🔴 YALNIZ CLASS PAYLAŞIMLARINDA olan mətn parçası.
+ *
+ * ⚠️ SADƏCƏ «bir CLASS postun ilk 40 simvolu» KİFAYƏT ETMİR və bu, Blok 11A-da
+ * ölçüldü: seed gövdələri sabit hovuzdan (`POST_BODIES[category]`) dövrə ilə
+ * seçilir, yəni EYNİ mətn həm CLASS, həm də PUBLIC paylaşımda ola bilər.
+ * Açılış səhifəsinə «Son xəbərlər» bloku gələnə qədər bu, gözə dəymirdi —
+ * indi PUBLIC gövdələr səhifədə görünür və köhnə forma YALANDAN qırılır.
+ *
+ * Düzgün needle: anonim ziyarətçinin GÖRDÜYÜ heç bir paylaşımda OLMAYAN mətn.
+ */
+async function classOnlyBodyFragment(): Promise<string> {
+  const [classPosts, visiblePosts] = await Promise.all([
+    prisma.post.findMany({
+      where: { visibility: "CLASS", status: "ACTIVE", body: { not: null } },
+      orderBy: [{ createdAt: "desc" }],
+      select: { body: true },
+    }),
+    prisma.post.findMany({
+      where: { visibility: "PUBLIC", status: "ACTIVE", body: { not: null } },
+      select: { body: true },
+    }),
+  ]);
+
+  const publicBodies = visiblePosts.map((post) => post.body as string);
+
+  for (const post of classPosts) {
+    const fragment = (post.body as string).slice(0, 40);
+    if (fragment.length <= 20) continue;
+    if (!publicBodies.some((body) => body.includes(fragment))) return fragment;
+  }
+
+  throw new Error("seed-də yalnız CLASS-a məxsus paylaşım mətni tapılmadı");
+}
+
 test("🔴 anonim brauzerdə seed-dəki CLASS paylaşımın mətni səhifədə YOXDUR", async ({
   page,
 }) => {
-  // ⚠️ `body: { not: null }` — sxemdə sahə NULLABLE-dir (media-only paylaşım),
-  // sızma testi isə MƏTNƏ baxır.
-  const classPost = await prisma.post.findFirstOrThrow({
-    where: { visibility: "CLASS", status: "ACTIVE", body: { not: null } },
-    orderBy: [{ createdAt: "desc" }],
-    select: { body: true },
-  });
+  const fragment = await classOnlyBodyFragment();
 
   await page.goto("/");
   const content = await page.content();
 
-  // Paylaşımın ilk 40 simvolu — təsadüfi uyğunluq üçün kifayət qədər uzun.
-  const fragment = (classPost.body as string).slice(0, 40);
-  expect(fragment.length).toBeGreaterThan(20);
   expect(content, "CLASS paylaşım açılış səhifəsinə SIZDI").not.toContain(fragment);
 });
 
@@ -228,7 +289,10 @@ test("bağlanış CTA-sı qeydiyyata aparır", async ({ page }) => {
   await page.waitForURL("**/register");
 });
 
-test("header naviqasiya linklərinin hamısı MÖVCUD bölməyə aparır", async ({ page }) => {
+test("header naviqasiya linkləri REAL səhifələrə aparır (Blok 11A)", async ({ page }) => {
+  // ⚠️ Blok 9S-də bu linklər açılış anchor-larına (`/#about`) baxırdı, çünki
+  // səhifələr hələ yox idi. Blok 11A-da hamısı real ünvandır — test də
+  // anchor deyil, SƏHİFƏ gözləyir.
   await page.goto("/");
 
   const nav = page.getByRole("navigation", { name: "Əsas naviqasiya" });
@@ -237,9 +301,12 @@ test("header naviqasiya linklərinin hamısı MÖVCUD bölməyə aparır", async
     const link = nav.getByRole("link", { name: item.label });
     await expect(link).toHaveAttribute("href", item.href);
 
-    // Anchor hədəfi səhifədə var — link "heç yerə" aparmır.
-    const id = item.href.replace("/#", "");
-    await expect(page.locator(`#${id}`), `«${item.href}» hədəfi`).toHaveCount(1);
+    // Anchor dövrü bitdi.
+    expect(item.href.startsWith("/#"), `«${item.href}» hələ anchor-dur`).toBe(false);
+
+    const response = await page.goto(item.href);
+    expect(response?.status(), `${item.href} statusu`).toBe(200);
+    await page.goto("/");
   }
 });
 
@@ -270,7 +337,12 @@ test("mobil menyu 360px-də açılır və naviqasiya linkləri görünür", asyn
   await expect(sheet.getByRole("link", { name: "Fakültələr" })).toBeVisible();
 
   await sheet.getByRole("link", { name: "Fakültələr" }).click();
-  await expect(page).toHaveURL(/#faculties$/);
+  // ⚠️ Blok 9S-də bu, açılış anchor-u idi (`/#faculties`); Blok 11A-da real
+  // səhifədir və mobil menyu da ora aparmalıdır.
+  await expect(page).toHaveURL(/\/faculties$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Fakültələr və ixtisaslar" }),
+  ).toBeVisible();
 });
 
 /** KUDS breakpoint-ləri: Mobile · Tablet · Laptop · Desktop · Large. */

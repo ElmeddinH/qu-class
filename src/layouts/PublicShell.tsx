@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/sonner";
+import { ConsentGate } from "@/features/consent/ConsentGate";
 import { Brand } from "./Brand";
 import { PublicMobileMenu, PublicNavLinks } from "./PublicNav";
 import { SkipLink } from "./SkipLink";
@@ -14,6 +16,13 @@ interface PublicShellProps {
  * Giriş etməmiş ziyarətçilər üçün karkas: üst header + footer, sidebar yoxdur.
  * Welcome Page, fakültələr, Xankəndi bələdçisi, açıq tədbirlər və auth
  * səhifələri bunu işlədir (`src/app/(public)/layout.tsx` — Blok 2).
+ *
+ * ⚠️ `Toaster` BURADA DA var (`(app)` karkasında artıq vardı): `/accessibility`
+ * səhifəsindəki maneə forması server action nəticəsini toast ilə göstərir və
+ * ictimai qrupda qab olmasaydı mesaj səssizcə itərdi.
+ *
+ * ⚠️ `ConsentGate` SERVER komponentidir və kukini serverdə oxuyur — razılıq
+ * verilmişsə banner HTML-ə ÜMUMİYYƏTLƏ düşmür (TƏLƏ E).
  */
 export function PublicShell({ children }: PublicShellProps) {
   return (
@@ -104,6 +113,9 @@ export function PublicShell({ children }: PublicShellProps) {
           </div>
         </div>
       </footer>
+
+      <ConsentGate />
+      <Toaster position="bottom-right" />
     </div>
   );
 }

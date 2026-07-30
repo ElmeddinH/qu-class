@@ -48,6 +48,39 @@ export const NUMBERS_SECTION = {
     "ictimai səhifədə göstərilmir.",
 } as const;
 
+/**
+ * Blok 11A-nın üç CANLI bölməsi (GW analizi #12).
+ *
+ * ⚠️ `LANDING_SECTIONS`-ə ƏLAVƏ EDİLMİR: o siyahı «linkin gedə biləcəyi
+ * yerlər» müqaviləsidir və bu üç bölməyə naviqasiyadan link YOXDUR. Üstəlik
+ * onlar BOŞ HALDA GİZLƏNİR — nav hədəfi olsaydı link heç yerə aparardı.
+ */
+export const STORIES_SECTION = {
+  id: "stories",
+  title: "İcmamızdan hekayələr",
+  description:
+    "Tələbələrin və məzunların ictimai paylaşdığı xatirələr. Sinif daxili " +
+    "xatirələr burada görünmür — onlar yalnız öz sinfinə açıqdır.",
+} as const;
+
+export const NEWS_SECTION = {
+  id: "news",
+  title: "Son xəbərlər",
+  description: "Universitet icmasının ictimaiyyətə açıq paylaşımları.",
+} as const;
+
+export const QUOTE_SECTION = {
+  id: "quote",
+  title: "Məzunlarımız deyir",
+  description: "Hər gün başqa bir məzunun universitetə mesajı.",
+} as const;
+
+/** Açılışda göstərilən canlı blokların limitləri. */
+export const STORY_LIMIT = 2;
+export const NEWS_LIMIT = 4;
+/** Sitat hovuzu — gün nömrəsinə görə birinin seçildiyi siyahı. */
+export const QUOTE_POOL_LIMIT = 12;
+
 export const CLOSING_SECTION = {
   id: "start",
   title: "Sinif səhifən səni gözləyir",

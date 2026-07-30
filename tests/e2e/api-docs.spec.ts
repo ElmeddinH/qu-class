@@ -130,8 +130,9 @@ test("openapi.json etibarlı sənəddir və hər əməliyyatda operationId var",
   }
 
   // 18 (Blok 9S) + 4 (Blok 10A: memories · yearbook · support ·
-  // guide-places/{id}/memories) + 1 (Blok 10B: stats/where-are-we-now) = 23.
-  expect(count).toBe(23);
+  // guide-places/{id}/memories) + 1 (Blok 10B: stats/where-are-we-now)
+  // + 5 (Blok 11A: bildirişlər × 3 · content/pages/{slug} · guide-places/{id}) = 28.
+  expect(count).toBe(28);
 
   // Kuka adı sənəddə göstərilir — «Try it out» üçün kritikdir.
   expect(document.components.securitySchemes.cookieAuth?.name).toContain(

@@ -10,15 +10,21 @@
 // ============================================================================
 
 import { prisma } from "@/lib/db";
-import { ReportStatus, type ReportEntityType, type ReportReason } from "@/lib/enums";
+import {
+  ReportEntityType,
+  ReportReason,
+  ReportStatus,
+  type ReportEntityType as ReportEntityTypeValue,
+  type ReportReason as ReportReasonValue,
+} from "@/lib/enums";
 import type { Viewer } from "@/lib/visibility";
 
 type UserViewer = Extract<Viewer, { kind: "USER" }>;
 
 export interface CreateReportData {
-  entityType: ReportEntityType;
+  entityType: ReportEntityTypeValue;
   entityId: string;
-  reason: ReportReason;
+  reason: ReportReasonValue;
   details: string | null;
 }
 
@@ -63,4 +69,58 @@ export async function createReport(
   });
 
   return { ok: true, value: { reportId: report.id, duplicate: false } };
+}
+
+// ---------------------------------------------------------------------------
+// Əlçatanlıq maneəsi (KUDS §21 / WCAG 2.2) — Blok 11A
+// ---------------------------------------------------------------------------
+
+/**
+ * `/accessibility` səhifəsindəki formanın gövdəsi.
+ *
+ * ⚠️ `pagePath` sətir ID-si DEYİL, YOLDUR (`/khankendi/gpl-01`). `Report`
+ * modelində ayrıca sütun açmadıq: `entityId` onsuz da "hansı obyekt" sualına
+ * cavab verir və əlçatanlıq bildirişində həmin obyekt SƏHİFƏDİR
+ * (bax `lib/enums.ts` → `REPORT_ENTITY_TYPE_VALUES` şərhi).
+ */
+export interface CreateAccessibilityReportData {
+  /** Maneənin görüldüyü səhifə yolu — sayt daxilində, mütləq. */
+  pagePath: string;
+  details: string;
+}
+
+/**
+ * Əlçatanlıq maneəsi bildirişi.
+ *
+ * 🔴 NİYƏ AYRI FUNKSİYA (dublikat deyil):
+ * 1. `createReport` TƏKRARI ƏZİR — eyni istifadəçi + eyni obyekt + açıq status
+ *    → yeni sətir yaranmır. Məzmun şikayətində bu doğrudur (moderatoru eyni
+ *    postun on eyni şikayəti boğar), əlçatanlıqda isə YANLIŞDIR: bir səhifədə
+ *    iki fərqli maneə ola bilər (kontrast + klaviatura tələsi) və ikincisi
+ *    səssizcə itərdi.
+ * 2. `reason` istifadəçidən SORUŞULMUR — `ReportReason` siyahısı məzmun
+ *    şikayəti üçündür (spam, təhqir…) və maneəyə uyğun gələni yoxdur. Sabit
+ *    `OTHER` yazılır, əsl məlumat `details`-dədir.
+ *
+ * ⚠️ `reporterId` MƏCBURİDİR (sxem), yəni forma GİRİŞ TƏLƏB EDİR. Anonim
+ * ziyarətçiyə `/accessibility` səhifəsi TAM göstərilir (bəyanat + e-poçt
+ * kanalı), forma isə giriş çağırışı ilə əvəzlənir — səbəbi STATE.md-dədir.
+ */
+export async function createAccessibilityReport(
+  viewer: UserViewer,
+  data: CreateAccessibilityReportData,
+): Promise<{ reportId: string }> {
+  const report = await prisma.report.create({
+    data: {
+      reporterId: viewer.userId,
+      entityType: ReportEntityType.ACCESSIBILITY,
+      entityId: data.pagePath,
+      reason: ReportReason.OTHER,
+      details: data.details,
+      status: ReportStatus.OPEN,
+    },
+    select: { id: true },
+  });
+
+  return { reportId: report.id };
 }

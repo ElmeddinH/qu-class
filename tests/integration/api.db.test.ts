@@ -993,3 +993,199 @@ describe("Blok 10A — xatirə səthləri", () => {
     expect(body.data).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Blok 11A — bildiriş və ictimai tək-resurs endpoint-ləri
+// ---------------------------------------------------------------------------
+
+describe("Blok 11A — bildiriş endpoint-ləri", () => {
+  it("🔴 anonim sorğu 401 JSON alır (boş siyahı YOX)", async () => {
+    // Bildirişin sahibi var — anonim viewer üçün "boş nəticə" səhv cavabdır.
+    currentViewer = ANONYMOUS;
+    const { GET } = await import("@/app/api/v1/notifications/route");
+
+    const response = await call(GET, "/api/v1/notifications");
+
+    expect(response.status).toBe(401);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect((await errorOf(response)).code).toBe("UNAUTHENTICATED");
+  });
+
+  it("🔴 cavab YALNIZ sorğunu edənin bildirişləridir", async () => {
+    currentViewer = rep;
+    const { GET } = await import("@/app/api/v1/notifications/route");
+
+    const body = await envelopeOf<Array<{ id: string }>>(
+      await call(GET, "/api/v1/notifications"),
+    );
+
+    if (body.data.length === 0) return; // seed-də bu istifadəçiyə bildiriş yoxdursa
+
+    const foreign = await prisma.notification.count({
+      where: { id: { in: body.data.map((row) => row.id) }, recipientId: { not: rep.userId } },
+    });
+
+    expect(foreign).toBe(0);
+  });
+
+  it("cavab ŞƏXSİDİR — `Cache-Control: private, no-store`", async () => {
+    currentViewer = rep;
+    const { GET } = await import("@/app/api/v1/notifications/route");
+
+    const response = await call(GET, "/api/v1/notifications");
+    expect(response.headers.get("cache-control")).toContain("no-store");
+  });
+
+  it("naməlum filtr dəyəri 422 verir", async () => {
+    currentViewer = rep;
+    const { GET } = await import("@/app/api/v1/notifications/route");
+
+    const response = await call(GET, "/api/v1/notifications?status=yarımoxunmuş");
+    expect(response.status).toBe(422);
+  });
+
+  it("🔴 `read` — JSON olmayan sorğu 415 alır (TƏLƏ B qoruması)", async () => {
+    currentViewer = rep;
+    const { POST } = await import("@/app/api/v1/notifications/[id]/read/route");
+
+    const response = await call(
+      POST,
+      "/api/v1/notifications/ntf-001/read",
+      { id: "ntf-001" },
+      { method: "POST", headers: { "content-type": "text/plain" }, body: "{}" },
+    );
+
+    expect(response.status).toBe(415);
+  });
+
+  it("🔴 BAŞQASININ bildirişi 404 verir və sətir DƏYİŞMİR", async () => {
+    currentViewer = rep;
+
+    const foreign = await prisma.notification.findFirstOrThrow({
+      where: { recipientId: { not: rep.userId }, readAt: null },
+      select: { id: true },
+    });
+
+    const { POST } = await import("@/app/api/v1/notifications/[id]/read/route");
+    const response = await call(
+      POST,
+      `/api/v1/notifications/${foreign.id}/read`,
+      { id: foreign.id },
+      { method: "POST", headers: { "content-type": "application/json" }, body: "{}" },
+    );
+
+    expect(response.status).toBe(404);
+
+    const after = await prisma.notification.findUniqueOrThrow({
+      where: { id: foreign.id },
+      select: { readAt: true },
+    });
+    expect(after.readAt).toBeNull();
+  });
+
+  it("öz bildirişini işarələyir və GERİ QAYTARILIR", async () => {
+    currentViewer = rep;
+
+    const own = await prisma.notification.findFirst({
+      where: { recipientId: rep.userId, readAt: null },
+      select: { id: true },
+    });
+    if (!own) return;
+
+    const { POST } = await import("@/app/api/v1/notifications/[id]/read/route");
+
+    try {
+      const response = await call(
+        POST,
+        `/api/v1/notifications/${own.id}/read`,
+        { id: own.id },
+        { method: "POST", headers: { "content-type": "application/json" }, body: "{}" },
+      );
+
+      expect(response.status).toBe(200);
+      const body = await envelopeOf<{ changed: number }>(response);
+      expect(body.data.changed).toBe(1);
+    } finally {
+      // ⚠️ Seed determinizmi: sətir əvvəlki halına qaytarılır.
+      await prisma.notification.update({
+        where: { id: own.id },
+        data: { readAt: null },
+      });
+    }
+  });
+
+  it("`read-all` anonim sorğuda 401 verir", async () => {
+    currentViewer = ANONYMOUS;
+    const { POST } = await import("@/app/api/v1/notifications/read-all/route");
+
+    const response = await call(POST, "/api/v1/notifications/read-all", {}, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    });
+
+    expect(response.status).toBe(401);
+  });
+});
+
+describe("Blok 11A — ictimai tək-resurs endpoint-ləri", () => {
+  it("`/content/pages/{slug}` gövdə ilə səhifə verir", async () => {
+    currentViewer = ANONYMOUS;
+    const { GET } = await import("@/app/api/v1/content/pages/[slug]/route");
+
+    const response = await call(
+      GET,
+      "/api/v1/content/pages/haqqimizda",
+      { slug: "haqqimizda" },
+    );
+
+    expect(response.status).toBe(200);
+    const body = await envelopeOf<{ slug: string; body: string }>(response);
+    expect(body.data.slug).toBe("haqqimizda");
+    expect(body.data.body.length).toBeGreaterThan(0);
+  });
+
+  it("🔴 QARALAMA səhifə 404 verir", async () => {
+    currentViewer = ANONYMOUS;
+    const page = await prisma.contentPage.findUniqueOrThrow({
+      where: { slug: "yataqxana" },
+      select: { id: true },
+    });
+
+    const { GET } = await import("@/app/api/v1/content/pages/[slug]/route");
+
+    try {
+      await prisma.contentPage.update({
+        where: { id: page.id },
+        data: { isPublished: false },
+      });
+
+      const response = await call(
+        GET,
+        "/api/v1/content/pages/yataqxana",
+        { slug: "yataqxana" },
+      );
+
+      expect(response.status).toBe(404);
+      expect((await errorOf(response)).code).toBe("NOT_FOUND");
+    } finally {
+      await prisma.contentPage.update({
+        where: { id: page.id },
+        data: { isPublished: true },
+      });
+    }
+  });
+
+  it("`/guide-places/{id}` mövcud məkanı verir, naməlum `id` 404 alır", async () => {
+    currentViewer = ANONYMOUS;
+    const place = await prisma.guidePlace.findFirstOrThrow({ select: { id: true } });
+
+    const { GET } = await import("@/app/api/v1/guide-places/[id]/route");
+
+    const found = await call(GET, `/api/v1/guide-places/${place.id}`, { id: place.id });
+    expect(found.status).toBe(200);
+
+    const missing = await call(GET, "/api/v1/guide-places/yoxdur", { id: "yoxdur" });
+    expect(missing.status).toBe(404);
+  });
+});

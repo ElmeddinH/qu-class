@@ -27,6 +27,7 @@ import type {
   AchievementStatus,
   ClubRole,
   CohortRole,
+  ContentSection,
   Degree,
   EventCategory,
   EventScope,
@@ -37,6 +38,9 @@ import type {
   JobFunction,
   LanguageLevel,
   MemoryType,
+  NotificationType,
+  PostCategory,
+  ReportEntityType,
   RsvpStatus,
   SupportOfferType,
   TimelineSourceType,
@@ -189,6 +193,35 @@ export const MEMORY_TYPE_LABELS: Record<MemoryType, string> = {
 };
 
 /** `SupportOffer.type` — məzunun 7 dəstək təklifi (spec §9). */
+/**
+ * `Post.category` — 12 məcburi kateqoriya (spec §6).
+ *
+ * ⚠️ ETİKETLƏR BURADA (T13 nümunəsi, `MEMORY_TYPE_LABELS` ilə eyni səbəb):
+ * Blok 11A-da ikinci səth yarandı — açılış səhifəsinin «Son xəbərlər» bloku
+ * `features/welcome`-dədir və `features/*` bir-birindən import etmir. İki
+ * cədvəl saxlansaydı eyni kateqoriya lentdə və açılışda iki adla görünərdi.
+ * `features/feed/catalog.ts` → `POST_CATEGORY_META` buradan oxuyur, yalnız
+ * ikonu özü seçir.
+ */
+export const POST_CATEGORY_LABELS: Record<PostCategory, string> = {
+  FIRST_DAY: "İlk gün",
+  ORIENTATION: "Oriyentasiya",
+  EVENT_PHOTOS: "Tədbir fotoları",
+  ACADEMIC_ACHIEVEMENT: "Akademik nailiyyət",
+  SOCIAL_ACHIEVEMENT: "İctimai nailiyyət",
+  TRIPS: "Səyahətlər",
+  EXAM_PERIOD: "İmtahan dövrü",
+  INTERNSHIP: "Təcrübə",
+  CLUB_ACTIVITY: "Klub fəaliyyəti",
+  COMPETITION: "Yarışlar",
+  CAPSTONE: "Buraxılış layihəsi",
+  GENERAL: "Ümumi",
+};
+
+export function postCategoryLabel(value: string): string {
+  return POST_CATEGORY_LABELS[value as PostCategory] ?? POST_CATEGORY_LABELS.GENERAL;
+}
+
 export const SUPPORT_OFFER_LABELS: Record<SupportOfferType, string> = {
   GUEST_LECTURE: "Qonaq mühazirəsi",
   CAREER_TALK: "Karyera söhbəti",
@@ -372,4 +405,63 @@ export function faqCategoryLabel(value: string): string {
 
 export function guideCategoryLabel(value: string): string {
   return GUIDE_CATEGORY_LABELS[value as GuideCategory] ?? value;
+}
+
+/** `ContentPage.section` — ictimai məzmun səhifələrinin başlıq zolağı. */
+export const CONTENT_SECTION_LABELS: Record<ContentSection, string> = {
+  UNIVERSITY: "Universitet",
+  CAMPUS: "Kampus",
+  SERVICES: "Tələbə xidmətləri",
+  NEWCOMERS: "Yeni gələnlər",
+};
+
+export function contentSectionLabel(value: string): string {
+  return CONTENT_SECTION_LABELS[value as ContentSection] ?? value;
+}
+
+// ---------------------------------------------------------------------------
+// Bildiriş mərkəzi (spec §15) & moderasiya
+// ---------------------------------------------------------------------------
+
+/**
+ * `Notification.type` — 9 növ.
+ *
+ * ⚠️ Etiketlər bildirişin BAŞLIĞINI əvəz etmir: başlıq sətirdə saxlanılır və
+ * fərdiləşdirilib ("Aysu sinifə qoşuldu"). Bu cədvəl yalnız FİLTR düymələri və
+ * rozet üçündür — istifadəçi "hansı növ bildirişləri görüm?" sualına cavab verir.
+ */
+export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
+  POST_LIKE: "Reaksiyalar",
+  POST_COMMENT: "Şərhlər",
+  NEW_MEMBER: "Yeni üzvlər",
+  EVENT_INVITE: "Tədbir dəvətləri",
+  EVENT_REMINDER: "Tədbir xatırlatmaları",
+  ACHIEVEMENT_VERIFIED: "Nailiyyət təsdiqi",
+  MODERATION_RESULT: "Moderasiya nəticəsi",
+  MENTION: "Qeyd olunmalar",
+  SYSTEM: "Sistem",
+};
+
+export function notificationTypeLabel(value: string): string {
+  return NOTIFICATION_TYPE_LABELS[value as NotificationType] ?? NOTIFICATION_TYPE_LABELS.SYSTEM;
+}
+
+/**
+ * `Report.entityType` — moderasiya növbəsinin «nə barədə» sütunu.
+ *
+ * ⚠️ `ACCESSIBILITY` sətir deyil, SƏHİFƏ bildirir (bax `lib/enums.ts`) —
+ * etiket də məhz buna görə "Əlçatanlıq maneəsi"dir, "Əlçatanlıq" deyil.
+ */
+export const REPORT_ENTITY_TYPE_LABELS: Record<ReportEntityType, string> = {
+  POST: "Paylaşım",
+  COMMENT: "Şərh",
+  MEMORY: "Xatirə",
+  ACHIEVEMENT: "Nailiyyət",
+  USER: "İstifadəçi",
+  EVENT: "Tədbir",
+  ACCESSIBILITY: "Əlçatanlıq maneəsi",
+};
+
+export function reportEntityTypeLabel(value: string): string {
+  return REPORT_ENTITY_TYPE_LABELS[value as ReportEntityType] ?? value;
 }

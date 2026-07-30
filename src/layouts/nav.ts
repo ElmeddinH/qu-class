@@ -34,6 +34,10 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { LEGAL_PAGES, legalHref } from "@/lib/content-routes";
+import { GuideCategory } from "@/lib/enums";
+import { guideHref } from "@/lib/guide-filters";
+
 /** İkon reyestri — `NavItem.icon` bu obyektin açarıdır. */
 export const NAV_ICONS = {
   bell: Bell,
@@ -152,24 +156,23 @@ export const ADMIN_NAV: NavSection[] = [
 // ---------------------------------------------------------------------------
 
 /**
- * 🔴 NİYƏ İCTİMAİ LİNKLƏR `#anchor`-DIR, SƏHİFƏ DEYİL.
+ * 🔴 ANCHOR VƏZİYYƏTİ BİTDİ — LİNKLƏR REAL SƏHİFƏLƏRƏ QAYTARILDI (Blok 11A).
  *
- * `/about`, `/faculties`, `/campus-life`, `/khankendi`, `/faq` və `/events`
- * səhifələri BLOK 11-in işidir (spec §2 Welcome Page, §3 Xankəndi bələdçisi).
- * O vaxta qədər naviqasiyada real ünvan kimi qalsalar hər klik 404 verir —
- * ziyarətçi üçün bu, "sayt sınıb" deməkdir.
+ * Blok 9-da `/about`, `/faculties`, `/campus-life`, `/khankendi`, `/faq` və
+ * `/events` səhifələri hələ yox idi, ona görə naviqasiya MÜVƏQQƏTİ olaraq
+ * açılış səhifəsinin anchor-larına baxırdı (hər klik 404 versəydi ziyarətçi
+ * üçün "sayt sınıb" demək olardı).
  *
- * Müvəqqəti həll: linklər açılış səhifəsindəki bölmələrə yönəldilir. Bölmələr
- * MƏHZ BU SİYAHIDAN render olunur (`(public)/page.tsx` onun üzərində dövr
- * edir), yəni `id` ilə link həmişə uzlaşır.
+ * İndi hamısı real səhifədir və `PUBLIC_NAV` / `FOOTER_NAV` onlara baxır.
  *
- * ⚠️ `/events` DƏ buradadır. Blok 9-da `routes.ts` → `PUBLIC_EXACT_PATHS` ona
- * istisna açdı (yol AÇIQ, auth tələb etmir), amma səhifənin ÖZÜ hələ yoxdur.
- * İstisnanı SİLMƏ — Blok 11-də `(public)/events/page.tsx` gələndə yalnız
- * aşağıdakı `href` real ünvana qaytarılır.
+ * ⚠️ `LANDING_SECTIONS` SİLİNMƏDİ və silinməməlidir: açılış səhifəsinin
+ * bölmələri MƏHZ bu siyahıdan render olunur (`features/welcome/sections.ts` →
+ * `landingSection`) və `/#events` kimi PAYLAŞILMIŞ linklər hələ də işləməlidir.
+ * Yəni siyahının rolu dəyişdi: naviqasiya hədəfi deyil, açılış bölmələrinin
+ * VAHİD MƏNBƏYİ.
  *
- * ⚠️ Anchor `id`-ləri qısa və sabitdir: paylaşılan link (`/#events`) Blok 11-də
- * də işləməlidir.
+ * ⚠️ `landingAnchor()` də saxlanılır — açılış səhifəsi öz daxili keçidlərində
+ * (məs. hero → bölmə) onu işlədir.
  */
 export interface LandingSection {
   /** `<section id>` — link `#` ilə buna bağlanır. */
@@ -223,55 +226,69 @@ export function landingAnchor(id: string): string {
   return `/#${id}`;
 }
 
-/**
- * PublicShell — giriş etməmiş ziyarətçi naviqasiyası.
- *
- * ⚠️ `href`-lər `landingAnchor()`-dandır (yuxarıdakı qeyd). Blok 11-də real
- * səhifələr yaranınca burada `/about`, `/faculties`… kimi ünvanlara qaytarılır.
- */
+/** PublicShell — giriş etməmiş ziyarətçi naviqasiyası. */
 export const PUBLIC_NAV: { href: string; label: string }[] = [
-  { href: landingAnchor("about"), label: "Universitet" },
-  { href: landingAnchor("faculties"), label: "Fakültələr" },
-  { href: landingAnchor("campus-life"), label: "Kampus həyatı" },
-  { href: landingAnchor("khankendi"), label: "Xankəndi bələdçisi" },
-  { href: landingAnchor("events"), label: "Tədbirlər" },
-  { href: landingAnchor("faq"), label: "FAQ" },
+  { href: "/about", label: "Universitet" },
+  { href: "/faculties", label: "Fakültələr" },
+  { href: "/campus-life", label: "Kampus həyatı" },
+  { href: "/khankendi", label: "Xankəndi bələdçisi" },
+  { href: "/events", label: "Tədbirlər" },
+  { href: "/faq", label: "FAQ" },
 ];
 
 /**
- * PublicShell footer sütunları.
+ * PublicShell footer sütunları — DÖRD sütun (Blok 11A).
  *
- * ⚠️ `PUBLIC_NAV` ilə eyni səbəbdən anchor-lardır (yuxarıdaki qeyd). Footer
- * daha çox link daşıyır və onların bir hissəsi eyni bölməyə düşür — bu,
- * qəsdəndir: "Tarixçə" və "Missiya" Blok 11-də ayrı səhifələr olacaq, indi isə
- * hər ikisi "Universitet haqqında" bölməsini göstərir. 404-dən yaxşıdır.
+ * ⚠️ Bələdçi linkləri `guideHref()` ilə qurulur, əl ilə YAZILMIR: kateqoriya
+ * dəyəri enum-dandır və filtrin parametr adı `lib/guide-filters.ts`-dədir.
+ * Sətir literalı yazsaydıq enum dəyişəndə link səssizcə boş siyahıya aparardı.
+ *
+ * 🔴 DÖRDÜNCÜ SÜTUN — HÜQUQİ SƏNƏDLƏR (GW analizi #13). Məxfilik mühərriki
+ * layihənin texniki nüvəsidir; öz məxfilik bildirişi olmayan məxfilik
+ * platforması ziddiyyətdir. Siyahı `lib/content-routes.ts` → `LEGAL_PAGES`-dən
+ * TÖRƏYİR, yəni sənəd əlavə etmək bir yerdə yazılır.
+ *
+ * ⚠️ Etiketlər sütun daxilində UNİKAL olmalıdır — `PublicShell` React açarı
+ * kimi `label` işlədir (Blok 9-da bir neçə link eyni anchor-a baxırdı və `href`
+ * açar kimi təkrarlanırdı).
  */
 export const FOOTER_NAV: NavSection[] = [
   {
     title: "Universitet",
     items: [
-      { href: landingAnchor("about"), label: "Haqqımızda", icon: "book" },
-      { href: landingAnchor("about"), label: "Tarixçə", icon: "scroll" },
-      { href: landingAnchor("about"), label: "Missiya", icon: "sparkles" },
-      { href: landingAnchor("faculties"), label: "Fakültələr", icon: "graduation" },
+      { href: "/about", label: "Haqqımızda", icon: "book" },
+      { href: "/history", label: "Tarixçə", icon: "scroll" },
+      { href: "/mission", label: "Missiya", icon: "sparkles" },
+      { href: "/faculties", label: "Fakültələr", icon: "graduation" },
     ],
   },
   {
     title: "Tələbələr üçün",
     items: [
-      { href: landingAnchor("about"), label: "Yeni qəbul", icon: "users" },
-      { href: landingAnchor("campus-life"), label: "Kampus həyatı", icon: "heart" },
-      { href: landingAnchor("campus-life"), label: "Klublar", icon: "trophy" },
-      { href: landingAnchor("events"), label: "Tədbirlər", icon: "calendar" },
+      { href: "/newcomers", label: "Yeni qəbul", icon: "users" },
+      { href: "/campus-life", label: "Kampus həyatı", icon: "heart" },
+      { href: "/clubs", label: "Klublar", icon: "trophy" },
+      { href: "/services", label: "Tələbə xidmətləri", icon: "file" },
     ],
   },
   {
     title: "Xankəndi",
     items: [
-      { href: landingAnchor("khankendi"), label: "Şəhər bələdçisi", icon: "map" },
-      { href: landingAnchor("khankendi"), label: "Nəqliyyat", icon: "map" },
-      { href: landingAnchor("khankendi"), label: "Səhiyyə", icon: "map" },
-      { href: landingAnchor("faq"), label: "Tez-tez verilən suallar", icon: "file" },
+      { href: guideHref(), label: "Şəhər bələdçisi", icon: "map" },
+      { href: guideHref({ category: GuideCategory.TRANSPORT }), label: "Nəqliyyat", icon: "map" },
+      { href: guideHref({ category: GuideCategory.HEALTH }), label: "Səhiyyə", icon: "map" },
+      { href: "/faq", label: "Tez-tez verilən suallar", icon: "file" },
+    ],
+  },
+  {
+    title: "Hüquqi məlumat",
+    items: [
+      ...LEGAL_PAGES.map((page) => ({
+        href: legalHref(page.slug),
+        label: page.label,
+        icon: "shield" as NavIconName,
+      })),
+      { href: "/accessibility", label: "Əlçatanlıq", icon: "heart" },
     ],
   },
 ];

@@ -520,7 +520,24 @@ export const ReportStatusSchema = z.enum(REPORT_STATUS_VALUES);
 export type ReportStatus = z.infer<typeof ReportStatusSchema>;
 export const ReportStatus = asEnum(REPORT_STATUS_VALUES);
 
-/** Report.entityType — şikayət edilə bilən obyekt növləri. */
+/**
+ * Report.entityType — şikayət edilə bilən obyekt növləri.
+ *
+ * 🔴 `ACCESSIBILITY` DİGƏRLƏRİNDƏN FƏRQLİDİR (Blok 11A).
+ * Qalan dəyərlər DB sətrinə işarə edir (`entityId` = həmin sətrin `id`-si);
+ * `ACCESSIBILITY` isə `/accessibility` səhifəsindəki «maneə bildir» formasından
+ * gəlir və `entityId` SƏTİR İD-Sİ DEYİL, maneənin görüldüyü SƏHİFƏ YOLUDUR
+ * (`/khankendi/gpl-01` kimi). Moderator üçün fərq mühümdür: bu qeydi "məzmunu
+ * gizlət" düyməsi ilə həll etmək OLMAZ — o, texniki nasazlıq biletidir.
+ *
+ * ⚠️ Sütun `String`-dir (SQLite native enum dəstəkləmir) → MİQRASİYA LAZIM
+ * DEYİL. Amma dəyəri əlavə etmək `Record<ReportEntityType, …>` cədvəllərini
+ * natamam qoyur və `tsc` onları göstərir (`lib/labels.ts`).
+ *
+ * ⚠️ SEED bu siyahı üzərində `cycle()` İŞLƏTMİR — `prisma/seed.ts` öz SABİT
+ * siyahısını saxlayır (`REPORT_SEED_ENTITY_TYPES`). Buradan oxusaydı yeni dəyər
+ * 12 şikayətin bölgüsünü dəyişər və determinizm testi qırılardı.
+ */
 export const REPORT_ENTITY_TYPE_VALUES = [
   "POST",
   "COMMENT",
@@ -528,6 +545,7 @@ export const REPORT_ENTITY_TYPE_VALUES = [
   "ACHIEVEMENT",
   "USER",
   "EVENT",
+  "ACCESSIBILITY",
 ] as const;
 export const ReportEntityTypeSchema = z.enum(REPORT_ENTITY_TYPE_VALUES);
 export type ReportEntityType = z.infer<typeof ReportEntityTypeSchema>;

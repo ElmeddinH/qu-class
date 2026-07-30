@@ -27,7 +27,10 @@
 // səssizdir. Boş vəziyyət EmptyState ilə göstərilir, başlıq və anchor qalır.
 // ============================================================================
 
-import { ContentSection } from "@/lib/enums";
+import Link from "next/link";
+
+import { PublicEventCards } from "@/components/shared/PublicEventCards";
+import { ContentSection, MemoryType } from "@/lib/enums";
 import { ANONYMOUS } from "@/lib/visibility";
 import { getStructureCounts, listRegistrationCatalog } from "@/services/academic.service";
 import {
@@ -36,20 +39,30 @@ import {
   listGuidePlaces,
 } from "@/services/content.service";
 import { listEvents } from "@/services/event.service";
+import { listMemories } from "@/services/memory.service";
+import { listFeed } from "@/services/post.service";
 
+import { AlumniQuote } from "./AlumniQuote";
 import { ClosingCta } from "./ClosingCta";
+import { CommunityStories } from "./CommunityStories";
 import { ContentPageCards } from "./ContentPageCards";
 import { FacultyAccordion } from "./FacultiesSection";
 import { FaqAccordion } from "./FaqAccordion";
 import { GuidePreviewCards } from "./GuidePreviewCards";
-import { PublicEventCards } from "./PublicEventCards";
+import { LatestNews } from "./LatestNews";
 import { StructureStats } from "./StructureStats";
 import { WelcomeHero } from "./WelcomeHero";
 import { WelcomeSection } from "./WelcomeSection";
 import {
   FAQ_PREVIEW_LIMIT,
+  NEWS_LIMIT,
+  NEWS_SECTION,
   NUMBERS_SECTION,
   PREVIEW_CARD_LIMIT,
+  QUOTE_POOL_LIMIT,
+  QUOTE_SECTION,
+  STORIES_SECTION,
+  STORY_LIMIT,
   landingSection,
 } from "./sections";
 
@@ -65,6 +78,10 @@ export async function WelcomePage() {
     events,
     guidePlaces,
     faqs,
+    stories,
+    news,
+    messageQuotes,
+    gratitudeQuotes,
   ] = await Promise.all([
     getStructureCounts(),
     listRegistrationCatalog(),
@@ -74,7 +91,21 @@ export async function WelcomePage() {
     listEvents(viewer, { upcoming: true, take: PREVIEW_CARD_LIMIT }),
     listGuidePlaces(undefined, PREVIEW_CARD_LIMIT),
     listFaqs(undefined, FAQ_PREVIEW_LIMIT),
+    // 🔴 Üç CANLI blok — hamısı ANONİM viewer ilə (yalnız PUBLIC məzmun).
+    listMemories(viewer, { take: STORY_LIMIT }),
+    listFeed(viewer, { take: NEWS_LIMIT }),
+    // ⚠️ Sitat hovuzu İKİ növdən yığılır və servis TƏK `type` qəbul edir, ona
+    // görə iki sorğu paralel gedir və nəticə birləşdirilir. `OR` filtri əlavə
+    // etmək `MemoryFilters`-ı yalnız bu bölmə üçün genişləndirmək demək idi.
+    listMemories(viewer, { type: MemoryType.MESSAGE_TO_QU, take: QUOTE_POOL_LIMIT }),
+    listMemories(viewer, { type: MemoryType.WHAT_UNI_GAVE_ME, take: QUOTE_POOL_LIMIT }),
   ]);
+
+  // Sabit sıra: `id` üzrə — sitat seçimi gün nömrəsinə bağlıdır və hovuzun
+  // sırası da deterministik olmalıdır (bax `AlumniQuote.pickRotatingIndex`).
+  const quotes = [...messageQuotes, ...gratitudeQuotes].sort((a, b) =>
+    a.id.localeCompare(b.id),
+  );
 
   const about = landingSection("about");
   const facultiesSection = landingSection("faculties");
@@ -121,10 +152,39 @@ export async function WelcomePage() {
         />
       </WelcomeSection>
 
+      {/* 🔴 ÜÇ CANLI BLOK (GW #12) — hər biri BOŞ HALDA GİZLƏNİR.
+          Bu, «Qarşıdan gələn tədbirlər» bölməsindən fərqlidir: ora naviqasiya
+          anchor-unun HƏDƏFİDİR və gizlətmək linki heç yerə aparardı. Bu üçünə
+          isə heç bir link yoxdur (bax `sections.ts`). */}
+      {stories.length > 0 ? (
+        <WelcomeSection
+          id={STORIES_SECTION.id}
+          title={STORIES_SECTION.title}
+          description={STORIES_SECTION.description}
+        >
+          <CommunityStories memories={stories} />
+        </WelcomeSection>
+      ) : null}
+
+      {news.items.length > 0 ? (
+        <WelcomeSection
+          id={NEWS_SECTION.id}
+          title={NEWS_SECTION.title}
+          description={NEWS_SECTION.description}
+        >
+          <LatestNews posts={news.items} />
+        </WelcomeSection>
+      ) : null}
+
       <WelcomeSection
         id={eventsSection.id}
         title={eventsSection.title}
         description={eventsSection.description}
+        aside={
+          <Link href="/events" className="text-small text-ku-green hover:underline">
+            Bütün açıq tədbirlər →
+          </Link>
+        }
       >
         <PublicEventCards events={events} />
       </WelcomeSection>
@@ -137,7 +197,26 @@ export async function WelcomePage() {
         <GuidePreviewCards places={guidePlaces} />
       </WelcomeSection>
 
-      <WelcomeSection id={faq.id} title={faq.title} description={faq.description}>
+      {quotes.length > 0 ? (
+        <WelcomeSection
+          id={QUOTE_SECTION.id}
+          title={QUOTE_SECTION.title}
+          description={QUOTE_SECTION.description}
+        >
+          <AlumniQuote quotes={quotes} />
+        </WelcomeSection>
+      ) : null}
+
+      <WelcomeSection
+        id={faq.id}
+        title={faq.title}
+        description={faq.description}
+        aside={
+          <Link href="/faq" className="text-small text-ku-green hover:underline">
+            Bütün suallar →
+          </Link>
+        }
+      >
         <FaqAccordion items={faqs} />
       </WelcomeSection>
 

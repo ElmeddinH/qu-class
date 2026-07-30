@@ -43,7 +43,7 @@ import { CountriesChart } from "./CountriesChart";
 import { EducationLevelsChart } from "./EducationLevelsChart";
 import { IndustriesChart } from "./IndustriesChart";
 import { JobFunctionsChart } from "./JobFunctionsChart";
-import { MapSkeleton } from "./MapSkeleton";
+import { MapSkeleton } from "@/components/shared/MapSkeleton";
 import { MapPanel } from "./MapPanel";
 import { MAP_TAB_META, type MapTabIconName } from "./catalog";
 import { useMapFilters } from "./filter-state";

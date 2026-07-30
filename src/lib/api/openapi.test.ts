@@ -74,8 +74,10 @@ describe("əməliyyatlar", () => {
     // Sayı SABİT gözləmə kimi yazılır: yeni endpoint əlavə edən adam sənədə
     // yazmağı unutsa test dayanır.
     // 18 (Blok 9S) + 4 (Blok 10A: memories · yearbook · support ·
-    // guide-places/{id}/memories) + 1 (Blok 10B: stats/where-are-we-now) = 23.
-    expect(operations.length).toBe(23);
+    // guide-places/{id}/memories) + 1 (Blok 10B: stats/where-are-we-now)
+    // + 5 (Blok 11A: notifications · notifications/{id}/read ·
+    // notifications/read-all · content/pages/{slug} · guide-places/{id}) = 28.
+    expect(operations.length).toBe(28);
   });
 
   it.each(operations.map((o) => [o.label, o] as const))(
@@ -297,10 +299,15 @@ describe("təhlükəsizlik sxemi", () => {
 describe("POST endpoint-ləri", () => {
   const posts = operations.filter((o) => o.method === "post");
 
-  it("üç POST var: register, login, logout", () => {
+  it("beş POST var: auth × 3 + bildiriş × 2", () => {
+    // ⚠️ Siyahı SABİT gözləmədir: yeni yazma endpoint-i əlavə edən adam
+    // aşağıdaki İKİ testin (JSON gövdəsi + 415) əhatəsinə düşdüyünü görsün.
+    // Blok 11A-da bildiriş işarələmə əlavə olundu (spec §15).
     expect(posts.map((o) => o.operation.operationId).sort()).toEqual([
       "login",
       "logout",
+      "markAllNotificationsRead",
+      "markNotificationRead",
       "registerUser",
     ]);
   });

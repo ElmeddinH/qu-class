@@ -124,18 +124,31 @@ Hamısının şifrəsi: **`Test1234!`**
 
 | URL | Qrup | Nədir |
 |---|---|---|
-| `/` | `(public)` | **Welcome Page** — 8 bölmə, anonim açılır |
+| `/` | `(public)` | **Welcome Page** [M1] — 11 bölmə, anonim açılır |
+| `/about` · `/history` · `/mission` | `(public)` | Universitet məlumat səhifələri [M2] |
+| `/faculties` · `/faculties/[slug]` | `(public)` | Fakültə kataloqu və detalı [M2] |
+| `/campus-life` · `/clubs` · `/services` · `/newcomers` | `(public)` | Kampus, klublar, xidmətlər, yeni gələnlər [M2] |
+| `/khankendi` · `/khankendi/[id]` | `(public)` | **Xankəndi bələdçisi** [M3] — 11 kateqoriya + xəritə |
+| `/events` | `(public)` | Açıq tədbirlər (yalnız `visibility = PUBLIC`) |
+| `/faq` | `(public)` | 4 kateqoriya, akkordeon, axtarış |
+| `/accessibility` | `(public)` | KUDS §21 / WCAG 2.2 bəyanatı + maneə forması |
+| `/legal/[slug]` | `(public)` | Məxfilik · Şərtlər · Müəllif hüququ · Bərabər imkanlar |
 | `/docs` | `(public)` | **Swagger UI** — `/api/v1` sənədi, «Try it out» ilə |
 | `/login` · `/register` | `(public)` | Giriş və qeydiyyat |
 | `/home` | `(app)` | Əsas sinif səhifəsinə yönləndirir |
-| `/class/[slug]` | `(app)` | Class Page (Blok 5-ə qədər placeholder) |
+| `/class/[slug]/…` | `(app)` | Class Page və alt səhifələri |
+| `/notifications` | `(app)` | **Bildiriş mərkəzi** [M15] — filtr, səhifələmə, header rozeti |
 | `/kuds` | `(app)` | **KUDS stil bələdçisi** — daxili sənəd, auth arxasındadır |
 | `/admin` | `(admin)` | İdarə paneli — `UNIVERSITY_ADMIN` |
 
 Route qrupları URL-ə təsir etmir: `(app)/kuds/page.tsx` → `/kuds`.
-Qalan route-lar blok-blok əlavə olunur (bax [PLAN.md](PLAN.md) §4.2).
+İctimai səthin müqaviləsi `src/lib/routes.ts` → `PUBLIC_PAGE_PATHS`-dədir və hər
+yol üç ziyarətçi növü üçün testlə yoxlanılır (`routes.test.ts` + `public.spec.ts`).
 
-**`/api/v1` — 23 endpoint** (tam sənəd: `/docs`):
+⚠️ `/events` AÇIQDIR, `/events/[id]` isə AUTH ARXASINDADIR — detalda RSVP və
+iştirakçı siyahısı var. İstisna DƏQİQ yol üçündür (`PUBLIC_EXACT_PATHS`).
+
+**`/api/v1` — 28 endpoint** (tam sənəd: `/docs`):
 
 | Metod | Yol | Auth |
 |---|---|---|
@@ -147,6 +160,9 @@ Qalan route-lar blok-blok əlavə olunur (bax [PLAN.md](PLAN.md) §4.2).
 | GET | `/cohorts/{slug}/memories` · `/yearbook` · `/support` | kuka |
 | GET | `/cohorts/{slug}/stats/where-are-we-now` | kuka (`private, no-store`) |
 | GET | `/api/v1/events/{id}` · `/api/v1/search` · `/guide-places/{id}/memories` | ictimai (görünürlüyə görə) |
+| GET | `/api/v1/content/pages/{slug}` · `/guide-places/{id}` | ictimai |
+| GET | `/api/v1/notifications` | kuka (`private, no-store`) |
+| POST | `/api/v1/notifications/{id}/read` · `/notifications/read-all` | kuka + JSON |
 | GET | `/api/v1/openapi.json` | ictimai |
 
 ⚠️ Mövcud `/api/feed`, `/api/search`, `/api/upload`, `/api/events/[id]/ics` **dəyişməyib** —
@@ -180,6 +196,25 @@ qrafiki bir-birindən çıxıb qalıq (deməli fərd) almaq mümkün deyil. Şə
 3 nəfərdən kiçikdirsə sətir ölkə səviyyəsinə yığılır; ölkə də kiçikdirsə
 tamamilə «Açıqlanmayan» olur. Alqoritm və ölçülmüş alternativlər
 [`src/lib/career-stats.ts`](src/lib/career-stats.ts) başlığındadır.
+
+### 🔒 Məxfilik siyasəti — niyə koddan sonra SƏNƏD də var
+
+QU CLASS-ın texniki nüvəsi məxfilik mühərrikidir: dörd səviyyə, sahə-səviyyə
+görünürlük, aqreqasiya üçün AYRICA razılıq. **Öz məxfilik bildirişi olmayan
+məxfilik platforması ziddiyyətdir** — ona görə Blok 11A dörd hüquqi sənəd
+(`/legal/privacy` · `/terms` · `/copyright` · `/equal-opportunity`) və
+əlçatanlıq bəyanatı (`/accessibility`) gətirdi. Mətnlər demo səviyyəsindədir,
+amma məhsulun ƏSL davranışını təsvir edir: sənədlə kod arasında uyğunsuzluq
+qalmamalıdır.
+
+**Kuki razılığı `localStorage`-da SAXLANMIR.** Dəyər `document.cookie`-yə
+yazılır (`SameSite=Lax`, 1 il, identifikator DAŞIMIR) və serverdə `cookies()`
+ilə oxunur — razılıq verilmişsə banner HTML-ə ÜMUMİYYƏTLƏ düşmür.
+`localStorage` ilə server komponenti onu oxuya bilməzdi və banner hər yükləmədə
+bir anlıq görünərdi. Qayda [`src/lib/consent.ts`](src/lib/consent.ts)-dədir və
+[`consent.test.ts`](src/lib/consent.test.ts) + `public.spec.ts` ilə bərkidilib.
+
+---
 
 ### 7. E2E testlər
 

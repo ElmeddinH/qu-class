@@ -53,6 +53,60 @@ export async function listContentPages(
   });
 }
 
+/** Tam səhifə — `body` (Markdown) DAXİL. Detal görünüşü üçün. */
+export interface ContentPageDetail extends ContentPageCard {
+  body: string;
+}
+
+const CONTENT_PAGE_DETAIL_SELECT = {
+  id: true,
+  slug: true,
+  title: true,
+  excerpt: true,
+  coverUrl: true,
+  section: true,
+  updatedAt: true,
+  body: true,
+};
+
+/**
+ * Tək səhifə (slug ilə).
+ *
+ * 🔴 `isPublished: true` ŞƏRTİ MƏCBURİDİR və `getContentPage`-in bütün
+ * çağırışları ictimaidir. Qaralama səhifə HEÇ KİMƏ göstərilmir — admin redaktə
+ * ekranı (Blok 11B) öz sorğusunu yazır və `requireAdmin()` qapısından keçir.
+ * Buraya `includeDrafts` bayrağı ƏLAVƏ ETMƏ: bir çağırışda unudulsa qaralama
+ * ictimai internetə düşər.
+ */
+export async function getContentPage(slug: string): Promise<ContentPageDetail | null> {
+  return prisma.contentPage.findFirst({
+    where: { slug, isPublished: true },
+    select: CONTENT_PAGE_DETAIL_SELECT,
+  });
+}
+
+/**
+ * Bölmənin BÜTÜN dərc olunmuş səhifələri — gövdə ilə.
+ *
+ * `/newcomers` kimi səhifələr bölmənin hər yazısını ANCHOR-lu bölmə kimi
+ * göstərir (`#<slug>`), yəni tək sorğu ilə bütün mətn lazımdır.
+ *
+ * ⚠️ `listContentPages`-dən FƏRQLİDİR: orada `body` QƏSDƏN seçilmir (kart
+ * siyahısı üçün lazım deyil). İki funksiyanı birləşdirsək açılış səhifəsi hər
+ * kart üçün bir neçə KB artıq mətn daşıyardı.
+ */
+export async function listSectionPages(
+  section: ContentSection,
+  take: number = CONTENT_PAGE_LIMIT,
+): Promise<ContentPageDetail[]> {
+  return prisma.contentPage.findMany({
+    where: { section, isPublished: true },
+    orderBy: [{ order: "asc" }, { title: "asc" }],
+    take,
+    select: CONTENT_PAGE_DETAIL_SELECT,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // FAQ (spec §2, açılış səhifəsinin akkordeonu)
 // ---------------------------------------------------------------------------
@@ -107,6 +161,22 @@ export interface GuidePlaceItem {
 
 const GUIDE_PLACE_LIMIT = 40;
 
+const GUIDE_PLACE_SELECT = {
+  id: true,
+  category: true,
+  title: true,
+  description: true,
+  address: true,
+  latitude: true,
+  longitude: true,
+  imageUrl: true,
+  phone: true,
+  openingHours: true,
+  websiteUrl: true,
+  isEmergency: true,
+  order: true,
+};
+
 /**
  * Bələdçi yazıları — kateqoriya üzrə süzülə bilər.
  *
@@ -126,20 +196,20 @@ export async function listGuidePlaces(
     // Təcili əlaqələr önə çıxır (spec §3: təhlükəsizlik / təcili məlumat).
     orderBy: [{ isEmergency: "desc" }, { order: "asc" }, { title: "asc" }],
     take,
-    select: {
-      id: true,
-      category: true,
-      title: true,
-      description: true,
-      address: true,
-      latitude: true,
-      longitude: true,
-      imageUrl: true,
-      phone: true,
-      openingHours: true,
-      websiteUrl: true,
-      isEmergency: true,
-      order: true,
-    },
+    select: GUIDE_PLACE_SELECT,
+  });
+}
+
+/**
+ * Tək bələdçi məkanı — `/khankendi/[id]` detal səhifəsi üçün.
+ *
+ * ⚠️ Tapılmasa `null` → səhifə `notFound()` çağırır. Bələdçi kataloqu
+ * tamamilə ictimaidir, yəni burada "mövcudluğu gizlətmək" məsələsi yoxdur
+ * (`lib/api/cohort-scope.ts`-dəki 404-403 qaydası SİNİF məzmununa aiddir).
+ */
+export async function getGuidePlace(id: string): Promise<GuidePlaceItem | null> {
+  return prisma.guidePlace.findUnique({
+    where: { id },
+    select: GUIDE_PLACE_SELECT,
   });
 }

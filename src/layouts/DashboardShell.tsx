@@ -1,8 +1,6 @@
-import Link from "next/link";
-import { Bell } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { ConsentGate } from "@/features/consent/ConsentGate";
 import { CommandPalette } from "@/features/search/CommandPalette";
+import { NotificationBadge } from "@/features/notifications/NotificationBadge";
 import { cn } from "@/lib/utils";
 import { Brand } from "./Brand";
 import { MobileNav } from "./MobileNav";
@@ -78,11 +76,10 @@ export function DashboardShell({
           </div>
 
           <div className="ml-auto flex items-center gap-2">
-            <Button variant="ghost" size="icon" aria-label="Bildirişlər" asChild>
-              <Link href="/notifications">
-                <Bell className="h-6 w-6" aria-hidden />
-              </Link>
-            </Button>
+            {/* 🔴 TƏLƏ C: rozet SERVER komponentidir — `(admin)` qrupunda
+                `QueryClientProvider` YOXDUR və TanStack Query burada 500
+                verərdi (Blok 6, T18). Bax `NotificationBadge` başlığı. */}
+            <NotificationBadge />
             <UserMenu user={user} />
           </div>
         </div>
@@ -97,6 +94,14 @@ export function DashboardShell({
           {children}
         </div>
       </main>
+
+      {/* ⚠️ Razılıq banneri giriş etmiş istifadəçiyə DƏ göstərilir: kuki
+          razılığı sessiyadan asılı deyil və `PublicShell`-də verilmiş qərar
+          eyni kukidə saxlanılır — istifadəçi ikinci dəfə soruşulmur.
+          `print:hidden`: kağıza düşməməlidir (albom və hesabat çapı). */}
+      <div className="print:hidden">
+        <ConsentGate />
+      </div>
     </div>
   );
 }

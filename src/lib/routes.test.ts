@@ -20,7 +20,9 @@ import {
   AFTER_LOGIN_PATH,
   APP_ROUTE_PREFIXES,
   LOGIN_PATH,
+  PUBLIC_DYNAMIC_PARENTS,
   PUBLIC_EXACT_PATHS,
+  PUBLIC_PAGE_PATHS,
   SESSION_EXPIRED_PATH,
   isAdminRoute,
   isAppRoute,
@@ -144,6 +146,43 @@ const ACCESS_TABLE: ReadonlyArray<{
   { path: "/eventsomething", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
   // 🔴 Qaçış yolu — aşağıdaki ayrıca bloka bax.
   { path: SESSION_EXPIRED_PATH, anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+
+  // -------------------------------------------------------------------------
+  // 🔴 BLOK 11A — İCTİMAİ SƏTH (~15 yeni səhifə)
+  //
+  // Hər sətir İKİ şeyi eyni anda bərkidir:
+  //   1. anonim ziyarətçi AÇA BİLİR (`REQUIRE_AUTH` çıxsa səhifə /login-ə atılar)
+  //   2. GİRİŞ ETMİŞ istifadəçi DƏ aça bilir — ictimai səhifə istifadəçini
+  //      QOVMAMALIDIR. `REDIRECT_HOME` yalnız `/login` və `/register` üçündür;
+  //      buraya səhvən düşsəydi giriş etmiş ziyarətçi «Xankəndi bələdçisi»
+  //      linkinə klikləyəndə `/home`-a atılardı.
+  // -------------------------------------------------------------------------
+  { path: "/about", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/history", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/mission", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/faculties", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/faculties/muhendislik", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/campus-life", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/clubs", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/services", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/newcomers", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/khankendi", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/khankendi/gpl-01", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/faq", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/accessibility", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/legal/privacy", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  { path: "/legal/terms", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  // ⚠️ Bildiriş mərkəzi Blok 11A-da gəldi, amma `/notifications` prefiksi Blok
+  // 2-dən bəri qorunan siyahıdadır — səhifə yarandı, icazə məntiqi DƏYİŞMƏDİ.
+  { path: "/notifications", anonymous: "REQUIRE_AUTH", user: "PUBLIC", admin: "PUBLIC" },
+  // Yeni v1 endpoint-ləri — middleware QARIŞMAMALIDIR (401 JSON guard-dadır).
+  { path: "/api/v1/notifications", anonymous: "PUBLIC", user: "PUBLIC", admin: "PUBLIC" },
+  {
+    path: "/api/v1/content/pages/haqqimizda",
+    anonymous: "PUBLIC",
+    user: "PUBLIC",
+    admin: "PUBLIC",
+  },
 ];
 
 describe("resolveRouteAccess", () => {
@@ -263,6 +302,61 @@ describe("🔴 yönləndirmə dövrəsi", () => {
         );
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 🔴 İCTİMAİ SƏTHİN MÜQAVİLƏSİ (Blok 11A)
+//
+// `PUBLIC_PAGE_PATHS` icazə VERMİR — o, "bu yollar qorunan prefikslərlə
+// kəsişmir" iddiasıdır və aşağıdaki testlər həmin iddianı maşınla yoxlayır.
+// Yeni ictimai səhifə əlavə edən adam yolu siyahıya yazır; yol səhvən qorunan
+// prefiksin altına düşsə (`/events/public` kimi) test DƏRHAL qırılır — brauzerdə
+// "niyə /login-ə atır?" sualı yaranmır.
+// ---------------------------------------------------------------------------
+
+describe("🔴 ictimai səth müqaviləsi", () => {
+  for (const kind of VIEWER_KINDS) {
+    it(`${kind}: hər ictimai yol AÇIQDIR və yönləndirilmir`, () => {
+      for (const path of PUBLIC_PAGE_PATHS) {
+        expect(resolveRouteAccess(path, kind), path).toBe("PUBLIC");
+        expect(routeRedirectTarget(path, "", kind), path).toBeNull();
+      }
+    });
+  }
+
+  it("ictimai yollar qorunan prefikslərlə KƏSİŞMİR", () => {
+    for (const path of PUBLIC_PAGE_PATHS) {
+      expect(isProtectedRoute(path), `${path} qorunan siyahıya düşüb`).toBe(false);
+      expect(isAuthRoute(path), `${path} auth səhifəsi sayılır`).toBe(false);
+    }
+  });
+
+  it("dinamik valideynlərin ALT yolları da açıqdır", () => {
+    // `/faculties/<slug>`, `/khankendi/<id>`, `/legal/<slug>` — konkret dəyər
+    // bazadan gəlir, forma isə burada yoxlanılır.
+    for (const parent of PUBLIC_DYNAMIC_PARENTS) {
+      for (const kind of VIEWER_KINDS) {
+        expect(resolveRouteAccess(`${parent}/nümunə-1`, kind), parent).toBe("PUBLIC");
+      }
+    }
+  });
+
+  it("🔴 `/events` istisnadır, `/events/<id>` İSƏ DEYİL", () => {
+    // Bu sətir `PUBLIC_DYNAMIC_PARENTS`-in NİYƏ `/events`-i EHTİVA ETMƏDİYİNİ
+    // bərkidir: ictimai siyahı açıqdır, tədbir detalı (RSVP + iştirakçılar)
+    // auth arxasındadır.
+    expect(PUBLIC_DYNAMIC_PARENTS).not.toContain("/events");
+    expect(resolveRouteAccess("/events", "ANONYMOUS")).toBe("PUBLIC");
+    expect(resolveRouteAccess("/events/evt-01", "ANONYMOUS")).toBe("REQUIRE_AUTH");
+  });
+
+  it("`/notifications` ictimai siyahıda YOXDUR (sahiblik qapısı)", () => {
+    // Bildiriş bir nəfərə ünvanlanmış mesajdır — ictimai səthin bir hissəsi
+    // OLA BİLMƏZ. Siyahıya səhvən düşsəydi anonim ziyarətçi səhifəni açar və
+    // `requireUser()` onu yenidən `/login`-ə atardı (dövrə riski).
+    expect(PUBLIC_PAGE_PATHS as readonly string[]).not.toContain("/notifications");
+    expect(resolveRouteAccess("/notifications", "ANONYMOUS")).toBe("REQUIRE_AUTH");
   });
 });
 

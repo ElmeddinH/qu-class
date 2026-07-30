@@ -39,7 +39,6 @@ import {
   PostCategory,
   PostKind,
   PostStatus,
-  REPORT_ENTITY_TYPE_VALUES,
   REPORT_REASON_VALUES,
   ReactionType,
   ReportEntityType,
@@ -435,29 +434,35 @@ async function main(): Promise<void> {
     };
   });
 
-  await insertMany("Cohort", COHORTS, (chunk) =>
-    prisma.cohort.createMany({
-      data: chunk.map((c) => {
-        const runtime = cohorts.find((r) => r.key === c.key)!;
-        const program = PROGRAMS.find((p) => p.key === c.programKey)!;
-        return {
-          id: runtime.id,
-          scope: CohortScope.PROGRAM,
-          facultyId: runtime.facultyId,
-          programId: runtime.programId,
-          admissionYear: c.admissionYear,
-          graduationYear: c.graduationYear,
-          academicStartsAt: runtime.academicStartsAt,
-          graduatesAt: runtime.graduatesAt,
-          displayName: runtime.displayName,
-          slug: `${program.slug}-${c.graduationYear}`,
-          coverUrl: `https://picsum.photos/seed/qu-cohort-${c.key}/1600/400`,
-          welcomeMessage: c.welcomeMessage,
-          createdAt: addDays(runtime.academicStartsAt, -90),
-        };
-      }),
-    }),
+  // ⚠️ Sətirlər ƏVVƏLCƏ qurulur, sonra yazılır — `slug` ifadəsi TƏK yerdə
+  // qalsın. Blok 11A-da bildiriş `url`-ləri real sinif səhifəsinə yönəldildi
+  // (`/class/<slug>/feed`) və slug bu massivdən oxunur; təkrar hesablasaydıq
+  // iki formul yaranardı və biri köhnələrdi.
+  const cohortRows = COHORTS.map((c) => {
+    const runtime = cohorts.find((r) => r.key === c.key)!;
+    const program = PROGRAMS.find((p) => p.key === c.programKey)!;
+    return {
+      id: runtime.id,
+      scope: CohortScope.PROGRAM,
+      facultyId: runtime.facultyId,
+      programId: runtime.programId,
+      admissionYear: c.admissionYear,
+      graduationYear: c.graduationYear,
+      academicStartsAt: runtime.academicStartsAt,
+      graduatesAt: runtime.graduatesAt,
+      displayName: runtime.displayName,
+      slug: `${program.slug}-${c.graduationYear}`,
+      coverUrl: `https://picsum.photos/seed/qu-cohort-${c.key}/1600/400`,
+      welcomeMessage: c.welcomeMessage,
+      createdAt: addDays(runtime.academicStartsAt, -90),
+    };
+  });
+
+  await insertMany("Cohort", cohortRows, (chunk) =>
+    prisma.cohort.createMany({ data: chunk }),
   );
+
+  const cohortSlugById = new Map(cohortRows.map((row) => [row.id, row.slug]));
 
   // -------------------------------------------------------------------------
   // 3.3 İstifadəçilər
@@ -1524,6 +1529,20 @@ async function main(): Promise<void> {
   const notificationRows: Prisma.NotificationCreateManyInput[] = [];
   let notificationIndex = 0;
 
+  // 🔴 URL-LƏR REAL ROUTE-LARA BAXIR (Blok 11A düzəlişi).
+  // Əvvəl `/feed/<id>`, `/achievements/<id>` və `/directory/<id>` yazılırdı —
+  // HEÇ BİRİ mövcud route DEYİL (real ünvanlar `/class/<slug>/feed`,
+  // `/class/<slug>/achievements`, `/u/<id>`). Bildiriş mərkəzi Blok 11A-da
+  // gəldi və həmin sətirlər 404-ə aparan link kimi görünürdü.
+  //
+  // ⚠️ İKİ QAT QORUMA VAR və ikisi də lazımdır: burada məlumat düzəldilir,
+  // `lib/notification-links.ts` isə OXU tərəfində naməlum yolu linkə çevirmir.
+  // Yalnız seed-i düzəltsək istehsalda yaranan köhnə sətir yenə 404 verərdi;
+  // yalnız oxu qoruması olsaydı demo məlumatı kasıb görünərdi (link yox).
+  //
+  // ⚠️ Sətirlərin SAYI və PRNG axını DƏYİŞMİR — yalnız `url` sütununun dəyəri.
+  const feedUrl = (cohortId: string) => `/class/${cohortSlugById.get(cohortId)}/feed`;
+
   function pushNotification(row: {
     recipientId: string;
     actorId: string | null;
@@ -1555,7 +1574,7 @@ async function main(): Promise<void> {
       entityId: post.id,
       title: `${actor.firstName} ${actor.lastName} paylaşımınıza reaksiya verdi`,
       body: null,
-      url: `/feed/${post.id}`,
+      url: feedUrl(post.cohortId),
       createdAt: reaction.createdAt,
     });
   }
@@ -1572,7 +1591,7 @@ async function main(): Promise<void> {
       entityId: post.id,
       title: `${actor.firstName} ${actor.lastName} paylaşımınıza şərh yazdı`,
       body: comment.body.slice(0, 80),
-      url: `/feed/${post.id}`,
+      url: feedUrl(post.cohortId),
       createdAt: comment.createdAt,
     });
   }
@@ -1605,7 +1624,7 @@ async function main(): Promise<void> {
       entityId: ach.id,
       title: "Nailiyyətiniz təsdiqləndi",
       body: ach.title,
-      url: `/achievements/${ach.id}`,
+      url: `/class/${cohortSlugById.get(ach.cohortId)}/achievements`,
       createdAt: addDays(ach.awardedAt, randInt(2, 20)),
     });
   }
@@ -1623,7 +1642,7 @@ async function main(): Promise<void> {
         entityId: newcomer,
         title: `${newcomerUser.firstName} ${newcomerUser.lastName} sinifə qoşuldu`,
         body: null,
-        url: `/directory/${newcomer}`,
+        url: `/u/${newcomer}`,
         createdAt: addDays(cohort.contentFrom, randInt(1, 20)),
       });
     }
@@ -1647,9 +1666,26 @@ async function main(): Promise<void> {
 
   // -------------------------------------------------------------------------
   // 3.15 Moderasiya
+  //
+  // 🔴 SİYAHI SABİTDİR — `REPORT_ENTITY_TYPE_VALUES` İŞLƏDİLMİR (Blok 11A).
+  // Enum-a `ACCESSIBILITY` əlavə olundu; `cycle(REPORT_ENTITY_TYPE_VALUES, i)`
+  // qalsaydı 12 şikayətin növ bölgüsü sürüşərdi (6 dəyər → 7 dəyər) və hər
+  // sətrin `entityId`-si başqa obyektə düşərdi — determinizm testi qırılardı.
+  // Üstəlik `ACCESSIBILITY` seed üçün mənasızdır: onun `entityId`-si sətir ID-si
+  // deyil, SƏHİFƏ YOLUDUR (bax `lib/enums.ts`) və yuxarıdakı `entityId`
+  // seçicisinin heç bir şaxəsinə uyğun gəlmir.
   // -------------------------------------------------------------------------
+  const REPORT_SEED_ENTITY_TYPES = [
+    ReportEntityType.POST,
+    ReportEntityType.COMMENT,
+    ReportEntityType.MEMORY,
+    ReportEntityType.ACHIEVEMENT,
+    ReportEntityType.USER,
+    ReportEntityType.EVENT,
+  ] as const satisfies readonly ReportEntityType[];
+
   const reportRows = Array.from({ length: 12 }, (_, i) => {
-    const entityType: ReportEntityType = cycle(REPORT_ENTITY_TYPE_VALUES, i);
+    const entityType: ReportEntityType = cycle(REPORT_SEED_ENTITY_TYPES, i);
     const entityId =
       entityType === "COMMENT"
         ? cycle(commentRows, i).id

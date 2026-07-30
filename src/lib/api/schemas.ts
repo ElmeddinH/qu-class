@@ -40,6 +40,8 @@ import {
   GUIDE_CATEGORY_VALUES,
   GuideCategorySchema,
   MEMORY_TYPE_VALUES,
+  NOTIFICATION_TYPE_VALUES,
+  NotificationTypeSchema,
   POST_CATEGORY_VALUES,
   POST_KIND_VALUES,
   SUPPORT_OFFER_TYPE_VALUES,
@@ -48,6 +50,7 @@ import {
   USER_STAGE_VALUES,
   VISIBILITY_VALUES,
 } from "@/lib/enums";
+import { NOTIFICATION_STATUS_VALUES as NOTIFICATION_STATUS_QUERY_VALUES } from "@/lib/notification-filters";
 import { MIN_SEARCH_LENGTH, PALETTE_LIMIT, SEARCH_PAGE_LIMIT } from "@/lib/search";
 import { YEARBOOK_SECTIONS } from "@/lib/yearbook";
 import {
@@ -301,6 +304,21 @@ export const FaqSchema = z
   })
   .openapi("Faq");
 
+/**
+ * Səhifənin TAM forması — `body` (Markdown) DAXİL.
+ *
+ * ⚠️ Siyahı endpoint-i (`GET /content/pages`) `ContentPageSchema` işlədir və
+ * orada `body` QƏSDƏN yoxdur (kart siyahısı üçün lazım deyil, hər səhifə bir
+ * neçə KB-dır). Tam mətn yalnız `GET /content/pages/{slug}`-dadır.
+ */
+export const ContentPageDetailSchema = ContentPageSchema.extend({
+  body: z.string().openapi({
+    description:
+      "Markdown mətn. Müştəri onu HTML kimi YERİTMƏMƏLİDİR — veb interfeysi " +
+      "blokları React elementlərinə çevirir (`lib/markdown.ts`).",
+  }),
+}).openapi("ContentPageDetail");
+
 export const GuidePlaceSchema = z
   .object({
     id: idSchema,
@@ -318,6 +336,7 @@ export const GuidePlaceSchema = z
     order: z.number().int(),
   })
   .openapi("GuidePlace");
+
 
 // ---------------------------------------------------------------------------
 // Sinif
@@ -610,6 +629,52 @@ export const SupportOfferEntrySchema = z
   .openapi("SupportOfferEntry");
 
 // ---------------------------------------------------------------------------
+// Bildirişlər (Blok 11A, spec §15)
+// ---------------------------------------------------------------------------
+
+/**
+ * 🔴 SXEM SAHİBLİK QAYDASINI DA SƏNƏDLƏŞDİRİR: cavabda `recipientId` YOXDUR,
+ * çünki o, HƏMİŞƏ sorğunu edən istifadəçidir — endpoint başqasının bildirişini
+ * heç bir halda qaytarmır (`services/notification.service.ts`). Sahəni cavaba
+ * qoysaydıq müştəri "filtr etmək olar" təsəvvürünə düşərdi.
+ */
+export const NotificationSchema = z
+  .object({
+    id: idSchema,
+    type: z.enum(NOTIFICATION_TYPE_VALUES),
+    title: z.string(),
+    body: z.string().nullable(),
+    url: z.string().nullable().openapi({
+      description:
+        "Sayt daxilindəki yol. ⚠️ Bildiriş YARADILARKƏN yazılıb — köhnə sətir " +
+        "mövcud olmayan səhifəyə işarə edə bilər; veb interfeysi tanınmayan " +
+        "formanı link kimi göstərmir (`lib/notification-links.ts`).",
+      example: "/class/informasiya-tehlukesizliyi-2027/feed",
+    }),
+    entityType: z.string().nullable(),
+    entityId: z.string().nullable(),
+    readAt: dateTimeSchema.nullable().openapi({
+      description: "`null` → oxunmamış.",
+    }),
+    createdAt: dateTimeSchema,
+    actor: memoryAuthorSchema.nullable().openapi({
+      description: "Bildirişi doğuran istifadəçi. Sistem bildirişlərində `null`.",
+    }),
+  })
+  .passthrough()
+  .openapi("Notification");
+
+export const NotificationReadResultSchema = z
+  .object({
+    changed: z.number().int().nonnegative().openapi({
+      description:
+        "Dəyişdirilmiş sətir sayı. `0` → sətir yoxdur VƏ YA başqasınındır — " +
+        "iki hal QƏSDƏN ayırd edilmir (mövcudluq faktı da məlumatdır).",
+    }),
+  })
+  .openapi("NotificationReadResult");
+
+// ---------------------------------------------------------------------------
 // "İndi haradayıq?" aqreqasiyası (Blok 10B, spec §13)
 // ---------------------------------------------------------------------------
 //
@@ -809,4 +874,30 @@ export const CURSOR_DEFAULT_TAKE = 20;
 export const PostsQuerySchema = z.object({
   cursor: z.string().optional(),
   take: takeSchema(CURSOR_MAX_TAKE, CURSOR_DEFAULT_TAKE),
+});
+
+/**
+ * `GET /notifications` — filtr + səhifələmə.
+ *
+ * ⚠️ Parametr ADLARI UI ilə EYNİDİR (`lib/notification-filters.ts` →
+ * `NOTIFICATION_PARAMS`): `status` · `type` · `page`. Ayrılsalar eyni URL veb
+ * səhifədə və API-də fərqli nəticə verərdi (Blok 6-nın filtr dərsi).
+ *
+ * ⚠️ `page` SƏTİRDƏN ədədə çevrilir — query parametrləri həmişə sətirdir.
+ */
+export const NotificationsQuerySchema = z.object({
+  status: z.enum(NOTIFICATION_STATUS_QUERY_VALUES).optional(),
+  type: NotificationTypeSchema.optional(),
+  page: z
+    .string()
+    .optional()
+    .transform((value) => (value === undefined || value === "" ? 1 : Number(value)))
+    .refine((value) => Number.isInteger(value) && value >= 1, {
+      message: "«page» 1-dən başlayan tam ədəd olmalıdır",
+    }),
+});
+
+/** Yol parametri ilə gələn səhifə — `GET /content/pages/{slug}`. */
+export const ContentPageParamsSchema = z.object({
+  slug: z.string().min(1),
 });

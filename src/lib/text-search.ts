@@ -63,6 +63,54 @@ export function textVariants(value: string): string[] {
   return [...new Set([trimmed, lower, upper, capitalized])];
 }
 
+// ---------------------------------------------------------------------------
+// Diakritik qatlama — DB-də DEYİL, YADDAŞDA müqayisə üçün
+// ---------------------------------------------------------------------------
+//
+// ⚠️ Aşağıdakılar `LIKE` şərti QURMUR. Onlar iki yerdə lazımdır və hər ikisi
+// DB süzgəci DEYİL:
+//   · `lib/geo.ts`         — şəhər/ölkə adının müqayisə açarı (Blok 10B)
+//   · `lib/faq-filters.ts` — FAQ axtarışı (ictimai, 20 sətir, məxfilik şərti yox)
+// Cədvəl TƏK yerdə saxlanılır: iki nüsxə olsaydı «İstanbul» bir modulda
+// `istanbul`, digərində `ıstanbul` olardı (Blok 10B-də məhz bu tapılmışdı).
+
+/**
+ * Azərbaycan hərflərinin ASCII qarşılığı.
+ *
+ * ⚠️ `İ` və `I` burada YOXDUR — onları `toLocaleLowerCase(AZ_LOCALE)` özü
+ * `i` / `ı`-ya çevirir, `ı` isə cədvəldə `i`-yə düşür. Böyük hərfləri də
+ * yazsaq eyni qayda iki yerdə saxlanardı.
+ */
+const AZ_FOLD: Record<string, string> = {
+  ə: "e",
+  ı: "i",
+  ş: "s",
+  ğ: "g",
+  ö: "o",
+  ü: "u",
+  ç: "c",
+};
+
+/** `az` lokalı ilə kiçik hərf + diakritik qatlama. Ayırıcılar SAXLANILIR. */
+export function foldDiacritics(value: string): string {
+  const lowered = value.trim().toLocaleLowerCase(AZ_LOCALE);
+
+  let out = "";
+  for (const char of lowered) out += AZ_FOLD[char] ?? char;
+  return out;
+}
+
+/**
+ * Axtarış müqayisəsi üçün açar: qatlanmış mətn, boşluqlar tək boşluğa yığılıb.
+ *
+ * ⚠️ `normalizeCityKey`-dən FƏRQLİ olaraq boşluq ATILMIR: «kampus həyatı»
+ * sorğusu söz sırasını qorumalıdır, «kampusheyati» isə səhvən «kampus heyat
+ * ianəsi» kimi sətirlərə də uyğun gələrdi.
+ */
+export function foldForSearch(value: string): string {
+  return foldDiacritics(value).replace(/\s+/g, " ").trim();
+}
+
 /** Sorğu sözlərə bölünür: "aysel məmmədova" → ["aysel", "məmmədova"]. */
 export function searchTokens(query: string): string[] {
   return query.trim().split(/\s+/).filter((token) => token !== "");

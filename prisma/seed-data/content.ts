@@ -963,6 +963,19 @@ export interface ContentPageSeed {
   section: ContentSection;
 }
 
+/**
+ * ⚠️ SIRA `ContentPage.order` SÜTUNUNU TƏYİN EDİR (seed `index`-i yazır) və
+ * bölmə səhifələrində (`/services`, `/newcomers`) göstərilmə sırasıdır.
+ * Yeni yazını bölməsinin SONUNA əlavə et — ortaya salsan mövcud səhifələrin
+ * sırası dəyişər.
+ *
+ * ⚠️ Slug-lar `src/lib/content-routes.ts` xəritəsindən oxunur
+ * (`content-routes.test.ts` uyğunluğu yoxlayır) — burada slug dəyişsə səhifə
+ * 404 verər.
+ *
+ * ⚠️ Bu blok PRNG İŞLƏTMİR (seed-in son addımıdır), yəni sətir əlavə etmək
+ * determinizmə TƏSİR ETMİR — digər cədvəllərin sayları və dəyərləri dəyişmir.
+ */
 export const CONTENT_PAGES: readonly ContentPageSeed[] = [
   {
     slug: "haqqimizda",
@@ -979,6 +992,13 @@ export const CONTENT_PAGES: readonly ContentPageSeed[] = [
     body: "## Təsis\n\nUniversitet bölgənin təhsil infrastrukturunun bərpası çərçivəsində yaradılıb və ilk tələbə qəbulunu yeni kampusda həyata keçirib.\n\n## İlk illər\n\nİlk qəbul nəsli universitetin ənənələrini formalaşdıran nəsildir: tələbə klubları, elmi konfranslar və könüllü proqramlar məhz həmin dövrdə qurulub.\n\n## Sənədləşdirmə\n\nQU CLASS platformasının Timeline bölməsi bu dövrün rəqəmsal arxivi kimi nəzərdə tutulub — hər sinif öz tarixini özü yazır.",
   },
   {
+    slug: "missiya",
+    title: "Missiya və dəyərlər",
+    excerpt: "Universitetin strateji hədəfləri və gündəlik işini istiqamətləndirən dəyərlər.",
+    section: "UNIVERSITY",
+    body: "## Missiya\n\nQarabağ Universiteti bölgənin bərpası prosesində təhsil, elm və icma mərkəzi rolunu daşıyır. Missiya üç sözlə ifadə olunur: bilik, bərpa, davamlılıq.\n\n## Strateji hədəflər\n\n1. Regionun ehtiyaclarına cavab verən mütəxəssis hazırlığı.\n2. Tədqiqatın yerli problemlərlə bağlanması — su, enerji, aqrar sahə və ekologiya.\n3. Tələbə icmasının universitetdən sonra da bir arada qalması.\n\n## Dəyərlər\n\n- Akademik dürüstlük: mənbə göstərilir, nəticə saxtalaşdırılmır.\n- Bərabər imkanlar: qəbul və qiymətləndirmə şəffaf meyarlarla aparılır.\n- Məxfiliyə hörmət: tələbənin şəxsi məlumatı onun öz nəzarətindədir.\n- Açıqlıq: qərarların əsası izah olunur.\n\n## Bu platforma missiyanın harasındadır\n\nQU CLASS üçüncü hədəfin alətidir: sinif səhifəsi qəbuldan məzuniyyətə və sonrasına qədər açıq qalır, tələbəlik xatirələri isə universitetin rəqəmsal yaddaşına çevrilir.",
+  },
+  {
     slug: "kampus-heyati",
     title: "Kampus həyatı",
     excerpt: "Klublar, tədbirlər, idman və gündəlik kampus qaydaları.",
@@ -991,6 +1011,13 @@ export const CONTENT_PAGES: readonly ContentPageSeed[] = [
     excerpt: "Fond, oxu zalı və rəqəmsal mənbələrdən istifadə qaydaları.",
     section: "CAMPUS",
     body: "## Fond\n\nKitabxana fondu ixtisas ədəbiyyatı, dövri mətbuat və elektron mənbələrdən ibarətdir.\n\n## Qeydiyyat\n\nQeydiyyat tələbə bileti ilə aparılır. Kitab götürmə müddəti 14 gündür və bir dəfə uzadıla bilər.\n\n## Elektron bazalar\n\nUniversitet hesabı ilə beynəlxalq elektron bazalara kampusdan kənarda da giriş mümkündür. Giriş problemi olduqda kitabxananın texniki dəstəyinə müraciət edin.",
+  },
+  {
+    slug: "klublar",
+    title: "Tələbə klubları və təşkilatları",
+    excerpt: "Klubların istiqamətləri, üzvlük qaydaları və klub tədbirləri.",
+    section: "CAMPUS",
+    body: "## İstiqamətlər\n\nKampusda beş istiqamətdə klub fəaliyyət göstərir: akademik, idman, incəsənət, sosial və texnologiya. Hər klubun öz idarə heyəti və illik proqramı var.\n\n## Üzvlük\n\n1. Klublar yarmarkasında və ya klubun səhifəsindən müraciət et.\n2. İlk toplantıya qatıl — üzvlük adətən elə orada rəsmiləşir.\n3. Bir neçə kluba eyni vaxtda üzv olmaq mümkündür.\n\n## Yeni klub açmaq\n\nƏn azı beş təsisçi tələbə, bir akademik məsləhətçi və illik fəaliyyət planı tələb olunur. Müraciət tələbə işləri şöbəsinə edilir.\n\n## Klub tədbirləri\n\nKlub səviyyəli tədbirlər ümumi təqvimə düşür və QU CLASS-dakı Tədbirlər bölməsində görünür. İctimaiyyətə açıq olanları giriş etmədən də oxumaq olar.",
   },
   {
     slug: "telebe-xidmetleri",
@@ -1019,6 +1046,48 @@ export const CONTENT_PAGES: readonly ContentPageSeed[] = [
     excerpt: "Məzun şəbəkəsi, dəstək təklifləri və görüşlər.",
     section: "NEWCOMERS",
     body: "## Şəbəkə\n\nMəzunlar sinif səhifəsində qalır və 'Where Are We Now' bölməsində harada olduqlarını paylaşa bilirlər. Statistikaya daxil olmaq ayrıca razılıq tələb edir.\n\n## Dəstək təklifləri\n\nQonaq mühazirəsi, karyera söhbəti, təcrübə yeri, mentorluq və startap əməkdaşlığı — məzunlar bu formatlarda dəstək təklif edə bilər.\n\n## Görüşlər\n\nReunion tədbirləri sinif səviyyəsində və universitet səviyyəsində təşkil olunur. Təqvim Tədbirlər bölməsindədir.",
+  },
+
+  // -------------------------------------------------------------------------
+  // Hüquqi sənədlər — `/legal/[slug]` (GW analizi #13)
+  //
+  // 🔴 NİYƏ MƏCBURİDİR: QU CLASS-ın texniki nüvəsi MƏXFİLİK mühərrikidir
+  // (dörd səviyyə, sahə-səviyyə görünürlük, aqreqasiya razılığı). Öz məxfilik
+  // bildirişi olmayan məxfilik platforması ziddiyyətdir və müdafiədə ilk
+  // soruşulacaq yerdir. Mətnlər DEMO səviyyəsindədir, amma məhsulun ƏSL
+  // davranışını təsvir edir — sənəd ilə koda arasında uyğunsuzluq olmasın.
+  //
+  // ⚠️ Slug-lar `lib/content-routes.ts` → `LEGAL_PAGES` ilə EYNİDİR.
+  // ⚠️ `section` UNIVERSITY-dir (sxemdə hüquqi bölmə yoxdur, miqrasiya
+  //    açmadıq) — ayrılma `LEGAL_SLUGS` süzgəci ilə aparılır.
+  // -------------------------------------------------------------------------
+  {
+    slug: "privacy",
+    title: "Məxfilik bildirişi",
+    excerpt: "Hansı məlumatı toplayırıq, niyə saxlayırıq və siz nəyi idarə edirsiniz.",
+    section: "UNIVERSITY",
+    body: "## Nə toplayırıq\n\nQeydiyyat zamanı ad, soyad, universitet e-poçtu, fakültə, ixtisas və qəbul ili toplanır. Profilin qalan sahələri (bio, maraqlar, telefon, karyera qeydləri) tamamilə könüllüdür.\n\n## Kim görür\n\nHər sahə üçün dörd görünürlük səviyyəsindən birini seçirsiniz: ictimai, universitet daxili, yalnız sinif, şəxsi. Telefon və şəxsi e-poçt standart olaraq şəxsidir — yəni yalnız siz görürsünüz. Səviyyə hər sorğuda verilənlər bazası səviyyəsində tətbiq olunur.\n\n## Statistika ayrıca razılıqdır\n\n'İndi haradayıq?' panelindəki karyera statistikası yalnız açıq razılıq vermiş qeydləri sayır. Görünürlük səviyyəsi tək başına kifayət etmir. Razılığı istənilən vaxt geri götürə bilərsiniz — rəqəmlər növbəti yükləmədə dəyişir.\n\n## Nə göstərmirik\n\nDəqiq ünvan və koordinat heç vaxt ictimai görünüşə düşmür — yalnız şəhər və ölkə. Üç nəfərdən kiçik qruplar statistikada ümumiləşdirilir. Maaş məlumatı platformada ümumiyyətlə saxlanılmır.\n\n## Kukilər\n\nZəruri kukilər sessiyanı saxlayır — onlarsız giriş işləmir. Razılıq seçiminiz bir il müddətinə kukidə saxlanılır və heç bir identifikator daşımır.\n\n## Hüquqlarınız\n\nMəlumatlarınıza baxmaq, düzəltmək və hesabınızın silinməsini tələb etmək hüququnuz var. Silinmə tələbi profil parametrlərindən göndərilir və 30 gün ərzində icra olunur.\n\n## Əlaqə\n\nMəxfiliklə bağlı suallar üçün universitetin məlumat təhlükəsizliyi məsul şəxsinə yazın.",
+  },
+  {
+    slug: "terms",
+    title: "İstifadə şərtləri",
+    excerpt: "Platformadan kim, hansı qaydalarla istifadə edir.",
+    section: "UNIVERSITY",
+    body: "## Kim istifadə edə bilər\n\nQU CLASS Qarabağ Universitetinin qəbul olunmuş tələbələri, hazırkı tələbələri və məzunları üçündür. Giriş universitet e-poçtu ilə həyata keçirilir; hesabı başqasına vermək qadağandır.\n\n## Məzmun qaydaları\n\nPaylaşılan məzmun universitetin etika qaydalarına uyğun olmalıdır. Qadağandır: təhqir və hədə, başqasının şəxsi məlumatının icazəsiz yayılması, saxta məlumat, reklam spam-ı, müəllif hüququ pozuntusu.\n\n## Moderasiya\n\nHər paylaşımın 'Şikayət et' düyməsi var. Şikayət sinif moderatoruna və universitet administratoruna düşür. Qayda pozuntusu təsdiqlənərsə məzmun gizlədilir, təkrarlanan hallarda hesab məhdudlaşdırıla bilər. Moderasiya qərarları jurnala yazılır.\n\n## Sizin məzmununuz sizindir\n\nYüklədiyiniz mətn və şəkillərin müəllif hüququ sizdə qalır. Platformaya yalnız məzmunu göstərmək üçün icazə verirsiniz. Paylaşımı sildikdə o, siyahılardan dərhal çıxır.\n\n## Xidmətin mövcudluğu\n\nPlatforma universitetin daxili xidmətidir; texniki işlər zamanı müvəqqəti dayandırıla bilər. Məlumatın ehtiyat nüsxəsi universitet qaydaları ilə saxlanılır.\n\n## Dəyişikliklər\n\nŞərtlər dəyişdikdə səhifənin yenilənmə tarixi dəyişir və əhəmiyyətli dəyişiklik barədə platformadaxili bildiriş göndərilir.",
+  },
+  {
+    slug: "copyright",
+    title: "Müəllif hüququ",
+    excerpt: "Universitet məzmunu, istifadəçi məzmunu və istinad qaydaları.",
+    section: "UNIVERSITY",
+    body: "## Universitet məzmunu\n\nUniversitetin rəsmi mətnləri, loqosu və vizual identikliyi Qarabağ Universitetinə məxsusdur. Təhsil və məlumat məqsədilə istinadla istifadə oluna bilər.\n\n## İstifadəçi məzmunu\n\nTələbə və məzunların paylaşdığı mətn, şəkil və video onların müəllifliyindədir. Başqasının paylaşımını platformadan kənarda yaymaq üçün müəllifin icazəsi lazımdır.\n\n## Şəkillərdə üçüncü şəxslər\n\nQrup şəkli paylaşarkən şəkildəki adamların razılığını nəzərə alın. Razılığı olmayan şəxs şəklin silinməsini tələb edə bilər və bu tələb icra olunur.\n\n## İddia bildirişi\n\nMüəllif hüququnuzun pozulduğunu düşünürsünüzsə, məzmunun ünvanı və hüququnuzun əsası ilə birlikdə universitetə yazın. Yoxlama müddətində məzmun müvəqqəti gizlədilə bilər.\n\n## Açıq mənbələr\n\nPlatforma açıq mənbəli komponentlərdən istifadə edir; onların lisenziyaları layihənin repozitoriyasında sadalanıb.",
+  },
+  {
+    slug: "equal-opportunity",
+    title: "Bərabər imkanlar bəyanatı",
+    excerpt: "Ayrı-seçkiliyə sıfır dözüm, əlçatanlıq və müraciət yolu.",
+    section: "UNIVERSITY",
+    body: "## Prinsip\n\nQarabağ Universiteti təhsil, qəbul, işə götürmə və kampus həyatında bərabər imkanlar prinsipini tətbiq edir. Cins, yaş, etnik mənşə, dil, din, əlillik və sosial mənşəyə görə ayrı-seçkilik qəbuledilməzdir.\n\n## Bu platformada\n\nQU CLASS-da sinif səhifəsi bütün üzvlərə eyni imkanları verir: hər kəs paylaşa, xatirə yaza və tədbirə qeydiyyatdan keçə bilər. Rollar (nümayəndə, koordinator, moderator) vəzifədir, imtiyaz deyil.\n\n## Əlçatanlıq\n\nİnterfeys WCAG 2.2 AA səviyyəsini hədəfləyir: klaviatura ilə tam idarəetmə, ekran oxuyucu üçün semantik quruluş, rəngdən başqa kanallar və 4.5:1 kontrast. Aşkarladığınız maneəni Əlçatanlıq səhifəsindəki forma ilə bildirə bilərsiniz.\n\n## Ayrı-seçkilik və qısnama\n\nAyrı-seçkilik və ya qısnama halında universitetin etika komissiyasına müraciət edin. Platformadaxili hallar üçün paylaşımın 'Şikayət et' düyməsi eyni prosesə qoşulur.\n\n## Cavab müddəti\n\nMüraciətlər 10 iş günü ərzində baxılır; nəticə barədə müraciət edənə yazılı cavab verilir.",
   },
 ] as const;
 

@@ -1,23 +1,34 @@
 // ============================================================================
-// src/features/welcome/PublicEventCards.tsx
-// «Qarşıdan gələn tədbirlər» — YALNIZ ictimai tədbirlər.
+// src/components/shared/PublicEventCards.tsx
+// «Açıq tədbirlər» kart qridi — YALNIZ ictimai tədbirlər.
 //
-// 🔴 TƏLƏ E — SIZMA NÖQTƏSİ. Siyahı `listEvents(ANONYMOUS, …)` ilə çəkilir və
+// ⚠️ Blok 11A-da `features/welcome/`-dan bura köçdü: `/events` səhifəsi ikinci
+// istifadəçi oldu və `features/*` bir-birindən import etmir (istiqamət həmişə
+// features → shared, `PrintButton` və `MapSkeleton` ilə eyni yol).
+//
+// 🔴 SIZMA NÖQTƏSİ. Siyahı `listEvents(ANONYMOUS, …)` ilə çəkilir və
 // `visibleWithStatus` anonim viewer üçün yalnız `visibility = PUBLIC` seçir.
 // Burada ƏLAVƏ FİLTR YOXDUR və olmamalıdır: ikinci filtr yazsaydıq iki
 // müstəqil məxfilik məntiqi yaranardı və biri köhnələrdi (CLAUDE.md §5).
 //
-// ⚠️ Açılış səhifəsi ANONİM viewer-lə oxuyur — hətta giriş etmiş istifadəçi
-// üçün də. Səbəb: `/` ictimai səhifədir və məzmunu ziyarətçidən ziyarətçiyə
-// dəyişməməlidir; sinif məzmununu görmək üçün `/home` var. Bu, həm keşləməni
-// sadələşdirir, həm də "girişdən sonra açılışda sinif postu göründü" kimi
-// gözlənilməz sızmanı struktur olaraq bağlayır.
+// ⚠️ Açılış səhifəsi və `/events` ANONİM viewer-lə oxuyur — hətta giriş etmiş
+// istifadəçi üçün də. Səbəb: bunlar ictimai səhifələrdir və məzmunları
+// ziyarətçidən ziyarətçiyə dəyişməməlidir; sinif tədbirləri
+// `/class/[slug]/events`-dədir. Bu, "girişdən sonra ictimai səhifədə sinif
+// tədbiri göründü" sızmasını struktur olaraq bağlayır.
 //
 // ⚠️ Kartda RSVP və iştirakçı sayı GÖSTƏRİLMİR: `attendingCount` sinif daxili
 // məlumatdır (kim gəlir sualına yaxınlaşır) və ictimai səhifədə yeri yoxdur.
+//
+// ⚠️ `hrefFor` OPSİYONALDIR. Açılış səhifəsində kart LİNKSİZDİR (tam siyahı
+// `/events`-dədir), `/events` səhifəsində isə `/events/[id]`-yə keçir. Həmin
+// detal səhifəsi AUTH ARXASINDADIR və bu, qəsdəndir: orada RSVP və iştirakçı
+// siyahısı var. Anonim ziyarətçi `/login?callbackUrl=…`-ə düşür, yəni girişdən
+// sonra MƏHZ həmin tədbirə qayıdır.
 // ============================================================================
 
 import Image from "next/image";
+import Link from "next/link";
 import { CalendarDays, Clock, MapPin, Monitor } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -26,6 +37,11 @@ import type { EventItem } from "@/services/event.service";
 
 interface PublicEventCardsProps {
   events: EventItem[];
+  /** Kart başlığından keçid — verilməzsə kart mətn kartı olaraq qalır. */
+  hrefFor?: (event: EventItem) => string;
+  /** Boş halda göstərilən mətn — səhifədən səhifəyə fərqlidir. */
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
 /** Tarix formatı: "12 sentyabr 2026, 13:00". */
@@ -40,13 +56,18 @@ const TIME_FORMAT = new Intl.DateTimeFormat("az-AZ", {
   minute: "2-digit",
 });
 
-export function PublicEventCards({ events }: PublicEventCardsProps) {
+export function PublicEventCards({
+  events,
+  hrefFor,
+  emptyTitle = "Açıq tədbir yoxdur",
+  emptyDescription = "Hazırda ictimaiyyətə açıq qarşıdan gələn tədbir elan olunmayıb. Sinif, fakültə və universitet tədbirlərini görmək üçün daxil olun.",
+}: PublicEventCardsProps) {
   if (events.length === 0) {
     return (
       <EmptyState
         icon={CalendarDays}
-        title="Açıq tədbir yoxdur"
-        description="Hazırda ictimaiyyətə açıq qarşıdan gələn tədbir elan olunmayıb. Sinif, fakültə və universitet tədbirlərini görmək üçün daxil olun."
+        title={emptyTitle}
+        description={emptyDescription}
         action={{ href: "/login", label: "Daxil ol" }}
       />
     );
@@ -81,7 +102,18 @@ export function PublicEventCards({ events }: PublicEventCardsProps) {
               </span>
             </div>
 
-            <h3 className="text-h4 font-medium text-text-primary">{event.title}</h3>
+            <h3 className="text-h4 font-medium text-text-primary">
+              {hrefFor ? (
+                <Link
+                  href={hrefFor(event)}
+                  className="transition-colors hover:text-ku-green"
+                >
+                  {event.title}
+                </Link>
+              ) : (
+                event.title
+              )}
+            </h3>
 
             {event.description ? (
               <p className="line-clamp-3 text-small text-text-secondary">

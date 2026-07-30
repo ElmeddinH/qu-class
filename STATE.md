@@ -904,3 +904,215 @@ Test dəstindən sonra 28 cədvəlin sayları təzə seed ilə **bayt-bayt eynid
 - Təhsil pilləsi yalnız CARİ İŞ QEYDİ OLAN üzvlər üçün sayılır (dataset karyera
   qeydinə bağlıdır); yalnız təhsil qeydi olan üzv `totalConsented`-də görünür,
   bölgüdə yox.
+
+---
+
+## Blok 11A — bitdi (Welcome Page [M1] · Fakültələr [M2] · Xankəndi bələdçisi [M3] · Bildiriş mərkəzi [M15])
+
+⚠️ **ADMİN PANELİ BU BLOKDA DEYİL** — o, 11B-dir (dashboard, moderasiya növbəsi,
+istifadəçi/rol idarəsi, CMS, CSV import, audit jurnalı). `(admin)` route qrupuna
+TOXUNULMADI; yeganə dəyişiklik `DashboardShell`-dəki bildiriş rozetidir və o,
+hər iki qrupda işləyir (aşağıda TƏLƏ C).
+
+### Yeni route-lar (17 yol)
+
+**İctimai məzmun (`(public)`):** `/about` · `/history` · `/mission` ·
+`/campus-life` · `/clubs` · `/services` · `/newcomers` · `/faq` ·
+`/faculties` · `/faculties/[slug]` · `/khankendi` · `/khankendi/[id]` ·
+`/events` · `/accessibility` · `/legal/[slug]` (4 sənəd).
+**`(app)`:** `/notifications`.
+
+### routes.ts-də NƏ DƏYİŞDİ (TƏLƏ A)
+
+🔴 **İCAZƏ MƏNTİQİ DƏYİŞMƏDİ.** `APP_ROUTE_PREFIXES`, `PUBLIC_EXACT_PATHS`,
+`ADMIN_ROUTE_PREFIXES`, `resolveRouteAccess`, `routeRedirectTarget` — HAMISI
+olduğu kimi qaldı. Yeni ictimai səhifələr onsuz da açıqdır (qorunan prefikslə
+kəsişmirlər), yəni "yeni yol → yeni qayda" ehtiyacı YARANMADI. Bu, qəsdən
+seçilmiş yoldur: dövrə məhz icazə qaydasına toxunanda yaranmışdı.
+
+Əlavə olunan İKİ SİYAHI icazə vermir, ƏKSİNİ SÜBUT EDİR:
+- `PUBLIC_PAGE_PATHS` — 14 statik ictimai yol (müqavilə siyahısı)
+- `PUBLIC_DYNAMIC_PARENTS` — `/faculties` · `/khankendi` · `/legal`
+  (⚠️ `/events` BURADA YOXDUR və bu, qərardır: `/events/<id>` detalında RSVP və
+  iştirakçı siyahısı var, ona görə auth arxasında qalır)
+
+Hər ikisi İKİ testin girişidir:
+- `routes.test.ts` — hər yol × 3 ziyarətçi → `PUBLIC` VƏ yönləndirmə `null`;
+  cədvələ 17 yeni sətir düşdü (dövrə testi avtomatik onların üzərindən keçir)
+- `tests/e2e/public.spec.ts` — anonim VƏ giriş etmiş brauzerdə 200, URL
+  DƏYİŞMİR (ictimai səhifə istifadəçini `/home`-a qovmur)
+
+### PlaceMemories harada quraşdırıldı (Blok 10A-nın qalan işi)
+
+`features/guide/GuidePlaceDetail.tsx` → `/khankendi/[id]` səhifəsinin sol
+sütununda, təsvirdən sonra: `<PlaceMemories placeId={place.id} placeTitle={…} />`.
+Komponent viewer-i ÖZÜ qurur (`getViewer()`), servis isə `activeVisibleWhere`
+şərtini məkan filtrinin ÜSTÜNƏ qoyur — yəni anonim ziyarətçi yalnız `PUBLIC`
+xatirələri görür. Üç yerdə ölçülür: `memories.db.test.ts` (10A-dan), yeni
+`public-content.db.test.ts` (bütün məkanlar üzrə) və `public.spec.ts` (anonim
+brauzerdə CLASS xatirənin BAŞLIĞI tapılmır).
+
+### ACCESSIBILITY enum əlavəsi — kimlərə təsir etdi (TƏLƏ D)
+
+`REPORT_ENTITY_TYPE_VALUES`-ə `"ACCESSIBILITY"` əlavə olundu. Sütun `String`-dir
+→ **miqrasiya LAZIM OLMADI**. Təsir etdiyi yerlər:
+- `lib/labels.ts` → yeni `REPORT_ENTITY_TYPE_LABELS` (`Record<>` — tsc qapısı)
+- `labels.test.ts` → cədvəl əhatə testinə əlavə olundu
+- `services/report.service.ts` → `createAccessibilityReport` (ayrı funksiya)
+
+🔴 **`ACCESSIBILITY` DİGƏRLƏRİNDƏN FƏRQLİDİR:** qalan dəyərlərdə `entityId` DB
+sətrinin `id`-sidir, burada isə SƏHİFƏ YOLUDUR (`/khankendi/gpl-01`). Moderator
+üçün fərq mühümdür — bu qeydi «məzmunu gizlət» ilə həll etmək olmaz, o, texniki
+nasazlıq biletidir. 11B-nin moderasiya növbəsi bunu nəzərə almalıdır.
+
+🔴 **SEED QORUNDU:** `prisma/seed.ts` artıq `cycle(REPORT_ENTITY_TYPE_VALUES, i)`
+İŞLƏTMİR — yerli sabit `REPORT_SEED_ENTITY_TYPES` (əvvəlki 6 dəyər, eyni sıra)
+qurulub. Enum-dan oxusaydı 12 şikayətin növ bölgüsü sürüşər və hər sətrin
+`entityId`-si başqa obyektə düşərdi.
+
+### Kuki razılığının saxlanma üsulu (TƏLƏ E)
+
+`document.cookie` → `qu_cookie_consent=all|necessary`, `path=/`,
+`max-age=31536000` (1 il), `SameSite=Lax`. `Secure` bayrağı **protokoldan
+törəyir** (`window.location.protocol === "https:"`) — `localhost`-da `Secure`
+kuka brauzer tərəfindən səssizcə atılır və banner heç vaxt bağlanmazdı (e2e
+http üzərindədir).
+
+Qərar SERVERDƏ verilir: `features/consent/ConsentGate.tsx` (server komponenti)
+`cookies()` ilə oxuyur və razılıq varsa `CookieBanner` **ÜMUMİYYƏTLƏ render
+olunmur** — HTML-də izi qalmır, hidrasiya sıçrayışı yoxdur. Banner həm
+`PublicShell`, həm `DashboardShell`-dədir (razılıq sessiyadan asılı deyil,
+istifadəçi ikinci dəfə soruşulmur).
+
+- «Rədd et» AYRI dəyər DEYİL → `necessary`. Zəruri (sessiya) kukiləri söndürmək
+  mümkün deyil, düymə yalan vəd etməməlidir; banner mətni bunu açıq yazır.
+- Kuka istifadəçi identifikatoru DAŞIMIR (`consent.test.ts` yoxlayır) — razılıq
+  kukisinin özü izləyici olsaydı ziddiyyət yaranardı.
+- `role="region"`, `dialog` DEYİL: banner modal deyil, fokus tələsi qurmur.
+
+🔴 **YOL BOYU TAPILAN NASAZLIQ:** `fixed` banner səhifənin son ~120 pikselini
+DAİMİ örtürdü və orada duran düymə (profil formasının «Yadda saxla»-sı) klikə
+cavab vermirdi — pointer hadisəsini banner tuturdu. E2E dəstində ÜÇ fayl
+qırıldı və bu, istifadəçi üçün də eyni nasazlıqdır. Həll: banner öz hündürlüyünü
+ölçüb axına eyni ölçüdə boşluq (`spacer`) əlavə edir.
+
+### Anonim əlçatanlıq forması üçün seçilən yol və SƏBƏBİ
+
+**Seçim: forma GİRİŞ TƏLƏB EDİR; bəyanat isə anonimə TAM açıqdır.**
+
+`Report.reporterId` sxemdə məcburidir (`String`, nullable deyil). İki variant
+vardı:
+- (a) `reporterId`-ni nullable etmək → miqrasiya + `Report`-un BÜTÜN oxu
+  tərəfini (moderasiya növbəsi, audit jurnalı, 11B-nin filtrləri) «müəllif ola
+  bilər / olmaya bilər» halına açmaq;
+- (b) anonim ziyarətçiyə formanın yerinə giriş çağırışı + alternativ kanal
+  göstərmək.
+
+**(b) seçildi.** Səbəblər: maneə bildirişi nadir hadisədir; anonim axın
+moderasiya növbəsinə spam qapısı açır; ən əsası — cavab kanalı qalmır (kimə
+yazaq?). WCAG-ın «əlaqə yolu olsun» tələbi girişsiz də ödənilir: bəyanat tam
+oxunur və `equal-opportunity` sənədindəki e-poçt kanalı göstərilir.
+⚠️ 11B-nin moderasiya növbəsi `ACCESSIBILITY` qeydlərini AYRI göstərməlidir.
+
+### Yeni saf modullar (Prisma / React yoxdur, testlə örtülü)
+
+`lib/markdown.ts` (`parseAgenda` Blok 9-dan bura köçdü — ikinci istifadəçi
+yarandı) · `lib/consent.ts` · `lib/content-routes.ts` (ünvan ↔ slug xəritəsi) ·
+`lib/faq-filters.ts` · `lib/guide-filters.ts` · `lib/notification-filters.ts` ·
+`lib/notification-links.ts` · `lib/public-event-filters.ts`.
+`lib/text-search.ts` → **`foldDiacritics` / `foldForSearch`**: qatlama cədvəli
+`lib/geo.ts`-dən bura köçdü (T13 nümunəsi — iki nüsxə «İstanbul» sözünü iki
+fərqli açara salardı).
+
+### `shared/`-ə köçən komponentlər (features → shared, əksi yox)
+
+`PublicEventCards` (welcome → shared, `/events` ikinci istifadəçi) ·
+`MapSkeleton` (where-are-we-now → shared, Xankəndi xəritəsi) ·
+yeni `components/shared/Markdown.tsx`.
+`lib/labels.ts` → **`POST_CATEGORY_LABELS`** (feed kataloqundan lib-ə, T13).
+
+### 🔴 Bildiriş linkləri — 404 verən keçid göstərilmir
+
+Seed-dəki bildiriş `url`-ləri MÖVCUD OLMAYAN route-lara baxırdı:
+`/feed/<id>` · `/achievements/<id>` · `/directory/<id>`. Düzəliş İKİ QATDIR:
+1. **Məlumat:** seed indi `/class/<slug>/feed`, `/class/<slug>/achievements`,
+   `/u/<id>` yazır (`cohortSlugById` xəritəsi əlavə olundu; sətir sayı və PRNG
+   axını DƏYİŞMƏDİ — yalnız `url` sütununun dəyəri).
+2. **Davranış:** `lib/notification-links.ts` AĞ SİYAHIDIR — tanınmayan forma
+   linkə çevrilmir (başlıq mətn kimi qalır). Bu, həm 404-ün, həm də açıq
+   yönləndirmənin (`//evil.example.com`) qarşısını alır.
+Yalnız birincisi olsaydı istehsalda yaranan köhnə sətir yenə 404 verərdi.
+
+### TƏLƏ C — header rozeti necə həll olundu
+
+`NotificationBadge` **SERVER komponentidir**. TanStack Query İŞLƏDİLMİR:
+`DashboardShell` həm `(app)`, həm `(admin)` qrupundadır, `QueryClientProvider`
+isə yalnız `(app)`-dədir → `useQuery` admin panelini «No QueryClient set» ilə
+500 verərdi (Blok 6, T18). Say `countUnreadNotifications` ilə serverdə oxunur;
+təzələnmə server action-larındakı `revalidatePath("/", "layout")` + client
+tərəfdəki `router.refresh()` ilə olur.
+⚠️ **`revalidatePath` TƏK BAŞINA KİFAYƏT ETMƏDİ** — açıq səhifə yenidən
+çəkilmirdi və rozet köhnə rəqəmdə qalırdı (e2e ilə tapıldı, Blok 9-un
+`EventComposer` nümunəsi ilə eyni həll).
+E2E `admin@` ilə `/admin`-i açıb konsolda `QueryClient` xətası OLMADIĞINI
+yoxlayır.
+
+### Seed dəyişikliyi
+
+`CONTENT_PAGES` **8 → 14**: `missiya` + `klublar` (route xəritəsi onları tələb
+edir) və dörd hüquqi sənəd (`privacy` · `terms` · `copyright` ·
+`equal-opportunity`). Blok PRNG İŞLƏTMİR (seed-in son addımıdır), yəni
+determinizmə təsir yoxdur — **qalan 27 cədvəlin sayları və dəyərləri
+DƏYİŞMƏDİ** (iki ardıcıl seed icrası bayt-bayt eyni: 28 cədvəlin sətirləri
+sıralanıb hash-lənərək müqayisə olundu).
+
+### Testlər
+
+vitest **1275** (1030 → +245: `routes` +26 (cədvəl + ictimai səth müqaviləsi),
+`consent` 14, `faq-filters` 20, `guide-filters` 15, `notification-filters` 16,
+`notification-links` 24, `markdown` 14, `content-routes` 24, `public-event-filters` 11,
+`labels` +6, `notifications.db` 14, `public-content.db` 20, `api.db` +12,
+`openapi` +29 avtomatik `it.each`).
+playwright **133** (105 → +28: `public.spec.ts` 17, `notifications.spec.ts` 8,
+`landing.spec.ts` +1, mövcudlar yeniləndi).
+
+`tsc --noEmit` · `lint` · `build` təmiz.
+`grep -rn "prisma\." src/app src/features` → yalnız şərhlər.
+`grep -rn "localStorage" src/` → yalnız şərhlər (TƏLƏ E).
+`grep -rn "#[0-9a-f]\{3,6\}" src/features/{guide,notifications,consent,content,accessibility,faculties}` → yalnız şərhlər.
+
+⚠️ **E2E-dən sonra `User` cədvəlinin SAYI eynidir, DƏYƏRLƏRİ isə yox** —
+giriş axını `lastSeenAt` / `stage` sütunlarını yeniləyir. Bu, Blok 11A-nın
+gətirdiyi davranış DEYİL: təkbaşına işlədilən `auth.spec.ts` (Blok 2-dən bəri
+var) eyni nəticəni verir (ölçüldü). Qalan 27 cədvəl e2e-dən sonra təzə seed ilə
+bayt-bayt eynidir.
+
+### Mövcud testlərdə edilən DÜZƏLİŞLƏR (və səbəbləri)
+
+- `public-nav.spec.ts` / `landing.spec.ts` — naviqasiya anchor-dan REAL route-a
+  qayıtdığı üçün gözləmələr yeniləndi (`/#faculties` → `/faculties`).
+- 🔴 **CLASS paylaşım sızma testi YALANDAN qırılırdı.** Seed gövdələri sabit
+  hovuzdan (`POST_BODIES[category]`) dövrə ilə seçilir, yəni EYNİ mətn həm
+  CLASS, həm PUBLIC paylaşımda ola bilər. Açılışa «Son xəbərlər» bloku gələnə
+  qədər bu gözə dəymirdi. Needle indi «anonim ziyarətçinin gördüyü HEÇ BİR
+  paylaşımda olmayan mətn» kimi seçilir — sızma xassəsi eyni qalır, ölçmə
+  düzəlir.
+- `notifications.spec.ts` — rozet SIFIRDA render OLUNMUR, ona görə «0» mətnini
+  gözləmək olmaz: köməkçi element yoxdursa `0` qaytarır.
+- `openapi.test.ts` / `api-docs.spec.ts` — endpoint sayı 23 → **28**; POST
+  siyahısı 3 → 5.
+
+### Qalan borc
+
+- «Seçimlər» düyməsi ayrıca kateqoriya ekranı AÇMIR — məxfilik bildirişinə
+  aparır. Hazırda yalnız iki kateqoriya var (zəruri / analitika) və analitika
+  ÜMUMİYYƏTLƏ quraşdırılmayıb; saxta «parametrlər» modalı açmaqdansa sənədə
+  aparmaq dürüstdür. Analitika əlavə olunanda ekran da lazım olacaq
+  (`allowsAnalytics()` qapısı hazırdır).
+- Xankəndi xəritəsində zoom/pan yoxdur (10B-nin eyni borcu).
+- `/faculties/[slug]` sinif səhifəsinin ÖZÜNƏ link vermir — `/class/[slug]`
+  auth arxasındadır və anonim ziyarətçini `/login`-ə atardı.
+- Bildiriş mərkəzində «oxunmuşu geri qaytar» yoxdur (qəsdən) və silmə də yoxdur
+  (tarixçə qalır).
+- İctimai məzmun səhifələrində axtarış yoxdur — yalnız `/faq`-da var.
+- `ContentPage` üçün admin CMS 11B-dədir; hazırda mətn yalnız seed-dən gəlir.

@@ -18,6 +18,7 @@ import { describe, expect, it } from "vitest";
 import {
   CLUB_ROLE_VALUES,
   COHORT_ROLE_VALUES,
+  CONTENT_SECTION_VALUES,
   DEGREE_VALUES,
   EVENT_CATEGORY_VALUES,
   EVENT_SCOPE_VALUES,
@@ -25,6 +26,9 @@ import {
   INDUSTRY_VALUES,
   JOB_FUNCTION_VALUES,
   LANGUAGE_LEVEL_VALUES,
+  NOTIFICATION_TYPE_VALUES,
+  POST_CATEGORY_VALUES,
+  REPORT_ENTITY_TYPE_VALUES,
   RSVP_STATUS_VALUES,
   SUPPORT_OFFER_TYPE_VALUES,
   USER_STAGE_VALUES,
@@ -32,6 +36,7 @@ import {
 import {
   CLUB_ROLE_LABELS,
   COHORT_ROLE_LABELS,
+  CONTENT_SECTION_LABELS,
   DEGREE_LABELS,
   EVENT_CATEGORY_LABELS,
   EVENT_SCOPE_LABELS,
@@ -40,6 +45,9 @@ import {
   JOB_FUNCTION_LABELS,
   LANGUAGE_LEVEL_HINTS,
   LANGUAGE_LEVEL_LABELS,
+  NOTIFICATION_TYPE_LABELS,
+  POST_CATEGORY_LABELS,
+  REPORT_ENTITY_TYPE_LABELS,
   RSVP_STATUS_LABELS,
   STAGE_LABELS,
   SUPPORT_OFFER_LABELS,
@@ -50,8 +58,12 @@ import {
   eventScopeLabel,
   industryLabel,
   jobFunctionLabel,
+  contentSectionLabel,
   labelOf,
   languageLevelLabel,
+  notificationTypeLabel,
+  postCategoryLabel,
+  reportEntityTypeLabel,
   rsvpStatusLabel,
   stageLabel,
   supportOfferLabel,
@@ -72,6 +84,11 @@ const TABLES: Array<[string, readonly string[], Record<string, string>]> = [
   ["EVENT_CATEGORY_LABELS", EVENT_CATEGORY_VALUES, EVENT_CATEGORY_LABELS],
   ["EVENT_STATUS_LABELS", EVENT_STATUS_VALUES, EVENT_STATUS_LABELS],
   ["RSVP_STATUS_LABELS", RSVP_STATUS_VALUES, RSVP_STATUS_LABELS],
+  // Blok 11A — bildiriş mərkəzi [M15], ictimai məzmun səhifələri, moderasiya.
+  ["NOTIFICATION_TYPE_LABELS", NOTIFICATION_TYPE_VALUES, NOTIFICATION_TYPE_LABELS],
+  ["POST_CATEGORY_LABELS", POST_CATEGORY_VALUES, POST_CATEGORY_LABELS],
+  ["REPORT_ENTITY_TYPE_LABELS", REPORT_ENTITY_TYPE_VALUES, REPORT_ENTITY_TYPE_LABELS],
+  ["CONTENT_SECTION_LABELS", CONTENT_SECTION_VALUES, CONTENT_SECTION_LABELS],
 ];
 
 describe("etiket cədvəlləri", () => {
@@ -140,6 +157,25 @@ describe("…Label() köməkçiləri", () => {
     }
   });
 
+  it("🔴 `ACCESSIBILITY` şikayət növü etiketlənib (Blok 11A)", () => {
+    // Dəyər `lib/enums.ts`-ə əlavə olundu; `Record<ReportEntityType, …>`
+    // cədvəli natamam qalsaydı `tsc` dayanardı, amma etiketin MƏNALI olduğunu
+    // yalnız test yoxlaya bilir.
+    expect(REPORT_ENTITY_TYPE_VALUES as readonly string[]).toContain("ACCESSIBILITY");
+    expect(REPORT_ENTITY_TYPE_LABELS.ACCESSIBILITY).not.toBe("ACCESSIBILITY");
+    expect(reportEntityTypeLabel("ACCESSIBILITY")).toBe(
+      REPORT_ENTITY_TYPE_LABELS.ACCESSIBILITY,
+    );
+  });
+
+  it("bildiriş, kateqoriya və bölmə köməkçiləri cədvəldən oxuyur", () => {
+    expect(notificationTypeLabel("EVENT_INVITE")).toBe(
+      NOTIFICATION_TYPE_LABELS.EVENT_INVITE,
+    );
+    expect(postCategoryLabel("FIRST_DAY")).toBe(POST_CATEGORY_LABELS.FIRST_DAY);
+    expect(contentSectionLabel("NEWCOMERS")).toBe(CONTENT_SECTION_LABELS.NEWCOMERS);
+  });
+
   it("naməlum dəyərdə təhlükəsiz nəticə verir", () => {
     expect(stageLabel("???")).toBe(STAGE_LABELS.STUDENT);
     expect(cohortRoleLabel("???")).toBe(COHORT_ROLE_LABELS.MEMBER);
@@ -151,5 +187,10 @@ describe("…Label() köməkçiləri", () => {
     // ⚠️ `eventScopeLabel` XAM dəyəri saxlayır: təşkilatçı səviyyəsi üçün
     // mənalı defolt yoxdur (`degreeLabel` ilə eyni məntiq).
     expect(eventScopeLabel("???")).toBe("???");
+    expect(notificationTypeLabel("???")).toBe(NOTIFICATION_TYPE_LABELS.SYSTEM);
+    expect(postCategoryLabel("???")).toBe(POST_CATEGORY_LABELS.GENERAL);
+    // ⚠️ `reportEntityTypeLabel` XAM dəyəri saxlayır: moderasiya növbəsində
+    // naməlum növü «Paylaşım» kimi göstərmək moderatoru YANILDARDI.
+    expect(reportEntityTypeLabel("???")).toBe("???");
   });
 });

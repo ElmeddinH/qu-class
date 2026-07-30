@@ -33,7 +33,7 @@
 // bazadaki əsl dəyəri tapmaz.
 // ============================================================================
 
-import { AZ_LOCALE } from "@/lib/text-search";
+import { foldDiacritics } from "@/lib/text-search";
 
 /** Azərbaycan xəritəsi bu ölkə adına görə seçilir (seed və UI eyni sətri işlədir). */
 export const AZERBAIJAN = "Azərbaycan";
@@ -41,23 +41,6 @@ export const AZERBAIJAN = "Azərbaycan";
 // ---------------------------------------------------------------------------
 // Normallaşdırma
 // ---------------------------------------------------------------------------
-
-/**
- * Azərbaycan hərflərinin ASCII qarşılığı.
- *
- * ⚠️ `İ` və `I` burada YOXDUR — onları `toLocaleLowerCase(AZ_LOCALE)` özü
- * `i` / `ı`-ya çevirir, `ı` isə aşağıdaki cədvəldə `i`-yə düşür. Böyük hərfləri
- * də yazsaq iki yerdə eyni qayda saxlanardı.
- */
-const FOLD: Record<string, string> = {
-  ə: "e",
-  ı: "i",
-  ş: "s",
-  ğ: "g",
-  ö: "o",
-  ü: "u",
-  ç: "c",
-};
 
 /**
  * Şəhər / ölkə adını müqayisə açarına çevirir.
@@ -72,15 +55,17 @@ const FOLD: Record<string, string> = {
  * ⚠️ ÖLKƏ adları da MƏHZ bu funksiyadan keçir. Ayrı `normalizeCountryKey`
  * yazmaq iki fərqli qatlama qaydası (deməli iki fərqli nəticə) riski deməkdir —
  * bir şəhərin ölkəsi cədvəldə tapılmayanda səbəbi tapmaq günlər alır.
+ *
+ * ⚠️ Qatlama cədvəli BURADA DEYİL — `lib/text-search.ts` → `foldDiacritics`
+ * (Blok 11A: FAQ axtarışı ikinci istifadəçi oldu, cədvəlin iki nüsxəsi isə
+ * «İstanbul» sözünün iki fərqli açara düşməsi deməkdir). Bu funksiya yalnız
+ * AYIRICI ATMA addımını əlavə edir.
  */
 export function normalizeCityKey(value: string): string {
-  const lowered = value.trim().toLocaleLowerCase(AZ_LOCALE);
-
   let out = "";
-  for (const char of lowered) {
-    const folded = FOLD[char] ?? char;
+  for (const char of foldDiacritics(value)) {
     // \p{L} = hər hansı dildə hərf, \p{N} = rəqəm. Qalanı ayırıcıdır.
-    if (/[\p{L}\p{N}]/u.test(folded)) out += folded;
+    if (/[\p{L}\p{N}]/u.test(char)) out += char;
   }
 
   return out;

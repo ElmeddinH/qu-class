@@ -57,7 +57,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { MEMORY_TYPE_LABELS } from "@/lib/labels";
+import { MEMORY_TYPE_LABELS, POST_CATEGORY_LABELS } from "@/lib/labels";
 import {
   ACHIEVEMENT_CATEGORY_VALUES,
   MEMORY_TYPE_VALUES,
@@ -125,19 +125,28 @@ export interface CatalogEntry {
 // 1. Post kateqoriyaları — 12 dəyər, MƏCBURİ seçim (spec §6)
 // ---------------------------------------------------------------------------
 
+/**
+ * ⚠️ ETİKETLƏR BURADA YAZILMIR — `lib/labels.ts` → `POST_CATEGORY_LABELS`
+ * (T13 nümunəsi, `MEMORY_TYPE_META` ilə eyni səbəb). Blok 11A-da açılış
+ * səhifəsinin «Son xəbərlər» bloku ikinci istifadəçi oldu və `features/*`
+ * bir-birindən import etmir. Burada YALNIZ lentin ikon seçimi qalır.
+ */
 export const POST_CATEGORY_META: Record<PostCategory, CatalogEntry> = {
-  FIRST_DAY: { label: "İlk gün", icon: "sunrise" },
-  ORIENTATION: { label: "Oriyentasiya", icon: "compass" },
-  EVENT_PHOTOS: { label: "Tədbir fotoları", icon: "camera" },
-  ACADEMIC_ACHIEVEMENT: { label: "Akademik nailiyyət", icon: "graduation" },
-  SOCIAL_ACHIEVEMENT: { label: "İctimai nailiyyət", icon: "users" },
-  TRIPS: { label: "Səyahətlər", icon: "plane" },
-  EXAM_PERIOD: { label: "İmtahan dövrü", icon: "book" },
-  INTERNSHIP: { label: "Təcrübə", icon: "briefcase" },
-  CLUB_ACTIVITY: { label: "Klub fəaliyyəti", icon: "sparkles" },
-  COMPETITION: { label: "Yarışlar", icon: "trophy" },
-  CAPSTONE: { label: "Buraxılış layihəsi", icon: "scroll" },
-  GENERAL: { label: "Ümumi", icon: "message" },
+  FIRST_DAY: { label: POST_CATEGORY_LABELS.FIRST_DAY, icon: "sunrise" },
+  ORIENTATION: { label: POST_CATEGORY_LABELS.ORIENTATION, icon: "compass" },
+  EVENT_PHOTOS: { label: POST_CATEGORY_LABELS.EVENT_PHOTOS, icon: "camera" },
+  ACADEMIC_ACHIEVEMENT: {
+    label: POST_CATEGORY_LABELS.ACADEMIC_ACHIEVEMENT,
+    icon: "graduation",
+  },
+  SOCIAL_ACHIEVEMENT: { label: POST_CATEGORY_LABELS.SOCIAL_ACHIEVEMENT, icon: "users" },
+  TRIPS: { label: POST_CATEGORY_LABELS.TRIPS, icon: "plane" },
+  EXAM_PERIOD: { label: POST_CATEGORY_LABELS.EXAM_PERIOD, icon: "book" },
+  INTERNSHIP: { label: POST_CATEGORY_LABELS.INTERNSHIP, icon: "briefcase" },
+  CLUB_ACTIVITY: { label: POST_CATEGORY_LABELS.CLUB_ACTIVITY, icon: "sparkles" },
+  COMPETITION: { label: POST_CATEGORY_LABELS.COMPETITION, icon: "trophy" },
+  CAPSTONE: { label: POST_CATEGORY_LABELS.CAPSTONE, icon: "scroll" },
+  GENERAL: { label: POST_CATEGORY_LABELS.GENERAL, icon: "message" },
 };
 
 /** UI-da göstərilmə sırası — enum massivi ilə eynidir. */

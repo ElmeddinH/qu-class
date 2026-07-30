@@ -41,6 +41,10 @@ import {
 } from "@/lib/directory-filters";
 import { ACHIEVEMENT_PARAMS } from "@/lib/achievement-filters";
 import { MEMORY_PARAMS, MEMORY_PLACE_FLAG } from "@/lib/memory-filters";
+import {
+  NOTIFICATION_PARAMS,
+  NOTIFICATION_STATUS_VALUES,
+} from "@/lib/notification-filters";
 import { TIMELINE_PARAMS } from "@/lib/timeline-filters";
 import {
   EVENT_FORMAT_VALUES,
@@ -55,6 +59,7 @@ import {
   FAQ_CATEGORY_VALUES,
   GUIDE_CATEGORY_VALUES,
   MEMORY_TYPE_VALUES,
+  NOTIFICATION_TYPE_VALUES,
   POST_CATEGORY_VALUES,
   TIMELINE_SOURCE_TYPE_VALUES,
   USER_STAGE_VALUES,
@@ -64,6 +69,7 @@ import {
   AchievementSchema,
   ApiErrorSchema,
   CohortHeaderSchema,
+  ContentPageDetailSchema,
   ContentPageSchema,
   DirectoryEntrySchema,
   EventSchema,
@@ -75,6 +81,8 @@ import {
   LoginBodySchema,
   LogoutBodySchema,
   MemorySchema,
+  NotificationReadResultSchema,
+  NotificationSchema,
   NullableSessionSchema,
   PlaceMemorySchema,
   RegisterBodySchema,
@@ -110,6 +118,13 @@ export const API_TAGS = [
       "süzgəcindən keçir — icazəsiz sinif üçün 404 qaytarılır, 403 YOX.",
   },
   { name: "Events", description: "Tədbirlər və Reunion." },
+  {
+    name: "Notifications",
+    description:
+      "Bildiriş mərkəzi [M15]. 🔴 Cavab HƏMİŞƏ yalnız sorğunu edənin " +
+      "bildirişləridir — bu qapı `visibilityWhere` DEYİL, SAHİBLİK şərtidir " +
+      "(`recipientId = viewer.userId`).",
+  },
   { name: "Search", description: "Qlobal axtarış (istifadəçi, paylaşım, tədbir, nailiyyət)." },
   { name: "System", description: "Sağlamlıq yoxlaması və sənəd." },
 ] as const;
@@ -331,6 +346,25 @@ const PostsQuery = z.object({
     "Əvvəlki səhifənin son paylaşım `id`-si (`meta.nextCursor`).",
   ),
   take: queryField(z.string().openapi({ example: "20" }), "Səhifə ölçüsü (1–50)."),
+});
+
+/**
+ * Bildiriş filtrləri — adlar `lib/notification-filters.ts`-dən TÖRƏYİR
+ * (`NOTIFICATION_PARAMS`), sənədə əl ilə yazılmır.
+ */
+const NotificationQuery = z.object({
+  [NOTIFICATION_PARAMS.status]: queryField(
+    z.enum(NOTIFICATION_STATUS_VALUES),
+    "Oxunma vəziyyəti. Verilməzsə hamısı qaytarılır.",
+  ),
+  [NOTIFICATION_PARAMS.type]: queryField(
+    z.enum(NOTIFICATION_TYPE_VALUES),
+    "Bildiriş növü (9 dəyər).",
+  ),
+  [NOTIFICATION_PARAMS.page]: queryField(
+    z.string().openapi({ example: "2" }),
+    "Səhifə nömrəsi (1-dən).",
+  ),
 });
 
 const SearchQuery = z.object({
@@ -964,6 +998,158 @@ path({
     200: jsonResponse(
       "Növ üzrə qruplaşdırılmış nəticələr.",
       envelope(SearchResultsSchema, "SearchResponse"),
+    ),
+    ...commonResponses({ isPublic: true }),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Notifications (Blok 11A, spec §15)
+// ---------------------------------------------------------------------------
+
+path({
+  method: "get",
+  path: "/api/v1/notifications",
+  operationId: "listNotifications",
+  tags: ["Notifications"],
+  summary: "Öz bildirişlərim",
+  description:
+    "🔴 CAVAB HƏMİŞƏ YALNIZ SORĞUNU EDƏNİN bildirişləridir. Şərt " +
+    "(`recipientId = viewer.userId`) servis qatındadır və `recipientId` " +
+    "parametri QƏBUL EDİLMİR — «başqasının bildirişlərini gör» sorğusu ifadə " +
+    "edilə bilmir.\n\n" +
+    "⚠️ Bu qapı `visibilityWhere` DEYİL: bildirişin görünürlük səviyyəsi yoxdur, " +
+    "o, bir nəfərə ünvanlanmış mesajdır. Ona görə anonim sorğu boş siyahı deyil, " +
+    "**401** alır.\n\n" +
+    "⚠️ Filtr adları veb interfeysi ilə eynidir (`status` · `type` · `page`), " +
+    "yəni eyni URL hər iki səthdə eyni nəticəni verir.",
+  security: SECURED,
+  request: { query: NotificationQuery },
+  responses: {
+    200: jsonResponse(
+      "Bildirişlər (yenidən köhnəyə) + `meta.total`.",
+      listEnvelope(NotificationSchema, "NotificationListResponse"),
+    ),
+    ...commonResponses(),
+  },
+});
+
+path({
+  method: "post",
+  path: "/api/v1/notifications/{id}/read",
+  operationId: "markNotificationRead",
+  tags: ["Notifications"],
+  summary: "Bildirişi oxunmuş işarələ",
+  description:
+    "🔴 Başqasının bildirişi ilə **404** qaytarılır — «yoxdur» və «sənin deyil» " +
+    "QƏSDƏN ayırd edilmir (mövcudluq faktı da məlumatdır). Əməliyyat " +
+    "`updateMany` ilə icra olunur, yəni sahiblik şərti `where`-dədir.\n\n" +
+    "⚠️ Artıq oxunmuş bildirişdə `readAt` DƏYİŞMİR (cavab yenə 404-dür): " +
+    "siyahını iki dəfə açmaq vaxt möhürünü sürüşdürməməlidir.\n\n" +
+    "⚠️ Gövdə oxunmur, amma `Content-Type: application/json` MƏCBURİDİR — " +
+    "brauzer `<form>`-u JSON göndərə bilmir, yəni cross-site POST kəsilir.",
+  security: SECURED,
+  request: {
+    params: z.object({
+      id: pathField(z.string(), "Bildirişin `id`-si (`GET /notifications`)."),
+    }),
+    body: {
+      required: false,
+      content: { [JSON_MEDIA]: { schema: LogoutBodySchema } },
+    },
+  },
+  responses: {
+    200: jsonResponse(
+      "İşarələndi.",
+      envelope(NotificationReadResultSchema, "NotificationReadResponse"),
+    ),
+    ...commonResponses(),
+    415: UNSUPPORTED_415,
+  },
+});
+
+path({
+  method: "post",
+  path: "/api/v1/notifications/read-all",
+  operationId: "markAllNotificationsRead",
+  tags: ["Notifications"],
+  summary: "Hamısını oxunmuş işarələ",
+  description:
+    "Yalnız SORĞUNU EDƏNİN oxunmamış bildirişləri işarələnir.\n\n" +
+    "⚠️ `changed: 0` XƏTA DEYİL — oxunmamış bildiriş yox idi.\n\n" +
+    "⚠️ Yol `/{id}/read` ilə TOQQUŞMUR: Next.js statik seqmenti dinamikdən " +
+    "üstün tutur, yəni `read-all` heç vaxt `id` kimi oxunmur.",
+  security: SECURED,
+  request: {
+    body: {
+      required: false,
+      content: { [JSON_MEDIA]: { schema: LogoutBodySchema } },
+    },
+  },
+  responses: {
+    200: jsonResponse(
+      "İşarələnmiş sətir sayı.",
+      envelope(NotificationReadResultSchema, "NotificationReadAllResponse"),
+    ),
+    ...commonResponses(),
+    415: UNSUPPORTED_415,
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Public — tək resurs endpoint-ləri (Blok 11A)
+// ---------------------------------------------------------------------------
+
+path({
+  method: "get",
+  path: "/api/v1/content/pages/{slug}",
+  operationId: "getContentPage",
+  tags: ["Public"],
+  summary: "Tam redaksiya səhifəsi",
+  description:
+    "Siyahı endpoint-indən FƏRQİ: cavabda Markdown `body` VAR.\n\n" +
+    "🔴 Yalnız `isPublished = true` səhifə qaytarılır — qaralama HEÇ KİMƏ " +
+    "göstərilmir və bunu dəyişən parametr YOXDUR.\n\n" +
+    "⚠️ `body` Markdown-dur; müştəri onu HTML kimi YERİTMƏMƏLİDİR.",
+  request: {
+    params: z.object({
+      slug: pathField(
+        z.string().openapi({ example: "haqqimizda" }),
+        "Səhifənin `slug`-ı (`GET /content/pages?section=…` cavabından).",
+      ),
+    }),
+  },
+  responses: {
+    200: jsonResponse(
+      "Səhifə (Markdown gövdə ilə).",
+      envelope(ContentPageDetailSchema, "ContentPageDetailResponse"),
+    ),
+    ...commonResponses({ isPublic: true }),
+  },
+});
+
+path({
+  method: "get",
+  path: "/api/v1/guide-places/{id}",
+  operationId: "getGuidePlace",
+  tags: ["Public"],
+  summary: "Tək bələdçi məkanı",
+  description:
+    "⚠️ Naməlum `id` BURADA 404 verir, `…/memories` isə boş siyahı qaytarır — " +
+    "uyğunsuzluq deyil: burada resursun ÖZÜ istənilir, orada həmin məkana bağlı " +
+    "SİYAHI.\n\n" +
+    "⚠️ `address` / `latitude` / `longitude` cavabdadır və bu, məxfilik " +
+    "pozuntusu deyil: söhbət şəhərin İCTİMAİ obyektindən gedir (aptek, " +
+    "dayanacaq), istifadəçi məkanından yox.",
+  request: {
+    params: z.object({
+      id: pathField(z.string(), "Məkanın `id`-si (`GET /guide-places`)."),
+    }),
+  },
+  responses: {
+    200: jsonResponse(
+      "Bələdçi məkanı.",
+      envelope(GuidePlaceSchema, "GuidePlaceResponse"),
     ),
     ...commonResponses({ isPublic: true }),
   },

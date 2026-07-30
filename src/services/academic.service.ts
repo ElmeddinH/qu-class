@@ -98,6 +98,138 @@ export async function listRegistrationCatalog(): Promise<FacultyOption[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Fakültə səhifələri [M2] — `/faculties` və `/faculties/[slug]`
+// ---------------------------------------------------------------------------
+
+export interface FacultyCard {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  /** Fakültənin ixtisas sayı — STRUKTUR rəqəmi. */
+  programCount: number;
+  /** Bu fakültədə açılmış sinif səhifələrinin sayı. */
+  cohortCount: number;
+}
+
+/**
+ * `/faculties` — dörd fakültə kartı.
+ *
+ * 🔴 AQREQASİYA QAYDASI: burada ÜZV SAYI YOXDUR (10A-nın başlıq zolağı qaydası
+ * və `getStructureCounts` şərhi ilə eyni). Göstərilən iki rəqəm universitetin
+ * AÇIQ strukturudur — neçə ixtisas var, neçə sinif səhifəsi açılıb. «Bu
+ * fakültədə 42 tələbə var» isə ictimai səhifədə fərdiləşməyə açılan qapıdır:
+ * kiçik siniflərdə say + qəbul ili + ixtisas üçlüyü konkret adamı işarələyir.
+ *
+ * ⚠️ Bura `Viewer` GƏLMİR — fakültə/ixtisas redaksiya-struktur məlumatıdır
+ * (fayl başlığındaki səbəb). Sayğaclar isə İSTİFADƏÇİ sətirlərini deyil,
+ * struktur sətirlərini sayır, yəni `visibilityWhere` tətbiq ediləcək məzmun
+ * yoxdur.
+ */
+export async function listFacultyCards(): Promise<FacultyCard[]> {
+  const faculties = await prisma.faculty.findMany({
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      description: true,
+      _count: { select: { programs: true, cohorts: true } },
+    },
+  });
+
+  return faculties.map((faculty) => ({
+    id: faculty.id,
+    slug: faculty.slug,
+    name: faculty.name,
+    description: faculty.description,
+    programCount: faculty._count.programs,
+    cohortCount: faculty._count.cohorts,
+  }));
+}
+
+export interface FacultyProgramDetail {
+  id: string;
+  slug: string;
+  name: string;
+  degree: string;
+  /** Bu ixtisas üzrə AÇILMIŞ sinif səhifələrinin sayı (spec §2 tələbi). */
+  openClassCount: number;
+  /** Sinif səhifəsi açılmış qəbul illəri (azalan). */
+  admissionYears: number[];
+}
+
+export interface FacultyDetail {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  programs: FacultyProgramDetail[];
+}
+
+/**
+ * `/faculties/[slug]` — fakültə detalı.
+ *
+ * 🔴 «AÇIQ SİNİFLƏRİN SAYI» GÖSTƏRİLİR, ÜZV SAYI YOX. Fərq spec §2-nin
+ * "fakültələr və ixtisaslar" bəndi ilə məxfilik qaydası arasındakı sərhəddir:
+ * sinif səhifəsinin MÖVCUDLUĞU açıq faktdır (qeydiyyat forması onsuz da
+ * göstərir), içindəki adam sayı isə deyil.
+ *
+ * Tapılmasa `null` → səhifə `notFound()` çağırır.
+ */
+export async function getFacultyDetail(slug: string): Promise<FacultyDetail | null> {
+  const faculty = await prisma.faculty.findUnique({
+    where: { slug },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      description: true,
+      programs: {
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+          degree: true,
+          // ⚠️ Yalnız `PROGRAM` scope-lu cohort-lar sayılır: fakültə və
+          // universitet səviyyəli cohort-un `programId`-si onsuz da `null`-dır,
+          // amma şərt AÇIQ yazılır ki, sxem dəyişsə say səssizcə şişməsin.
+          cohorts: {
+            where: { scope: CohortScope.PROGRAM },
+            orderBy: { admissionYear: "desc" },
+            select: { admissionYear: true },
+          },
+        },
+      },
+    },
+  });
+
+  if (!faculty) return null;
+
+  return {
+    id: faculty.id,
+    slug: faculty.slug,
+    name: faculty.name,
+    description: faculty.description,
+    programs: faculty.programs.map((program) => ({
+      id: program.id,
+      slug: program.slug,
+      name: program.name,
+      degree: program.degree,
+      openClassCount: program.cohorts.length,
+      admissionYears: [...new Set(program.cohorts.map((c) => c.admissionYear))],
+    })),
+  };
+}
+
+/** `generateStaticParams` və e2e testi üçün — bütün fakültə slug-ları. */
+export async function listFacultySlugs(): Promise<string[]> {
+  const faculties = await prisma.faculty.findMany({ select: { slug: true } });
+  return faculties.map((faculty) => faculty.slug);
+}
+
+// ---------------------------------------------------------------------------
 // Struktur rəqəmləri — açılış səhifəsinin "Rəqəmlərlə" zolağı
 // ---------------------------------------------------------------------------
 

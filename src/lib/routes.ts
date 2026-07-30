@@ -41,6 +41,56 @@ export const APP_ROUTE_PREFIXES = [
  */
 export const PUBLIC_EXACT_PATHS = ["/events"] as const;
 
+/**
+ * 🔴 İCTİMAİ SƏTHİN MÜQAVİLƏSİ (Blok 11A) — İCAZƏ MƏNTİQİ DEYİL, YOXLAMA SİYAHISI.
+ *
+ * Bu siyahı HEÇ NƏYƏ İCAZƏ VERMİR: `resolveRouteAccess` qorunan prefikslərin
+ * siyahısına baxır və burada olmayan hər yol onsuz da açıqdır. Siyahının işi
+ * ƏKSİNİ sübut etməkdir — sadalanan yolların HEÇ BİRİ qorunan prefikslə
+ * kəsişmir və heç biri yönləndirilmir.
+ *
+ * NİYƏ LAZIMDIR: Blok 11A ~15 yeni ictimai səhifə gətirdi. Qorunan prefiks
+ * siyahısı isə qısadır (`/events`, `/search`, `/me`…) və yeni bir ictimai ad
+ * onlardan birinin ALT YOLU ola bilər — məsələn `/events/public` yazsaydıq
+ * `/events` istisnası ONU TUTMAZDI (istisna DƏQİQ bərabərlikdir) və səhifə
+ * səssizcə `/login`-ə atardı. 2026-07-30 dövrəsi məhz belə bir səssiz
+ * uyuşmazlıqdan doğmuşdu.
+ *
+ * İki test bu siyahı üzərində işləyir:
+ *   · `routes.test.ts`     — hər yol × 3 ziyarətçi → `PUBLIC`, yönləndirmə yox
+ *   · `tests/e2e/public.spec.ts` — anonim VƏ giriş etmiş brauzerdə 200
+ *
+ * ⚠️ Dinamik yollar (`/faculties/[slug]`, `/khankendi/[id]`, `/legal/[slug]`)
+ * burada PREFİKS kimi deyil, `PUBLIC_DYNAMIC_PARENTS`-də saxlanılır: onların
+ * konkret nümunəsi bazadan gəlir və e2e testi onu seed-dən oxuyur.
+ */
+export const PUBLIC_PAGE_PATHS = [
+  "/",
+  "/about",
+  "/history",
+  "/mission",
+  "/faculties",
+  "/campus-life",
+  "/clubs",
+  "/services",
+  "/newcomers",
+  "/khankendi",
+  "/faq",
+  "/events",
+  "/accessibility",
+  "/docs",
+] as const;
+
+/**
+ * Dinamik ictimai səhifələrin valideyn yolları — alt yolları da AÇIQDIR.
+ *
+ * ⚠️ `/events` BURADA YOXDUR və bu, qəsdəndir: `/events/<id>` tədbir detalıdır
+ * və AUTH ARXASINDADIR (`PUBLIC_EXACT_PATHS` qeydinə bax). Yəni ictimai
+ * siyahıdan detala keçən anonim ziyarətçi `/login`-ə düşür — bu, sızma deyil,
+ * qərardır: detal səhifəsi RSVP və iştirakçı siyahısı daşıyır.
+ */
+export const PUBLIC_DYNAMIC_PARENTS = ["/faculties", "/khankendi", "/legal"] as const;
+
 /** Yalnız UNIVERSITY_ADMIN üçün — `(admin)` qrupu. */
 export const ADMIN_ROUTE_PREFIXES = ["/admin"] as const;
 
