@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import {
   AchievementCategory,
   AchievementStatus,
+  POST_CATEGORY_VALUES,
   PostCategory,
   TimelineSourceType,
   VISIBILITY_VALUES,
@@ -25,11 +26,14 @@ import { academicYearOf } from "@/lib/stage";
 import { isStricter } from "@/lib/visibility";
 
 import {
+  ACHIEVEMENT_TIMELINE_CATEGORY,
   buildAchievement,
+  buildAchievementTimelineEntry,
   buildTimelineEntry,
   derivedVisibility,
   timelineSummaryFor,
   timelineTitleFor,
+  type AchievementTimelineSource,
   type PostFanoutSource,
 } from "./fanout";
 
@@ -255,5 +259,147 @@ describe("buildAchievement", () => {
     expect(achievement.ownerId).toBe("user-77");
     expect(achievement.postId).toBe("post-9");
     expect(achievement.awardedAt).toEqual(details.awardedAt);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 5. Achievement → Timeline (Blok 8 — moderasiya təsdiqi)
+// ---------------------------------------------------------------------------
+
+function achievementSourceOf(
+  overrides: Partial<AchievementTimelineSource> = {},
+): AchievementTimelineSource {
+  return {
+    achievementId: "ach-001",
+    cohortId: "cohort-1",
+    title: "Respublika olimpiadası — birinci yer",
+    description: "Riyaziyyat üzrə respublika mərhələsində birinci yer.",
+    organization: "Təhsil Nazirliyi",
+    awardedAt: localDate(2026, 10, 5), // 5 noyabr 2026
+    visibility: Visibility.CLASS,
+    ...overrides,
+  };
+}
+
+describe("buildAchievementTimelineEntry", () => {
+  it("mənbə növünü ACHIEVEMENT kimi işarələyir və achievementId-ni bağlayır", () => {
+    const entry = buildAchievementTimelineEntry(achievementSourceOf());
+
+    expect(entry.sourceType).toBe(TimelineSourceType.ACHIEVEMENT);
+    expect(entry.achievementId).toBe("ach-001");
+    expect(entry.cohortId).toBe("cohort-1");
+  });
+
+  // --- 🔒 Görünürlük: 16 kombinasiya ---
+
+  it("görünürlük nailiyyətdən KOPYALANIR (tavan verilməyəndə)", () => {
+    for (const level of VISIBILITY_VALUES) {
+      const entry = buildAchievementTimelineEntry(
+        achievementSourceOf({ visibility: level as VisibilityType }),
+      );
+      expect(entry.visibility).toBe(level);
+    }
+  });
+
+  it("bütün 16 kombinasiyada nəticə MƏNBƏDƏN AÇIQ DEYİL", () => {
+    for (const source of VISIBILITY_VALUES) {
+      for (const ceiling of VISIBILITY_VALUES) {
+        const entry = buildAchievementTimelineEntry(
+          achievementSourceOf({ visibility: source as VisibilityType }),
+          ceiling as VisibilityType,
+        );
+
+        expect(
+          isStricter(source as VisibilityType, entry.visibility as VisibilityType),
+          `${source} + tavan ${ceiling} → ${entry.visibility} (mənbədən açıqdır!)`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("tavan daha dardırsa nəticə tavandır, genişdirsə yenə mənbədir", () => {
+    expect(
+      buildAchievementTimelineEntry(
+        achievementSourceOf({ visibility: Visibility.PUBLIC }),
+        Visibility.CLASS,
+      ).visibility,
+    ).toBe(Visibility.CLASS);
+
+    expect(
+      buildAchievementTimelineEntry(
+        achievementSourceOf({ visibility: Visibility.CLASS }),
+        Visibility.PUBLIC,
+      ).visibility,
+    ).toBe(Visibility.CLASS);
+  });
+
+  // --- Akademik il: sentyabr sərhədi ---
+
+  it("academicYear `awardedAt`-dan hesablanır (31 avqust HƏLƏ əvvəlki il)", () => {
+    const entry = buildAchievementTimelineEntry(
+      achievementSourceOf({ awardedAt: localDate(2026, 7, 31) }),
+    );
+
+    expect(entry.academicYear).toBe("2025-2026");
+    expect(entry.academicYear).toBe(academicYearOf(localDate(2026, 7, 31)));
+  });
+
+  it("1 sentyabr YENİ tədris ilinə düşür", () => {
+    const entry = buildAchievementTimelineEntry(
+      achievementSourceOf({ awardedAt: localDate(2026, 8, 1) }),
+    );
+    expect(entry.academicYear).toBe("2026-2027");
+  });
+
+  it("`occurredAt` təsdiq tarixi DEYİL, `awardedAt`-dır", () => {
+    const awardedAt = localDate(2025, 2, 14);
+    const entry = buildAchievementTimelineEntry(achievementSourceOf({ awardedAt }));
+
+    expect(entry.occurredAt).toEqual(awardedAt);
+  });
+
+  // --- Kateqoriya: post varsa ondan, yoxdursa sabit ---
+
+  it("post kateqoriyası varsa ondan götürülür", () => {
+    const entry = buildAchievementTimelineEntry(
+      achievementSourceOf({ postCategory: PostCategory.COMPETITION }),
+    );
+    expect(entry.category).toBe(PostCategory.COMPETITION);
+  });
+
+  it("post yoxdursa sabit PostCategory işlədilir (AchievementCategory YOX)", () => {
+    const entry = buildAchievementTimelineEntry(
+      achievementSourceOf({ postCategory: null }),
+    );
+
+    expect(entry.category).toBe(ACHIEVEMENT_TIMELINE_CATEGORY);
+    // Xronologiya filtri 12 `PostCategory` üzərindədir — "STARTUP" heç bir
+    // filtrə düşməzdi.
+    expect(POST_CATEGORY_VALUES).toContain(entry.category);
+  });
+
+  // --- Başlıq / xülasə ---
+
+  it("xülasə izahdan gəlir, izah yoxdursa təşkilatdan", () => {
+    expect(
+      buildAchievementTimelineEntry(achievementSourceOf()).summary,
+    ).toBe("Riyaziyyat üzrə respublika mərhələsində birinci yer.");
+
+    expect(
+      buildAchievementTimelineEntry(achievementSourceOf({ description: null })).summary,
+    ).toBe("Təhsil Nazirliyi");
+
+    expect(
+      buildAchievementTimelineEntry(
+        achievementSourceOf({ description: null, organization: null }),
+      ).summary,
+    ).toBeNull();
+  });
+
+  it("xülasə başlıqla eyni olarsa `null` qaytarılır", () => {
+    const entry = buildAchievementTimelineEntry(
+      achievementSourceOf({ title: "Qrant", description: "Qrant" }),
+    );
+    expect(entry.summary).toBeNull();
   });
 });

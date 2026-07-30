@@ -127,12 +127,26 @@ export function canView(viewer: Viewer, r: Guarded): boolean {
   }
 }
 
+/**
+ * Viewer bu SİNFİN moderatorudurmu? (resurs deyil, cohort səviyyəsi)
+ *
+ * Moderasiya NÖVBƏSİ üçün lazımdır: növbə açılanda hələ heç bir konkret resurs
+ * yoxdur, sual "bu adam bu sinifdə moderasiya edə bilirmi?" formasındadır.
+ * `UNIVERSITY_ADMIN` bütün siniflərdə keçir (universitet miqyaslı rol).
+ *
+ * ⚠️ `moderatedCohortIds` JWT-dən DEYİL, hər sorğuda `getViewer()` ilə
+ * `CohortMembership`-dən oxunur — rol dəyişikliyi dərhal təsir edir.
+ */
+export function canModerateCohort(viewer: Viewer, cohortId: string | null): boolean {
+  if (viewer.kind !== "USER") return false;
+  if (viewer.systemRole === "UNIVERSITY_ADMIN") return true;
+  return cohortId !== null && viewer.moderatedCohortIds.includes(cohortId);
+}
+
 /** Moderasiya konteksti — YALNIZ şikayət edilmiş məzmunu açmaq üçün.
  *  Hər çağırışda AuditLog yaz. Adi oxu axınında İSTİFADƏ ETMƏ. */
 export function canModerate(viewer: Viewer, r: Guarded): boolean {
-  if (viewer.kind !== "USER") return false;
-  if (viewer.systemRole === "UNIVERSITY_ADMIN") return true;
-  return r.cohortId !== null && viewer.moderatedCohortIds.includes(r.cohortId);
+  return canModerateCohort(viewer, r.cohortId);
 }
 
 // ---------------------------------------------------------------------------

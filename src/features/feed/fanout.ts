@@ -15,10 +15,10 @@
 
 import {
   AchievementStatus,
+  PostCategory,
   TimelineSourceType,
   Visibility,
   type AchievementCategory,
-  type PostCategory,
   type Visibility as VisibilityType,
 } from "@/lib/enums";
 import { academicYearOf } from "@/lib/stage";
@@ -207,6 +207,86 @@ export function buildAchievement(
     proofUrl: details.proofUrl,
     awardedAt: details.awardedAt,
     status: AchievementStatus.SUBMITTED,
+    visibility: derivedVisibility(source.visibility, ceiling),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Achievement → TimelineEntry (Blok 8 — moderasiya təsdiqindən sonra)
+// ---------------------------------------------------------------------------
+
+/**
+ * Nailiyyət təsdiqləndikdə xronologiyaya düşən qeydin kateqoriyası —
+ * nailiyyət POST-dan gəlməyibsə.
+ *
+ * ⚠️ `AchievementCategory` (AWARD, STARTUP, PATENT…) və `PostCategory`
+ * (FIRST_DAY, EXAM_PERIOD…) TAMAMİLƏ AYRI siyahılardır (bax `catalog.ts`
+ * başlığı), yəni nailiyyət kateqoriyasını `TimelineEntry.category`-yə birbaşa
+ * yazmaq olmaz — xronologiya filtri 12 `PostCategory` üzərində qurulub və
+ * "STARTUP" heç bir filtrə düşməzdi. Post varsa onun kateqoriyası götürülür,
+ * yoxdursa bu sabit.
+ */
+export const ACHIEVEMENT_TIMELINE_CATEGORY = PostCategory.ACADEMIC_ACHIEVEMENT;
+
+/** Təsdiqlənmiş nailiyyətin yayılmada işlədilən sahələri. */
+export interface AchievementTimelineSource {
+  achievementId: string;
+  cohortId: string;
+  title: string;
+  description: string | null;
+  organization: string | null;
+  awardedAt: Date;
+  /** ⚠️ Nailiyyətin ÖZ səviyyəsi — qeyd ondan daha açıq ola bilməz. */
+  visibility: VisibilityType;
+  /** Nailiyyət lent paylaşımından gəlibsə həmin postun kateqoriyası. */
+  postCategory?: PostCategory | null;
+}
+
+/** `prisma.timelineEntry.upsert({ create })` üçün hazır obyekt. */
+export interface AchievementTimelineFanout {
+  cohortId: string;
+  sourceType: string;
+  achievementId: string;
+  title: string;
+  summary: string | null;
+  category: string;
+  occurredAt: Date;
+  academicYear: string;
+  visibility: string;
+}
+
+/**
+ * Təsdiqlənmiş (`VERIFIED` / `FEATURED`) nailiyyətdən TimelineEntry sahələri.
+ *
+ * · `occurredAt` — `awardedAt` (təsdiq tarixi DEYİL: xronologiya hadisənin
+ *   BAŞ VERDİYİ vaxta görə düzülür, moderatorun növbəyə baxdığı günə görə yox)
+ * · `academicYear` — `awardedAt`-dan hesablanır (sentyabr 1 – avqust 31)
+ * · `visibility` — nailiyyətdən KOPYALANIR (`derivedVisibility` yalnız daraldır)
+ *
+ * ⚠️ TƏLƏ T11: `TimelineEntry.achievementId` `@unique`-dir → servis bu obyekti
+ * `create` ilə deyil, `upsert` ilə yazır (nailiyyət iki dəfə təsdiqlənə bilər:
+ * VERIFIED → FEATURED).
+ */
+export function buildAchievementTimelineEntry(
+  source: AchievementTimelineSource,
+  ceiling?: VisibilityType,
+): AchievementTimelineFanout {
+  const title = clamp(source.title, TIMELINE_TITLE_MAX);
+  const summary = source.description?.trim()
+    ? clamp(source.description, TIMELINE_SUMMARY_MAX)
+    : source.organization?.trim()
+      ? clamp(source.organization, TIMELINE_SUMMARY_MAX)
+      : null;
+
+  return {
+    cohortId: source.cohortId,
+    sourceType: TimelineSourceType.ACHIEVEMENT,
+    achievementId: source.achievementId,
+    title,
+    summary: summary === title ? null : summary,
+    category: source.postCategory ?? ACHIEVEMENT_TIMELINE_CATEGORY,
+    occurredAt: source.awardedAt,
+    academicYear: academicYearOf(source.awardedAt),
     visibility: derivedVisibility(source.visibility, ceiling),
   };
 }

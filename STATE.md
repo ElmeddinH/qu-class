@@ -137,3 +137,57 @@ class-page → directory → profile → test → docs), tarixlər ardıcıl art
 **Testlər:** vitest **307** (+7: `labels` jobFunction əhatəsi,
 `visibility.db` +7 — jobFunctions k-anonimlik/razılıq, guidePlaceId sızma
 yoxlaması). `tsc --noEmit` · `lint` · `build` təmiz, mövcud 300+28 test yaşıl.
+
+---
+
+## Blok 8 — bitdi
+
+**Yeni saf modullar (Prisma YOX, testlə örtülü):** `lib/milestones.ts`
+(`buildCohortMilestones` — cohort tarixlərindən 4 növ milestone, deterministik
+`mil-<cohortId>-<açar>` id, gələcək tarixli qeyd YARADILMIR, görünürlük
+`UNIVERSITY`), `lib/timeline-filters.ts` və `lib/achievement-filters.ts`
+(parse ↔ serialize ↔ href dövrəsi), `fanout.ts` →
+**`buildAchievementTimelineEntry`** (+ `ACHIEVEMENT_TIMELINE_CATEGORY`).
+
+**Yeni servis funksiyaları:** `timeline.service` → `ensureCohortMilestones`
+(upsert + siyahıda olmayan milestone-ları silir; səhifənin server
+komponentindən çağırılır), `listTimeline` indi `sourceType` filtri və `total`
+qaytarır. `achievement.service` → `listFeaturedAchievements` ·
+`getAchievementStats` · `countAchievements` · **`listModerationQueue`** ·
+`verify/feature/rejectAchievement` (tək transaksiya: status + AuditLog +
+Notification + TimelineEntry upsert/delete). `visibility.ts` →
+`canModerateCohort` (resurs deyil, sinif səviyyəsi; `canModerate` ona delegat).
+
+**Üç tələnin həlli:**
+- **A** — moderasiya növbəsi AYRI funksiyadır. `listAchievements` status filtrini
+  yalnız sahibə tətbiq etmir, yəni moderator başqasının `SUBMITTED` qeydini
+  orada görmür; `listModerationQueue` rol qapısı (`canModerateCohort`) + status
+  şərti ilə işləyir, görünürlük filtri yoxdur. Bayraq kimi birləşdirilməyib.
+- **B** — milestone-un `postId`/`achievementId`/`eventId` üçü də `null` olduğu
+  üçün `timelineVisibilityWhere` sahib şaxəsinə düşmür → görünürlük
+  `UNIVERSITY`, `PRIVATE` ola bilməz (unit + inteqrasiya testi).
+- **C** — `ARCHIVED` sətri saxlayır (cascade yoxdur) → eyni transaksiyada
+  `timelineEntry.deleteMany({ achievementId })`. Təsdiqdə isə `create` deyil,
+  **`upsert`** (T11: `achievementId` @unique).
+
+**Yeni komponentlər / səhifələr:** `components/shared/PagerNav` (Blok 6-nın
+səhifələmə məntiqi ora çıxarıldı, `DirectoryPagination` nazik təbəqəyə çevrildi);
+`features/timeline/` → `ClassTimeline`, `TimelineFilters`(+`filter-state`),
+`TimelineEntryItem`; `features/achievements/` → `ClassAchievements`,
+`AchievementCard`, `AchievementFilters`, `ModerationQueue`, `ModerationActions`,
+`actions.ts`. Səhifələr: `/class/[slug]/timeline`, `/class/[slug]/achievements`,
+`/class/[slug]/achievements/moderation` (üçü də `force-dynamic`).
+`lib/labels.ts` → `ACHIEVEMENT_STATUS_LABELS`, `TIMELINE_SOURCE_LABELS`.
+Blok 5 widget-ləri milestone / FEATURED üçün vizual fərqləndirmə aldı.
+
+**Qərar:** SEED artıq milestone-ları ƏL İLƏ qurmur — `buildCohortMilestones`
+seed-in də mənbəyidir. Əks halda servisin ilk çağırışı öz sətirlərini yazar,
+seed-inkilər isə fərqli id ilə DUBLİKAT kimi qalardı. Baza yenidən seed
+edildi (21 milestone, hamısı `UNIVERSITY`, gələcək tarixli yoxdur).
+
+**Testlər:** vitest **373** (əvvəl 307 → +66: `milestones` 18,
+`timeline-filters` 14, `fanout` +11, `timeline.db` 23), playwright **38**
+(əvvəl 32 → +6). İnteqrasiya və e2e testlərinin yazdığı hər sətir `finally`-də
+geri qaytarılır — baza sayları seed-lə bayt-bayt eynidir.
+`tsc --noEmit` · `lint` · `build` təmiz; `grep -rn "prisma\." src/app src/features`
+→ yalnız şərhlər.

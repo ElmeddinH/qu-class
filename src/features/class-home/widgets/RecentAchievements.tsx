@@ -13,6 +13,8 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { getViewer } from "@/lib/auth";
 import { AchievementStatus } from "@/lib/enums";
+import { achievementStatusLabel } from "@/lib/labels";
+import { cn } from "@/lib/utils";
 import { achievementCategoryMeta, FEED_ICONS } from "@/features/feed/catalog";
 import { listAchievements } from "@/services/achievement.service";
 import { shortDate } from "@/utils/date";
@@ -47,11 +49,23 @@ export async function RecentAchievements({ cohort, headingId }: ClassHomeWidgetP
           {achievements.map((achievement) => {
             const meta = achievementCategoryMeta(achievement.category);
             const Icon = FEED_ICONS[meta.icon];
+            const isFeatured = achievement.status === AchievementStatus.FEATURED;
 
             return (
-              <li key={achievement.id} className="flex gap-3">
+              <li
+                key={achievement.id}
+                className={cn(
+                  "flex gap-3",
+                  // Seçilmiş nailiyyət VİZUAL olaraq fərqlənir (Blok 8): rozet
+                  // tək başına kifayət etmirdi, siyahıda gözə dəymirdi.
+                  isFeatured && "rounded-card border border-ku-green bg-ku-cream/30 p-3",
+                )}
+              >
                 <span
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-avatar bg-ku-cream"
+                  className={cn(
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-avatar",
+                    isFeatured ? "bg-ku-cream" : "bg-ku-soft",
+                  )}
                   aria-hidden
                 >
                   <Icon className="h-4 w-4 text-ku-dark" />
@@ -77,9 +91,9 @@ export async function RecentAchievements({ cohort, headingId }: ClassHomeWidgetP
                     <Badge variant="outline" className="text-caption font-normal">
                       {meta.label}
                     </Badge>
-                    {achievement.status === AchievementStatus.FEATURED ? (
+                    {isFeatured ? (
                       <Badge className="bg-ku-cream text-caption font-normal text-text-primary hover:bg-ku-cream">
-                        Seçilmiş
+                        {achievementStatusLabel(AchievementStatus.FEATURED)}
                       </Badge>
                     ) : null}
                   </div>

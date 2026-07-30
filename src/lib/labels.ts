@@ -24,6 +24,7 @@
 // ============================================================================
 
 import type {
+  AchievementStatus,
   ClubRole,
   CohortRole,
   Degree,
@@ -31,6 +32,7 @@ import type {
   JobFunction,
   LanguageLevel,
   SupportOfferType,
+  TimelineSourceType,
   UserStage,
 } from "@/lib/enums";
 
@@ -136,6 +138,29 @@ export const LANGUAGE_LEVEL_HINTS: Record<LanguageLevel, string> = {
   NATIVE: "Ana dili",
 };
 
+/**
+ * `Achievement.status` — Blok 8 (moderasiya axını).
+ *
+ * ⚠️ `SUBMITTED` etiketi SAHİB üçün yazılıb: adi siyahıda başqasının
+ * `SUBMITTED` nailiyyəti onsuz da görünmür (`visibleWithStatus` status filtrini
+ * yalnız sahibə tətbiq etmir), yəni bu rozet praktikada "sənin nailiyyətin
+ * növbədədir" deməkdir.
+ */
+export const ACHIEVEMENT_STATUS_LABELS: Record<AchievementStatus, string> = {
+  SUBMITTED: "Təsdiq gözləyir",
+  VERIFIED: "Təsdiqlənib",
+  FEATURED: "Seçilmiş",
+  ARCHIVED: "Arxivlənib",
+};
+
+/** `TimelineEntry.sourceType` — xronologiya filtrində mənbə növü. */
+export const TIMELINE_SOURCE_LABELS: Record<TimelineSourceType, string> = {
+  POST: "Paylaşım",
+  ACHIEVEMENT: "Nailiyyət",
+  EVENT: "Tədbir",
+  SYSTEM: "Sistem hadisəsi",
+};
+
 /** `SupportOffer.type` — məzunun 7 dəstək təklifi (spec §9). */
 export const SUPPORT_OFFER_LABELS: Record<SupportOfferType, string> = {
   GUEST_LECTURE: "Qonaq mühazirəsi",
@@ -200,4 +225,12 @@ export function languageLevelLabel(value: string | null | undefined): string | n
 
 export function supportOfferLabel(value: string): string {
   return SUPPORT_OFFER_LABELS[value as SupportOfferType] ?? "Dəstək";
+}
+
+export function achievementStatusLabel(value: string): string {
+  return ACHIEVEMENT_STATUS_LABELS[value as AchievementStatus] ?? value;
+}
+
+export function timelineSourceLabel(value: string): string {
+  return TIMELINE_SOURCE_LABELS[value as TimelineSourceType] ?? value;
 }

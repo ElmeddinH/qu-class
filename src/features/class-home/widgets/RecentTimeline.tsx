@@ -5,11 +5,12 @@
 // yoxdur — servis `timelineVisibilityWhere()` işlədir. Bura yalnız oxuyur.
 // ============================================================================
 
-import { ScrollText } from "lucide-react";
+import { Flag, ScrollText } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { getViewer } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { postCategoryMeta } from "@/features/feed/catalog";
 import { listTimeline } from "@/services/timeline.service";
 import { shortDate } from "@/utils/date";
@@ -43,11 +44,29 @@ export async function RecentTimeline({ cohort, headingId }: ClassHomeWidgetProps
         // Sol kənarda davamlı xətt — hadisələr onun üzərində nöqtə kimi düzülür.
         <ol className="relative flex flex-col gap-4 border-l border-border pl-4">
           {items.map((item) => (
-            <li key={item.id} className="relative flex flex-col gap-1">
-              <span
-                className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-avatar bg-ku-green"
-                aria-hidden
-              />
+            <li
+              key={item.id}
+              className={cn(
+                "relative flex flex-col gap-1",
+                // Sistem milestone-u vizual olaraq FƏRQLİDİR — üslub Timeline
+                // səhifəsi (`TimelineEntryItem`) ilə eynidir: sahibi və mənbəyi
+                // olmayan qeyd adi paylaşımla qarışdırılmamalıdır.
+                item.isSystemMilestone && "rounded-card bg-ku-cream/40 p-3",
+              )}
+            >
+              {item.isSystemMilestone ? (
+                <span
+                  className="absolute -left-[27px] top-3 flex h-4 w-4 items-center justify-center rounded-avatar bg-ku-cream"
+                  aria-hidden
+                >
+                  <Flag className="h-2.5 w-2.5 text-ku-dark" />
+                </span>
+              ) : (
+                <span
+                  className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-avatar bg-ku-green"
+                  aria-hidden
+                />
+              )}
 
               <span className="text-caption text-text-secondary">
                 {shortDate(item.occurredAt)} · {item.academicYear}
@@ -63,9 +82,15 @@ export async function RecentTimeline({ cohort, headingId }: ClassHomeWidgetProps
                 </p>
               ) : null}
 
-              <Badge variant="outline" className="w-fit text-caption font-normal">
-                {postCategoryMeta(item.category).label}
-              </Badge>
+              {item.isSystemMilestone ? (
+                <Badge className="w-fit bg-ku-cream text-caption font-normal text-text-primary hover:bg-ku-cream">
+                  Sinif tarixçəsi
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="w-fit text-caption font-normal">
+                  {postCategoryMeta(item.category).label}
+                </Badge>
+              )}
             </li>
           ))}
         </ol>

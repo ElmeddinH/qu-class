@@ -56,6 +56,7 @@ import {
   type Visibility as VisibilityType,
 } from "@/lib/enums";
 import { ACHIEVEMENT_CATEGORY_VALUES } from "@/lib/enums";
+import { buildCohortMilestones } from "@/lib/milestones";
 import { academicYearOf, resolveStage } from "@/lib/stage";
 
 import {
@@ -1278,39 +1279,19 @@ async function main(): Promise<void> {
     });
   }
 
-  // SYSTEM milestone-ları — hər cohort üçün
+  // SYSTEM milestone-ları — hər cohort üçün.
+  //
+  // ⚠️ Blok 8-dən sonra bu sətirlər ƏL İLƏ qurulmur: `buildCohortMilestones`
+  // (saf modul) həm seed-in, həm də `ensureCohortMilestones` servisinin VAHİD
+  // mənbəyidir. İki yerdə ayrı-ayrı qursaydıq, Timeline səhifəsinin ilk
+  // açılışında servis öz variantını yazar və seed-inki DUBLİKAT kimi qalardı
+  // (id-lər fərqli olduğu üçün `upsert` onları görməzdi).
+  //
+  // Deterministik id (`mil-<cohortId>-<açar>`) buradan da gəlir, yəni seed-dən
+  // sonra servisin ilk çağırışı heç nə DƏYİŞMİR — `upsert` eyni sətirlərə düşür.
   for (const cohort of cohorts) {
-    pushTimeline({
-      cohortId: cohort.id,
-      sourceType: TimelineSourceType.SYSTEM,
-      title: "Qəbul nəticələri elan olundu",
-      summary: `${cohort.admissionYear} qəbulu üzrə siyahılar açıqlandı və sinif səhifəsi yaradıldı.`,
-      category: PostCategory.ORIENTATION,
-      occurredAt: addDays(cohort.academicStartsAt, -45),
-      visibility: Visibility.UNIVERSITY,
-      isSystemMilestone: true,
-    });
-    pushTimeline({
-      cohortId: cohort.id,
-      sourceType: TimelineSourceType.SYSTEM,
-      title: "Tədris ili başladı",
-      summary: "İlk dərs günü — sinif rəsmi olaraq tələbə mərhələsinə keçdi.",
-      category: PostCategory.FIRST_DAY,
-      occurredAt: cohort.academicStartsAt,
-      visibility: Visibility.UNIVERSITY,
-      isSystemMilestone: true,
-    });
-    if (cohort.graduatesAt < NOW) {
-      pushTimeline({
-        cohortId: cohort.id,
-        sourceType: TimelineSourceType.SYSTEM,
-        title: "Məzuniyyət mərasimi",
-        summary: "Sinif məzun statusuna keçdi. Class Page bağlanmır — məzmun dəyişir.",
-        category: PostCategory.GENERAL,
-        occurredAt: cohort.graduatesAt,
-        visibility: Visibility.PUBLIC,
-        isSystemMilestone: true,
-      });
+    for (const milestone of buildCohortMilestones(cohort, NOW)) {
+      timelineRows.push({ ...milestone, createdAt: milestone.occurredAt });
     }
   }
 
