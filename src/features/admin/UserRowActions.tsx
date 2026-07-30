@@ -17,6 +17,26 @@
 // ⚠️ «Sonuncu admin» qoruması UI-da GÖSTƏRİLƏ BİLMİR: admin sayı transaksiya
 // içində oxunur (TOCTOU) və səhifə render olunanda hələ məlum deyil. Cəhd
 // edilsə server azərbaycanca səbəb qaytarır və toast göstərilir.
+//
+// ────────────────────────────────────────────────────────────────────────────
+// 🔴 BÜTÜN ÜZVLÜKLƏR REDAKTƏ OLUNUR (Blok 12B-də bağlanan borc)
+// ────────────────────────────────────────────────────────────────────────────
+// Əvvəl yalnız `cohorts[0]` (əsas sinif) üçün seçici göstərilirdi. İstifadəçi
+// isə birdən çox sinifdə ola bilər — ikinci ixtisas, magistratura, fakültə
+// cohort-u — və həmin siniflərdə rolu dəyişmək UI-dan MÜMKÜN DEYİLDİ.
+// Servis (`changeCohortRole`) onsuz da `cohortId` qəbul edirdi, yəni boşluq
+// yalnız bu ekranda idi.
+//
+// 🔴 İKİ ROL QARIŞDIRILMIR (CLAUDE.md «Rollar»):
+//   · SİSTEM rolu (`USER` / `UNIVERSITY_ADMIN`) — istifadəçi başına BİRDİR,
+//     yuxarıdakı «Admin et» düyməsi ilə idarə olunur;
+//   · COHORT rolu (`MEMBER` / `CLASS_REPRESENTATIVE` / `EVENT_COORDINATOR` /
+//     `CLASS_MODERATOR`) — hər ÜZVLÜK üçün ayrıdır və yalnız həmin sinifdə
+//     keçərlidir.
+// Ona görə aşağıdakı bölmə sinif-sinif göstərilir və başlığı açıq yazır.
+//
+// ⚠️ Hər dəyişiklik AYRICA AuditLog sətri yaradır — `changeCohortRole` audit
+// yazısını üzvlük id-si ilə eyni transaksiyada qeyd edir.
 // ============================================================================
 
 import { useState, useTransition } from "react";
@@ -40,7 +60,13 @@ interface UserRowActionsProps {
     fullName: string;
     systemRole: string;
     deactivated: boolean;
-    cohorts: Array<{ id: string; displayName: string; role: string }>;
+    /** BÜTÜN üzvlüklər — əsas sinif birincidir (servis `isPrimary desc` sıralayır). */
+    cohorts: Array<{
+      id: string;
+      displayName: string;
+      role: string;
+      isPrimary: boolean;
+    }>;
   };
   /** Əməliyyatı edən admin — öz sətrini tanımaq üçün. */
   actorId: string;
@@ -60,7 +86,6 @@ export function UserRowActions({ user, actorId }: UserRowActionsProps) {
 
   const isSelf = user.id === actorId;
   const isAdmin = user.systemRole === SystemRole.UNIVERSITY_ADMIN;
-  const primary = user.cohorts[0] ?? null;
 
   const call = (
     action: (input: unknown) => Promise<{ ok: boolean; message?: string }>,
@@ -90,8 +115,6 @@ export function UserRowActions({ user, actorId }: UserRowActionsProps) {
       </Button>
     );
   }
-
-  const roleSelectId = `cohort-role-${user.id}`;
 
   return (
     <div className="flex flex-col gap-3 rounded-card border border-border bg-background p-3">
@@ -139,40 +162,58 @@ export function UserRowActions({ user, actorId }: UserRowActionsProps) {
         </Button>
       </div>
 
-      {primary === null ? (
+      {user.cohorts.length === 0 ? (
         <p className="text-caption text-text-secondary">
           Bu istifadəçi heç bir sinifdə deyil.
         </p>
       ) : (
-        <div className="flex flex-col gap-2">
-          <Label htmlFor={roleSelectId} className="text-caption text-text-secondary">
-            {primary.displayName} — sinif rolu
-          </Label>
-          <select
-            id={roleSelectId}
-            defaultValue={primary.role}
-            disabled={pending}
-            onChange={(event) =>
-              call(changeCohortRoleAction, {
-                targetId: user.id,
-                cohortId: primary.id,
-                nextRole: event.target.value,
-              })
-            }
-            className="h-10 rounded-input border border-border bg-surface px-3 text-small text-text-primary"
-          >
-            {COHORT_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {cohortRoleLabel(role)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <fieldset className="flex flex-col gap-3">
+          {/* 🔴 Başlıq İKİ ROLU ayırır — bax fayl başlığı. */}
+          <legend className="text-caption font-medium text-text-primary">
+            Sinif rolları ({user.cohorts.length} üzvlük)
+          </legend>
+
+          {user.cohorts.map((cohort) => {
+            const selectId = `cohort-role-${user.id}-${cohort.id}`;
+
+            return (
+              <div key={cohort.id} className="flex flex-col gap-2">
+                <Label htmlFor={selectId} className="text-caption text-text-secondary">
+                  {cohort.displayName}
+                  {cohort.isPrimary ? " · əsas sinif" : ""}
+                </Label>
+                <select
+                  id={selectId}
+                  defaultValue={cohort.role}
+                  disabled={pending}
+                  onChange={(event) =>
+                    call(changeCohortRoleAction, {
+                      targetId: user.id,
+                      // ⚠️ MƏHZ bu üzvlüyün cohort-u — `cohorts[0]` DEYİL.
+                      cohortId: cohort.id,
+                      nextRole: event.target.value,
+                    })
+                  }
+                  className="h-10 rounded-input border border-border bg-surface px-3 text-small text-text-primary"
+                >
+                  {COHORT_ROLES.map((role) => (
+                    <option key={role} value={role}>
+                      {cohortRoleLabel(role)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+        </fieldset>
       )}
 
       <p className="text-caption text-text-secondary">
-        Hər dəyişiklik audit jurnalına yazılır və istifadəçiyə bildiriş gedir.
-        Sistem rolu dəyişikliyi növbəti girişdə tam qüvvəyə minir.
+        Sinif rolu (üzv / sinif nümayəndəsi / tədbir əlaqələndiricisi / moderator)
+        YALNIZ həmin sinifdə keçərlidir və sistem rolundan (istifadəçi / universitet
+        admini) fərqlidir. Hər dəyişiklik audit jurnalına ayrıca yazılır və
+        istifadəçiyə bildiriş gedir. Sistem rolu dəyişikliyi növbəti girişdə tam
+        qüvvəyə minir.
       </p>
     </div>
   );

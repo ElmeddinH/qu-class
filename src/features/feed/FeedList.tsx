@@ -63,6 +63,24 @@ function FeedSkeleton() {
   );
 }
 
+/**
+ * ⚠️ WCAG 1.3.1 — siyahı `<section>` + `<h2>` ilə sarınır.
+ * Səhifənin `<h1>`-i "Sinif lenti"dir, `PostCard` isə hər paylaşımı `<h3>` ilə
+ * başlıqlandırır (T22 qeydi orada). Aralıqda `<h2>` olmasa iyerarxiya
+ * h1 → h3 kimi ATLANIR. Başlıq `sr-only`-dir: ekranda `<h1>` onsuz da eyni
+ * mənanı daşıyır, təkrarı vizual gürültü olardı.
+ */
+function FeedSection({ children }: { children: React.ReactNode }) {
+  return (
+    <section aria-labelledby="feed-posts" className="flex flex-col gap-6">
+      <h2 id="feed-posts" className="sr-only">
+        Paylaşımlar
+      </h2>
+      {children}
+    </section>
+  );
+}
+
 export function FeedList({ cohortId, cohortSlug, category, initialPage }: FeedListProps) {
   const sentinelRef = useRef<HTMLDivElement | null>(null);
 
@@ -104,55 +122,65 @@ export function FeedList({ cohortId, cohortSlug, category, initialPage }: FeedLi
     void query.refetch();
   }
 
-  if (query.isPending) return <FeedSkeleton />;
+  if (query.isPending) {
+    return (
+      <FeedSection>
+        <FeedSkeleton />
+      </FeedSection>
+    );
+  }
 
   if (query.isError) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
-          <p className="text-body text-text-primary">Lent yüklənmədi.</p>
-          <p className="text-small text-text-secondary">
-            İnternet bağlantınızı yoxlayıb yenidən cəhd edin.
-          </p>
-          <Button type="button" variant="outline" onClick={refresh}>
-            Yenidən cəhd et
-          </Button>
-        </CardContent>
-      </Card>
+      <FeedSection>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+            <p className="text-body text-text-primary">Lent yüklənmədi.</p>
+            <p className="text-small text-text-secondary">
+              İnternet bağlantınızı yoxlayıb yenidən cəhd edin.
+            </p>
+            <Button type="button" variant="outline" onClick={refresh}>
+              Yenidən cəhd et
+            </Button>
+          </CardContent>
+        </Card>
+      </FeedSection>
     );
   }
 
   if (posts.length === 0) {
     return (
-      <Card>
-        <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-          <span
-            className="flex h-16 w-16 items-center justify-center rounded-avatar bg-ku-soft"
-            aria-hidden
-          >
-            <Sparkles className="h-8 w-8 text-ku-dark" />
-          </span>
+      <FeedSection>
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
+            <span
+              className="flex h-16 w-16 items-center justify-center rounded-avatar bg-ku-soft"
+              aria-hidden
+            >
+              <Sparkles className="h-8 w-8 text-ku-dark" />
+            </span>
 
-          <h3 className="text-h4 font-medium text-text-primary">
-            {category
-              ? `«${POST_CATEGORY_META[category].label}» kateqoriyasında paylaşım yoxdur`
-              : "Lent hələ boşdur"}
-          </h3>
+            <h3 className="text-h4 font-medium text-text-primary">
+              {category
+                ? `«${POST_CATEGORY_META[category].label}» kateqoriyasında paylaşım yoxdur`
+                : "Lent hələ boşdur"}
+            </h3>
 
-          <p className="max-w-md text-small text-text-secondary">
-            {category
-              ? "Başqa kateqoriya seçin və ya bu mövzuda ilk paylaşımı siz edin."
-              : "İlk gün fotoları, imtahan dövrü, səyahətlər — sinif tarixçəsi buradan başlayır."}
-          </p>
+            <p className="max-w-md text-small text-text-secondary">
+              {category
+                ? "Başqa kateqoriya seçin və ya bu mövzuda ilk paylaşımı siz edin."
+                : "İlk gün fotoları, imtahan dövrü, səyahətlər — sinif tarixçəsi buradan başlayır."}
+            </p>
 
-          <p className="text-small font-medium text-ku-dark">İlk paylaşımı sən et 👆</p>
-        </CardContent>
-      </Card>
+            <p className="text-small font-medium text-ku-dark">İlk paylaşımı sən et 👆</p>
+          </CardContent>
+        </Card>
+      </FeedSection>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <FeedSection>
       {posts.map((post) => (
         <PostCard
           key={post.id}
@@ -188,6 +216,6 @@ export function FeedList({ cohortId, cohortSlug, category, initialPage }: FeedLi
           Daha çox göstər
         </Button>
       )}
-    </div>
+    </FeedSection>
   );
 }

@@ -144,7 +144,7 @@ describe("changedVisibility", () => {
   });
 
   it("🔴 `phone` toxunulmayanda DB-yə YAZILMIR (səssiz açılma yoxdur)", () => {
-    // Forma 21 sahəni birlikdə göndərir. Fərq süzülməsəydi bio redaktə edən
+    // Forma 22 sahəni birlikdə göndərir. Fərq süzülməsəydi bio redaktə edən
     // istifadəçi üçün `phone` sətri də yazılardı — səviyyə eyni qalsa da bu,
     // "istifadəçi qəsdən seçdi" mənasını verərdi.
     const changes = changedVisibility(current, [

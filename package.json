@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "test:e2e:dev": "playwright test --config playwright.dev.config.ts",
     "db:seed": "prisma db seed",
+    "db:backfill": "tsx scripts/backfill-field-visibility.ts",
     "db:studio": "prisma studio",
     "git:init": "node scripts/git.mjs init",
     "git:commit": "node scripts/git.mjs commit",

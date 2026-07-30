@@ -16,11 +16,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  CONSENT_CATEGORIES,
   CONSENT_COOKIE_NAME,
   CONSENT_MAX_AGE_SECONDS,
   CONSENT_VALUES,
+  OPTIONAL_CONSENT_CATEGORIES,
   allowsAnalytics,
   consentCookieString,
+  consentValueFor,
   hasConsentDecision,
   parseConsent,
 } from "./consent";
@@ -102,5 +105,58 @@ describe("consentCookieString", () => {
       const raw = consentCookieString(value).split(";")[0].split("=")[1];
       expect(parseConsent(raw), value).toBe(value);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// «Seçimlər» ekranının kateqoriyaları (Blok 12B)
+//
+// 🔴 BU BLOKUN ƏSAS SUALI DÜRÜSTLÜKDÜR: siyahıda yalnız REAL emal olmalıdır.
+// Layihədə analitika, reklam və üçüncü tərəf izləyicisi YOXDUR — belə bir
+// kateqoriya göstərmək istifadəçiyə mövcud olmayan nəzarət satmaqdır (GDPR
+// mənasında da səhvdir: razılıq real əməliyyata verilir).
+// ---------------------------------------------------------------------------
+
+describe("razılıq kateqoriyaları", () => {
+  it("zəruri kateqoriya var və SÖNDÜRÜLƏ BİLMİR", () => {
+    const necessary = CONSENT_CATEGORIES.find((category) => category.id === "necessary");
+
+    expect(necessary).toBeDefined();
+    expect(necessary?.required).toBe(true);
+  });
+
+  it("🔴 UYDURMA analitika / reklam kateqoriyası YOXDUR", () => {
+    for (const category of CONSENT_CATEGORIES) {
+      expect(category.title).not.toMatch(/analitik|reklam|marketinq/i);
+      expect(category.id).not.toMatch(/analytics|marketing|ads/i);
+    }
+  });
+
+  it("ixtiyari kateqoriyalar `required: false` olanlardan TÖRƏYİR", () => {
+    // İki siyahı ayrıca saxlansaydı biri dəyişəndə digəri köhnə qalardı.
+    expect(OPTIONAL_CONSENT_CATEGORIES).toEqual(
+      CONSENT_CATEGORIES.filter((category) => !category.required),
+    );
+  });
+
+  it("hər kateqoriyanın izahı var — açar izahsız göstərilmir", () => {
+    for (const category of CONSENT_CATEGORIES) {
+      expect(category.description.length, category.id).toBeGreaterThan(20);
+    }
+  });
+});
+
+describe("consentValueFor", () => {
+  it("ixtiyari kateqoriya yoxdursa nəticə həmişə «necessary»dir", () => {
+    // Bugün «hamısını qəbul et» ilə «yalnız zəruri» EYNİ emalı bildirir;
+    // kuki bunu olduğu kimi yazır, uydurma fərq yaratmır.
+    expect(OPTIONAL_CONSENT_CATEGORIES).toHaveLength(0);
+    expect(consentValueFor([])).toBe("necessary");
+    expect(consentValueFor(["necessary"])).toBe("necessary");
+    expect(consentValueFor(["uydurma-id"])).toBe("necessary");
+  });
+
+  it("nəticə həmişə doğrulanmış razılıq dəyəridir", () => {
+    expect(CONSENT_VALUES as readonly string[]).toContain(consentValueFor([]));
   });
 });

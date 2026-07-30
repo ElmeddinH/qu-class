@@ -247,6 +247,13 @@ export const AUDIT_METADATA_KEYS = [
   "scope",
   "statuses",
   "recipients",
+  // ── Blok 12B · CMS «yarat» + toplu moderasiya ────────────────────────────
+  // `section` — `ContentPage.section` enum-u (UNIVERSITY | CAMPUS | …).
+  // `count`   — toplu əməliyyatda seçilmiş element SAYI (sətir-sətir yazılan
+  //             audit qeydlərində partiyanın böyüklüyünü göstərir).
+  // ⚠️ İkisi də enum / SAY-dır — sərbəst mətn DEYİL (bax yuxarıdakı qeyd).
+  "section",
+  "count",
 ] as const;
 
 export type AuditMetadataKey = (typeof AUDIT_METADATA_KEYS)[number];

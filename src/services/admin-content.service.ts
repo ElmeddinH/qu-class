@@ -27,14 +27,34 @@
 // dəyişikliyə İCAZƏ VERİLMİR; qalanlarda xəbərdarlıq göstərilir.
 // ============================================================================
 
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { assertFreshAdmin } from "@/lib/admin-guard";
 import { prisma } from "@/lib/db";
-import { AuditAction, type ContentSection, type FaqCategory } from "@/lib/enums";
+import {
+  AuditAction,
+  type ContentSection,
+  type FaqCategory,
+  type GuideCategory,
+} from "@/lib/enums";
 import { CONTENT_ROUTES, LEGAL_PAGES } from "@/lib/content-routes";
+import { slugify } from "@/lib/slugify";
 import type { Viewer } from "@/lib/visibility";
 import { recordAudit } from "@/services/audit.service";
+
+/**
+ * Unikal indeks pozuntusu (P2002) — slug artıq işlədilir.
+ *
+ * 🔴 ƏVVƏLCƏDƏN YOXLAMA YARIŞI BAĞLAMIR: `findUnique` ilə baxıb sonra yazsaq
+ * iki paralel sorğu arasında sətir yarana bilər. Yoxlama İSTİFADƏÇİ MESAJI
+ * üçün faydalıdır, ZƏMANƏTİ isə indeks verir — ona görə hər iki qat var.
+ */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2002"
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Kilidli slug-lar
@@ -199,6 +219,93 @@ export async function updateContentPage(
   return { ok: true, value: { id: page.id, slug: input.slug } };
 }
 
+export type ContentCreateFailure = "SLUG_TAKEN" | "SLUG_EMPTY";
+
+export const CONTENT_CREATE_FAILURE_MESSAGES: Record<ContentCreateFailure, string> = {
+  SLUG_TAKEN:
+    "Bu başlıqdan alınan ünvan (slug) artıq işlədilir. Başlığı bir qədər dəyişin.",
+  SLUG_EMPTY:
+    "Başlıqdan ünvan (slug) qurmaq olmadı — ən azı bir hərf və ya rəqəm yazın.",
+};
+
+export interface CreateContentPageInput {
+  title: string;
+  excerpt: string | null;
+  body: string;
+  section: ContentSection;
+  order: number;
+  isPublished: boolean;
+}
+
+export type ContentCreateResult =
+  | { ok: true; value: { id: string; slug: string } }
+  | { ok: false; reason: ContentCreateFailure };
+
+/**
+ * Yeni ictimai səhifə.
+ *
+ * 🔴 SLUG BAŞLIQDAN DETERMİNİSTİK QURULUR (`lib/slugify.ts`) — təsadüfi
+ * şəkilçi yoxdur. Səbəb: eyni başlıqla iki səhifə yaradılsa bu, SƏHVDİR və
+ * istifadəçi bunu görməlidir; təsadüfi şəkilçi həmin səhvi gizlədərdi.
+ *
+ * ⚠️ Unikallıq İKİ QATDADIR: (1) əvvəlcədən `findUnique` — dostcasına mesaj
+ * üçün; (2) `@unique` indeksi + `P2002` tutulması — yarışı MƏHZ bu bağlayır.
+ */
+export async function createContentPage(
+  viewer: Viewer,
+  input: CreateContentPageInput,
+): Promise<ContentCreateResult> {
+  const admin = await assertFreshAdmin(viewer);
+
+  const slug = slugify(input.title);
+  if (slug === "") return { ok: false, reason: "SLUG_EMPTY" };
+
+  const clash = await prisma.contentPage.findUnique({
+    where: { slug },
+    select: { id: true },
+  });
+  if (clash) return { ok: false, reason: "SLUG_TAKEN" };
+
+  try {
+    const created = await prisma.$transaction(async (tx) => {
+      const page = await tx.contentPage.create({
+        data: {
+          slug,
+          title: input.title,
+          excerpt: input.excerpt,
+          body: input.body,
+          section: input.section,
+          order: input.order,
+          isPublished: input.isPublished,
+        },
+        select: { id: true, slug: true },
+      });
+
+      await recordAudit(tx, {
+        actorId: admin.userId,
+        action: AuditAction.CREATE,
+        entityType: "ContentPage",
+        entityId: page.id,
+        metadata: {
+          operation: "createContentPage",
+          slug: page.slug,
+          section: input.section,
+          // ⚠️ GÖVDƏ METADATA-YA YAZILMIR — jurnal mətn anbarı deyil.
+          to: input.isPublished ? "PUBLISHED" : "DRAFT",
+        },
+      });
+
+      return page;
+    });
+
+    return { ok: true, value: created };
+  } catch (error) {
+    // Yarış: yoxlama ilə yazı arasında eyni slug yarandı.
+    if (isUniqueViolation(error)) return { ok: false, reason: "SLUG_TAKEN" };
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Faq
 // ---------------------------------------------------------------------------
@@ -272,6 +379,56 @@ export async function updateFaq(
   });
 
   return { ok: true, value: { id: faq.id } };
+}
+
+export interface CreateFaqInput {
+  question: string;
+  answer: string;
+  category: FaqCategory;
+  order: number;
+  isPublished: boolean;
+}
+
+/**
+ * Yeni FAQ sətri.
+ *
+ * ⚠️ `Faq`-ın slug-ı YOXDUR (ünvana düşmür) — unikallıq yoxlaması da yoxdur.
+ * Eyni sualın iki dəfə yazılması məzmun qərarıdır, texniki pozuntu deyil.
+ */
+export async function createFaq(
+  viewer: Viewer,
+  input: CreateFaqInput,
+): Promise<{ ok: true; value: { id: string } }> {
+  const admin = await assertFreshAdmin(viewer);
+
+  const created = await prisma.$transaction(async (tx) => {
+    const faq = await tx.faq.create({
+      data: {
+        question: input.question,
+        answer: input.answer,
+        category: input.category,
+        order: input.order,
+        isPublished: input.isPublished,
+      },
+      select: { id: true },
+    });
+
+    await recordAudit(tx, {
+      actorId: admin.userId,
+      action: AuditAction.CREATE,
+      entityType: "Faq",
+      entityId: faq.id,
+      metadata: {
+        operation: "createFaq",
+        category: input.category,
+        to: input.isPublished ? "PUBLISHED" : "DRAFT",
+      },
+    });
+
+    return faq;
+  });
+
+  return { ok: true, value: created };
 }
 
 // ---------------------------------------------------------------------------
@@ -357,4 +514,89 @@ export async function updateGuidePlace(
   });
 
   return { ok: true, value: { id: place.id } };
+}
+
+export interface CreateGuidePlaceInput {
+  category: GuideCategory;
+  title: string;
+  description: string;
+  address: string | null;
+  phone: string | null;
+  /** ⚠️ Koordinat İXTİYARİDİR — ikisi birlikdə verilir və ya heç biri. */
+  latitude: number | null;
+  longitude: number | null;
+  isEmergency: boolean;
+  order: number;
+}
+
+export type GuidePlaceCreateFailure = "COORDINATES_INCOMPLETE";
+
+export const GUIDE_PLACE_CREATE_FAILURE_MESSAGES: Record<
+  GuidePlaceCreateFailure,
+  string
+> = {
+  COORDINATES_INCOMPLETE:
+    "Koordinatların HƏR İKİSİNİ yazın və ya hər ikisini boş buraxın — yalnız biri xəritədə mövqe vermir.",
+};
+
+export type GuidePlaceCreateResult =
+  | { ok: true; value: { id: string } }
+  | { ok: false; reason: GuidePlaceCreateFailure };
+
+/**
+ * Yeni bələdçi məkanı.
+ *
+ * ⚠️ REDAKTƏDƏN FƏRQLİ OLARAQ koordinat BURADA verilir. `updateGuidePlace`
+ * onu qəsdən buraxmır (səhvən sürüşdürülən pin istifadəçini mövcud olmayan
+ * ünvana aparar), amma YARADARKƏN mövqeyi ilk dəfə kimsə yazmalıdır — yoxsa
+ * yeni məkan xəritədə heç vaxt görünməz.
+ *
+ * ⚠️ Yarımçıq koordinat RƏDD OLUNUR: yalnız `latitude` yazılsa Prisma sətri
+ * qəbul edər, xəritə isə mövqe qura bilməz və məkan səssizcə xəritədən
+ * düşərdi.
+ */
+export async function createGuidePlace(
+  viewer: Viewer,
+  input: CreateGuidePlaceInput,
+): Promise<GuidePlaceCreateResult> {
+  const admin = await assertFreshAdmin(viewer);
+
+  const hasLat = input.latitude !== null;
+  const hasLon = input.longitude !== null;
+  if (hasLat !== hasLon) return { ok: false, reason: "COORDINATES_INCOMPLETE" };
+
+  const created = await prisma.$transaction(async (tx) => {
+    const place = await tx.guidePlace.create({
+      data: {
+        category: input.category,
+        title: input.title,
+        description: input.description,
+        address: input.address,
+        phone: input.phone,
+        latitude: input.latitude,
+        longitude: input.longitude,
+        isEmergency: input.isEmergency,
+        order: input.order,
+      },
+      select: { id: true },
+    });
+
+    await recordAudit(tx, {
+      actorId: admin.userId,
+      action: AuditAction.CREATE,
+      entityType: "GuidePlace",
+      entityId: place.id,
+      metadata: {
+        operation: "createGuidePlace",
+        category: input.category,
+        // ⚠️ DƏQİQ KOORDİNAT jurnala YAZILMIR: audit səhifəsi metadata-nı
+        // olduğu kimi göstərir, məkan ünvanı isə orada lazım deyil.
+        to: input.isEmergency ? "EMERGENCY" : "REGULAR",
+      },
+    });
+
+    return place;
+  });
+
+  return { ok: true, value: created };
 }

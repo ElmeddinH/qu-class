@@ -89,6 +89,7 @@ export async function updateProfileAction(input: unknown): Promise<ProfileAction
     // T3: `""` → `null` çevirməsi MƏHZ BURADA olur, sxemdə yox.
     const scalars: ProfileScalars = {
       avatarUrl: emptyToNull(data.avatarUrl),
+      coverUrl: emptyToNull(data.coverUrl),
       hometown: emptyToNull(data.hometown),
       currentCity: emptyToNull(data.currentCity),
       currentCountry: emptyToNull(data.currentCountry),
@@ -114,7 +115,7 @@ export async function updateProfileAction(input: unknown): Promise<ProfileAction
         level: emptyToNull(tag.level),
       })),
       clubIds: data.clubIds,
-      // 21 sahənin hamısı göndərilir; DƏYİŞMƏYƏNLƏR servisdə süzülür
+      // 22 sahənin hamısı göndərilir; DƏYİŞMƏYƏNLƏR servisdə süzülür
       // (`changedVisibility`) — toxunulmamış `phone` üçün sətir yaranmır.
       visibility: CONTROLLED_PROFILE_FIELDS.map((field) => ({
         field,

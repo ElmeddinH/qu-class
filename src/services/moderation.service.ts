@@ -695,6 +695,144 @@ export async function decideReport(
 }
 
 // ---------------------------------------------------------------------------
+// TOPLU QƏRAR (Blok 12B)
+// ---------------------------------------------------------------------------
+
+/** Toplu əməliyyatın yuxarı həddi — bir səhifədəki şikayət sayından böyükdür. */
+export const BULK_DECISION_LIMIT = 100;
+
+export type BulkDecisionFailure =
+  | "EMPTY_SELECTION"
+  | "TOO_MANY"
+  | "RESOLUTION_REQUIRED"
+  | "NOT_FOUND"
+  | "ALREADY_CLOSED";
+
+export type BulkDecisionResult =
+  | { ok: true; value: { count: number; status: string } }
+  | { ok: false; reason: BulkDecisionFailure; blockedIds?: string[] };
+
+/**
+ * Seçilmiş şikayətlərə EYNİ qərarı tətbiq edir.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * 🔴 QAYDA 1 — HƏR ELEMENT ÜÇÜN AYRICA AuditLog SƏTRİ
+ * ════════════════════════════════════════════════════════════════════════════
+ * Bir «12 şikayət həll edildi» yekun sətri YAZILMIR. Səbəb: audit jurnalı
+ * `entityId` üzrə sorğulanır — «bu şikayətə kim, nə vaxt, nə qərar verdi?»
+ * sualının cavabı həmin sətirdədir. Yekun sətir bu izi qırar və toplu
+ * əməliyyat fərdi əməliyyatdan DAHA AZ izlənilən olardı; moderasiya sistemində
+ * bu, tam tərsinə olmalıdır. Metadata-ya `count` yazılır ki, sətrin bir
+ * PARTİYANIN hissəsi olduğu görünsün.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * 🔴 QAYDA 2 — HAMISI BİR `$transaction`-DA, QİSMƏN UĞUR YOXDUR
+ * ════════════════════════════════════════════════════════════════════════════
+ * Elementlərin biri sınsa HEÇ BİRİ tətbiq olunmur. Qismən uğur moderatoru
+ * yalan vəziyyətdə qoyardı: ekranda «hazırdır» görünər, siyahının bir hissəsi
+ * isə köhnə statusda qalar — və hansının qaldığı MƏLUM OLMAZ.
+ *
+ * ⚠️ Ona görə doğrulama TRANSAKSİYADAN ƏVVƏL bitir: tapılmayan və artıq
+ * bağlanmış şikayətlər əvvəlcədən aşkarlanır və istifadəçiyə hansı sətirlərin
+ * mane olduğu qaytarılır (`blockedIds`). Transaksiya yalnız yazı üçündür.
+ *
+ * ⚠️ `IN_REVIEW` toplu şəkildə DƏSTƏKLƏNİR, amma `resolution` yalnız bağlayan
+ * qərarlarda məcburidir — fərdi `decideReport` ilə eyni qayda.
+ */
+export async function bulkDecideReports(
+  viewer: Viewer,
+  input: {
+    reportIds: readonly string[];
+    decision: ReportDecision;
+    resolution: string | null;
+  },
+): Promise<BulkDecisionResult> {
+  const admin = await assertFreshAdmin(viewer);
+
+  // Təkrarlanan id-lər eyni sətrə iki audit qeydi yazardı.
+  const reportIds = [...new Set(input.reportIds)];
+
+  if (reportIds.length === 0) return { ok: false, reason: "EMPTY_SELECTION" };
+  if (reportIds.length > BULK_DECISION_LIMIT) return { ok: false, reason: "TOO_MANY" };
+
+  const resolution = input.resolution?.trim() ?? "";
+  if (input.decision !== ReportStatus.IN_REVIEW && resolution === "") {
+    return { ok: false, reason: "RESOLUTION_REQUIRED" };
+  }
+
+  const reports = await prisma.report.findMany({
+    where: { id: { in: reportIds } },
+    select: { id: true, status: true, reporterId: true, entityType: true },
+  });
+
+  if (reports.length !== reportIds.length) {
+    const found = new Set(reports.map((report) => report.id));
+    return {
+      ok: false,
+      reason: "NOT_FOUND",
+      blockedIds: reportIds.filter((id) => !found.has(id)),
+    };
+  }
+
+  const closed = reports.filter((report) => CLOSED_STATUSES.includes(report.status));
+  if (closed.length > 0) {
+    return {
+      ok: false,
+      reason: "ALREADY_CLOSED",
+      blockedIds: closed.map((report) => report.id),
+    };
+  }
+
+  const closing = CLOSED_STATUSES.includes(input.decision);
+  const notice = DECISION_NOTICE[input.decision];
+  const now = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    for (const report of reports) {
+      await tx.report.update({
+        where: { id: report.id },
+        data: {
+          status: input.decision,
+          resolvedById: closing ? admin.userId : null,
+          resolvedAt: closing ? now : null,
+          resolution: resolution === "" ? null : resolution,
+        },
+      });
+
+      // 🔴 QAYDA 1 — sətir-sətir audit (bax funksiya başlığı).
+      await recordAudit(tx, {
+        actorId: admin.userId,
+        action: AuditAction.UPDATE,
+        entityType: "Report",
+        entityId: report.id,
+        metadata: {
+          operation: "bulkDecideReports",
+          from: report.status,
+          to: input.decision,
+          entityType: report.entityType,
+          // Partiyanın böyüklüyü — SAY, sərbəst mətn deyil.
+          count: reports.length,
+        },
+      });
+
+      if (report.reporterId !== admin.userId) {
+        await tx.notification.create({
+          data: {
+            recipientId: report.reporterId,
+            actorId: admin.userId,
+            type: NotificationType.MODERATION_RESULT,
+            title: notice.title,
+            body: resolution === "" ? notice.body : resolution,
+          },
+        });
+      }
+    }
+  });
+
+  return { ok: true, value: { count: reports.length, status: input.decision } };
+}
+
+// ---------------------------------------------------------------------------
 // Məzmuna tədbir — GİZLƏT (soft delete)
 // ---------------------------------------------------------------------------
 

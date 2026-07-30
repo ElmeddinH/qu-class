@@ -28,7 +28,8 @@ import { HeartHandshake, LoaderCircle, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeading } from "@/components/kuds/SectionCard";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -86,10 +87,10 @@ export function SupportOfferForm({ openToSupport, offers, onSaved }: SupportOffe
   return (
     <Card id="support" className="scroll-mt-24">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardHeading className="flex items-center gap-2">
           <HeartHandshake className="h-5 w-5 text-ku-green" aria-hidden />
           Sinfimə necə dəstək ola bilərəm?
-        </CardTitle>
+        </CardHeading>
         <CardDescription>
           Məzun kimi hansı formada kömək edə biləcəyinizi seçin. Bu, görünürlük və
           statistika razılıqlarından AYRI bir seçimdir.

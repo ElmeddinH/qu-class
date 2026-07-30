@@ -20,7 +20,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeading } from "@/components/kuds/SectionCard";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -83,7 +84,7 @@ export function CohortCreateForm({ programs }: { programs: ProgramOption[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Yeni sinif</CardTitle>
+        <CardHeading>Yeni sinif</CardHeading>
       </CardHeader>
       <CardContent>
         <form

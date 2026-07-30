@@ -28,7 +28,8 @@ import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeading } from "@/components/kuds/SectionCard";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { CSV_BOM_BYTES } from "@/lib/csv";
 import {
@@ -124,7 +125,7 @@ export function SisImportScreen() {
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>1. Fayl seçin</CardTitle>
+          <CardHeading>1. Fayl seçin</CardHeading>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -170,7 +171,7 @@ export function SisImportScreen() {
       {preview === null ? null : (
         <Card>
           <CardHeader>
-            <CardTitle>2. Önizləmə (baza hələ dəyişməyib)</CardTitle>
+            <CardHeading>2. Önizləmə (baza hələ dəyişməyib)</CardHeading>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="flex flex-wrap gap-2">

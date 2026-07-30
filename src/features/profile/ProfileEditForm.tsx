@@ -37,7 +37,8 @@ import { toast } from "sonner";
 import { VisibilitySelector } from "@/components/shared/VisibilitySelector";
 import { VISIBILITY_META } from "@/components/shared/visibility-meta";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeading } from "@/components/kuds/SectionCard";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
@@ -116,6 +117,7 @@ export function ProfileEditForm({
       firstName,
       lastName,
       avatarUrl: text(draft.scalars.avatarUrl),
+      coverUrl: text(draft.scalars.coverUrl),
       bio: text(draft.scalars.bio),
       hometown: text(draft.scalars.hometown),
       learningGoals: text(draft.scalars.learningGoals),
@@ -193,7 +195,7 @@ export function ProfileEditForm({
         {/* --- Kimlik: ad-soyad HƏMİŞƏ görünür, görünürlük seçicisi yoxdur --- */}
         <Card>
           <CardHeader>
-            <CardTitle>Kimlik</CardTitle>
+            <CardHeading>Kimlik</CardHeading>
             <CardDescription>
               Ad və soyadınız həmişə görünür — platformanın işləməsi üçün minimum
               məlumatdır, ona görə burada görünürlük seçimi yoxdur.
@@ -229,11 +231,11 @@ export function ProfileEditForm({
           </CardContent>
         </Card>
 
-        {/* --- 21 idarə olunan sahə, `PRIVACY_SECTIONS` qruplaşması ilə --- */}
+        {/* --- 22 idarə olunan sahə, `PRIVACY_SECTIONS` qruplaşması ilə --- */}
         {PROFILE_FORM_SECTIONS.map((section) => (
           <Card key={section.id} id={section.id} className="scroll-mt-24">
             <CardHeader>
-              <CardTitle>{section.title}</CardTitle>
+              <CardHeading>{section.title}</CardHeading>
               <CardDescription>{section.description}</CardDescription>
             </CardHeader>
 

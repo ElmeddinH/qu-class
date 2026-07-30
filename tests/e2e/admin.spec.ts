@@ -300,6 +300,192 @@ test("şikayət növbəsində qərar verilir → status dəyişir, AuditLog art�
 });
 
 // ---------------------------------------------------------------------------
+// 4b. 🔴 TOPLU MODERASİYA (Blok 12B)
+//
+// SUALLAR:
+//   1. checkbox ilə çoxlu seçim işləyirmi?
+//   2. 🔴 HƏR element üçün AYRICA audit sətri yaranırmı (bir yekun sətir YOX)?
+//   3. 🔴 qismən uğur varmı? (artıq bağlanmış şikayət seçilsə HEÇ BİRİ
+//      dəyişməməlidir — hamısı bir `$transaction`-dadır)
+//
+// ⚠️ Test YAZIR — dəyişən hər sətir `finally`-də GERİ QAYTARILIR.
+// ---------------------------------------------------------------------------
+
+test("🔴 toplu qərar: hər element üçün AYRICA audit sətri, yekun sətir YOX", async ({
+  page,
+}) => {
+  // ⚠️ Növ FİLTRİ YOXDUR: seed-də hər növdən BİR açıq şikayət var (POST,
+  // MEMORY, USER), yəni «iki açıq POST» tələb etsək test seed-dən asılı olaraq
+  // qırılardı. Toplu əməliyyat onsuz da növdən asılı deyil.
+  const reports = await prisma.report.findMany({
+    where: { status: "OPEN" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: 2,
+    select: {
+      id: true,
+      status: true,
+      resolvedById: true,
+      resolvedAt: true,
+      resolution: true,
+    },
+  });
+  expect(reports.length, "seed-də ən azı iki AÇIQ şikayət olmalıdır").toBe(2);
+
+  const auditIdsBefore = new Set(
+    (await prisma.auditLog.findMany({ select: { id: true } })).map((row) => row.id),
+  );
+
+  try {
+    await login(page, ADMIN_EMAIL);
+    await page.goto("/admin/moderation?st=OPEN");
+
+    const bar = page.getByTestId("bulk-moderation-bar");
+    await expect(bar).toBeVisible();
+
+    // Sətir checkbox-ları — ilk ikisi işarələnir.
+    const checkboxes = page.getByRole("checkbox", { name: /Toplu əməliyyat üçün seç/ });
+    await expect.poll(async () => checkboxes.count()).toBeGreaterThanOrEqual(2);
+
+    await checkboxes.nth(0).check();
+    await checkboxes.nth(1).check();
+    await expect(bar.getByText("2 şikayət seçilib")).toBeVisible();
+
+    await bar
+      .getByLabel(/Qərarın izahı — seçilmiş HƏR şikayət üçün/)
+      .fill("E2E toplu testi — yoxlanıldı.");
+    await bar.getByRole("button", { name: "Seçilmişləri həll et" }).click();
+
+    // 🔴 T19 — nəticə serverdən gəlir.
+    await expect
+      .poll(
+        async () =>
+          prisma.report.count({
+            where: { id: { in: reports.map((r) => r.id) }, status: "RESOLVED" },
+          }),
+        { message: "toplu qərar tətbiq olunmadı" },
+      )
+      .toBe(2);
+
+    // 🔴 ƏSAS ÖLÇÜ: HƏR şikayət üçün AYRICA sətir — ikisi də ayrı `entityId`.
+    for (const report of reports) {
+      const rows = await prisma.auditLog.findMany({
+        where: { entityType: "Report", entityId: report.id },
+        select: { id: true, action: true },
+      });
+      const fresh = rows.filter((row) => !auditIdsBefore.has(row.id));
+
+      expect(fresh.length, `${report.id} üçün audit sətri`).toBe(1);
+      expect(fresh[0].action).toBe("UPDATE");
+    }
+
+    // 🔴 YEKUN SƏTİR YOXDUR: yaranan bütün yeni sətirlərin `entityId`-si
+    // seçilmiş şikayətlərdən biridir — «partiya» adlı ayrıca sətir yoxdur.
+    const allNew = (
+      await prisma.auditLog.findMany({
+        where: { entityType: "Report" },
+        select: { id: true, entityId: true },
+      })
+    ).filter((row) => !auditIdsBefore.has(row.id));
+
+    expect(allNew.length).toBe(2);
+    expect(allNew.every((row) => reports.some((r) => r.id === row.entityId))).toBe(true);
+  } finally {
+    for (const report of reports) {
+      await prisma.report.update({
+        where: { id: report.id },
+        data: {
+          status: report.status,
+          resolvedById: report.resolvedById,
+          resolvedAt: report.resolvedAt,
+          resolution: report.resolution,
+        },
+      });
+    }
+
+    const audits = await prisma.auditLog.findMany({ select: { id: true } });
+    const extra = audits.filter((row) => !auditIdsBefore.has(row.id));
+    if (extra.length > 0) {
+      await prisma.auditLog.deleteMany({
+        where: { id: { in: extra.map((row) => row.id) } },
+      });
+    }
+    await prisma.notification.deleteMany({
+      where: { body: { contains: "E2E toplu testi" } },
+    });
+  }
+});
+
+test("🔴 toplu qərarda QİSMƏN UĞUR yoxdur — bağlanmış sətir seçilsə heç biri dəyişmir", async ({
+  page,
+}) => {
+  const open = await prisma.report.findFirstOrThrow({
+    where: { status: "OPEN" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { id: true, status: true },
+  });
+
+  const auditIdsBefore = new Set(
+    (await prisma.auditLog.findMany({ select: { id: true } })).map((row) => row.id),
+  );
+
+  try {
+    await login(page, ADMIN_EMAIL);
+    await page.goto("/admin/moderation?st=OPEN");
+
+    const checkboxes = page.getByRole("checkbox", { name: /Toplu əməliyyat üçün seç/ });
+    await expect.poll(async () => checkboxes.count()).toBeGreaterThan(0);
+    await checkboxes.nth(0).check();
+
+    // Seçim edildikdən SONRA həmin şikayət başqa yoldan bağlanır — server
+    // əməliyyatı tamamilə rədd etməlidir (yarısını tətbiq etməməlidir).
+    await prisma.report.update({
+      where: { id: open.id },
+      data: { status: "RESOLVED", resolution: "E2E yarış testi" },
+    });
+
+    const bar = page.getByTestId("bulk-moderation-bar");
+    await bar
+      .getByLabel(/Qərarın izahı — seçilmiş HƏR şikayət üçün/)
+      .fill("E2E yarış testi — rədd olunmalıdır.");
+    await bar.getByRole("button", { name: "Seçilmişləri rədd et" }).click();
+
+    // Azərbaycanca səbəb göstərilir.
+    await expect(page.getByText(/artıq bağlanıb/)).toBeVisible();
+
+    // Status DƏYİŞMƏYİB (REJECTED olmayıb) və audit sətri YAZILMAYIB.
+    const after = await prisma.report.findUniqueOrThrow({
+      where: { id: open.id },
+      select: { status: true },
+    });
+    expect(after.status).toBe("RESOLVED");
+
+    const newAudits = (
+      await prisma.auditLog.findMany({
+        where: { entityType: "Report", entityId: open.id },
+        select: { id: true },
+      })
+    ).filter((row) => !auditIdsBefore.has(row.id));
+    expect(newAudits.length, "rədd olunan əməliyyat audit sətri yazmamalıdır").toBe(0);
+  } finally {
+    await prisma.report.update({
+      where: { id: open.id },
+      data: { status: open.status, resolution: null, resolvedById: null, resolvedAt: null },
+    });
+
+    const audits = await prisma.auditLog.findMany({ select: { id: true } });
+    const extra = audits.filter((row) => !auditIdsBefore.has(row.id));
+    if (extra.length > 0) {
+      await prisma.auditLog.deleteMany({
+        where: { id: { in: extra.map((row) => row.id) } },
+      });
+    }
+    await prisma.notification.deleteMany({
+      where: { body: { contains: "E2E yarış testi" } },
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // 5. Rol dəyişikliyi → bildiriş + audit
 // ---------------------------------------------------------------------------
 
@@ -349,6 +535,122 @@ test("rol dəyişikliyi → hədəfə bildiriş gedir, audit sətri yaranır", a
         title: "Sizə administrator səlahiyyəti verildi",
       },
     });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 5b. 🔴 İKİNCİ DƏRƏCƏLİ KOHORTDA rol redaktəsi (Blok 12B)
+//
+// SUAL: istifadəçi İKİ sinifdədirsə, İKİNCİSİNDƏ rolunu dəyişmək olurmu?
+// Əvvəl UI yalnız `cohorts[0]`-ı (əsas sinif) göstərirdi, yəni ikinci
+// üzvlüyün rolu heç bir yerdən dəyişdirilə bilmirdi.
+//
+// ⚠️ Seed-də çox-sinifli istifadəçi YOXDUR, ona görə test müvəqqəti ikinci
+// üzvlük yaradır və `finally`-də SİLİR (seed determinizmi pozulmur).
+//
+// ⚠️ İki rol qarışdırılmır: burada dəyişən COHORT rolu (`CLASS_MODERATOR`),
+// sistem rolu (`UNIVERSITY_ADMIN`) DEYİL.
+// ---------------------------------------------------------------------------
+
+test("ikinci dərəcəli kohortda sinif rolu dəyişir və AYRICA audit sətri yaranır", async ({
+  page,
+}) => {
+  const target = await prisma.user.findUniqueOrThrow({
+    where: { email: MEMBER_EMAIL },
+    select: {
+      id: true,
+      systemRole: true,
+      memberships: { select: { cohortId: true } },
+    },
+  });
+
+  const primaryCohortIds = target.memberships.map((membership) => membership.cohortId);
+
+  // Hədəfin ÜZVÜ OLMADIĞI bir sinif — ikinci üzvlük məhz orada qurulur.
+  const secondary = await prisma.cohort.findFirstOrThrow({
+    where: { id: { notIn: primaryCohortIds } },
+    select: { id: true, displayName: true },
+  });
+
+  const membership = await prisma.cohortMembership.create({
+    data: {
+      userId: target.id,
+      cohortId: secondary.id,
+      role: "MEMBER",
+      isPrimary: false,
+    },
+    select: { id: true },
+  });
+
+  const auditBefore = await prisma.auditLog.count({
+    where: { action: "ROLE_CHANGE", entityId: membership.id },
+  });
+
+  try {
+    await login(page, ADMIN_EMAIL);
+    await page.goto(`/admin/users?q=${encodeURIComponent(MEMBER_EMAIL)}`);
+
+    // Cədvəldə ikinci üzvlüyün varlığı görünür.
+    await expect(page.getByText("+1 digər sinif").first()).toBeVisible();
+
+    await page.getByRole("button", { name: /üçün əməliyyatlar$/ }).first().click();
+
+    // 🔴 HƏR üzvlük üçün AYRICA seçici var — biri deyil, ikisi.
+    // ⚠️ T29: `<select>` → `getByRole("combobox")`.
+    // ⚠️ Səhifədə filtr seçiciləri də var, ona görə axtarış `<fieldset>` ilə
+    // MƏHDUDLAŞIR (`<legend>` → `role="group"`).
+    const roleGroup = page.getByRole("group", { name: /^Sinif rolları/ });
+    await expect(roleGroup).toBeVisible();
+    await expect(roleGroup.getByRole("combobox")).toHaveCount(2);
+
+    // İkinci sinfin seçicisi öz adı ilə etiketlənib (əsas sinif «əsas sinif»
+    // qeydi daşıyır, ikincisi daşımır).
+    const secondarySelect = roleGroup.getByLabel(secondary.displayName, { exact: true });
+    await expect(secondarySelect).toBeVisible();
+
+    await secondarySelect.selectOption("CLASS_MODERATOR");
+
+    // 🔴 T19: nəticə SERVERDƏN gəlir.
+    await expect
+      .poll(
+        async () =>
+          (
+            await prisma.cohortMembership.findUniqueOrThrow({
+              where: { id: membership.id },
+              select: { role: true },
+            })
+          ).role,
+        { message: "ikinci kohortun rolu dəyişmədi" },
+      )
+      .toBe("CLASS_MODERATOR");
+
+    // 🔴 Audit sətri MƏHZ bu üzvlüyə yazılır.
+    expect(
+      await prisma.auditLog.count({
+        where: { action: "ROLE_CHANGE", entityId: membership.id },
+      }),
+      "ikinci kohort rol dəyişikliyi audit sətri yaratmadı",
+    ).toBe(auditBefore + 1);
+
+    // Əsas sinifdəki rol TOXUNULMAZ qalıb — səhv üzvlük dəyişməyib.
+    const primaryRoles = await prisma.cohortMembership.findMany({
+      where: { userId: target.id, cohortId: { in: primaryCohortIds } },
+      select: { role: true },
+    });
+    expect(primaryRoles.every((row) => row.role === "CLASS_REPRESENTATIVE")).toBe(true);
+
+    // Sistem rolu da dəyişməyib (iki rol qarışdırılmır).
+    const after = await prisma.user.findUniqueOrThrow({
+      where: { id: target.id },
+      select: { systemRole: true },
+    });
+    expect(after.systemRole).toBe(target.systemRole);
+  } finally {
+    await prisma.auditLog.deleteMany({ where: { entityId: membership.id } });
+    await prisma.notification.deleteMany({
+      where: { recipientId: target.id, title: "Sinif rolunuz dəyişdi" },
+    });
+    await prisma.cohortMembership.delete({ where: { id: membership.id } });
   }
 });
 
@@ -412,6 +714,230 @@ test("nümunə CSV şablonu endirilə bilir", async ({ page }) => {
   const download = await downloadPromise;
 
   expect(download.suggestedFilename()).toContain(".csv");
+});
+
+// ---------------------------------------------------------------------------
+// 6b. CMS «YARAT» (Blok 12B) — əvvəl yalnız redaktə var idi
+//
+// 🔴 SUALLAR:
+//   · yeni səhifə / sual / məkan yaradılırmı?
+//   · slug BAŞLIQDAN deterministik qurulurmu?
+//   · eyni başlıq İKİNCİ dəfə yaradılanda unikallıq tutulub azərbaycanca
+//     mesaj verilirmi (P2002)?
+//   · hər yaratma AuditLog (`CREATE`) sətri yazırmı?
+//
+// ⚠️ Test YAZIR — yaradılan hər sətir `finally`-də SİLİNİR.
+// ---------------------------------------------------------------------------
+
+test("CMS: yeni səhifə yaradılır, slug başlıqdan qurulur, təkrar başlıq rədd olunur", async ({
+  page,
+}) => {
+  const title = "E2E müvəqqəti səhifə";
+  const expectedSlug = "e2e-muveqqeti-sehife";
+
+  try {
+    await login(page, ADMIN_EMAIL);
+    await page.goto("/admin/content");
+
+    await page.getByRole("button", { name: "Yeni səhifə" }).click();
+
+    const form = page.getByRole("form", { name: "Yeni məzmun səhifəsi formu" });
+    await form.getByLabel("Başlıq").fill(title);
+    await form.getByLabel("Gövdə (Markdown)").fill("E2E gövdəsi.");
+
+    // 🔴 Slug ÖNİZLƏMƏSİ serverin qurduğu ilə eyni funksiyadandır.
+    await expect(form.getByText(`/${expectedSlug}`)).toBeVisible();
+
+    await form.getByRole("button", { name: "Yarat" }).click();
+
+    // T19 — nəticə SERVERDƏN gəlir.
+    await expect
+      .poll(
+        async () =>
+          prisma.contentPage.count({ where: { slug: expectedSlug } }),
+        { message: "səhifə yaradılmadı" },
+      )
+      .toBe(1);
+
+    const created = await prisma.contentPage.findUniqueOrThrow({
+      where: { slug: expectedSlug },
+      select: { id: true, isPublished: true },
+    });
+
+    // Qaralama defoltdur — «dərhal nəşr» işarələnməyib.
+    expect(created.isPublished).toBe(false);
+
+    // 🔴 Hər yaratma AuditLog sətri yazır.
+    expect(
+      await prisma.auditLog.count({
+        where: { action: "CREATE", entityType: "ContentPage", entityId: created.id },
+      }),
+      "yaratma audit sətri yazmadı",
+    ).toBe(1);
+
+    // 🔴 EYNİ başlıq ikinci dəfə → unikallıq tutulur, azərbaycanca mesaj.
+    await page.reload();
+    await page.getByRole("button", { name: "Yeni səhifə" }).click();
+    const second = page.getByRole("form", { name: "Yeni məzmun səhifəsi formu" });
+    await second.getByLabel("Başlıq").fill(title);
+    await second.getByLabel("Gövdə (Markdown)").fill("Təkrar cəhd.");
+    await second.getByRole("button", { name: "Yarat" }).click();
+
+    await expect(page.getByText(/artıq işlədilir/)).toBeVisible();
+
+    // Dublikat YARANMADI.
+    expect(await prisma.contentPage.count({ where: { slug: expectedSlug } })).toBe(1);
+  } finally {
+    const rows = await prisma.contentPage.findMany({
+      where: { slug: expectedSlug },
+      select: { id: true },
+    });
+    for (const row of rows) {
+      await prisma.auditLog.deleteMany({ where: { entityId: row.id } });
+    }
+    await prisma.contentPage.deleteMany({ where: { slug: expectedSlug } });
+  }
+});
+
+test("CMS: yeni FAQ və bələdçi məkanı yaradılır (11 kateqoriya + təcili + koordinat)", async ({
+  page,
+}) => {
+  const question = "E2E müvəqqəti sual?";
+  const placeTitle = "E2E müvəqqəti məkan";
+
+  try {
+    await login(page, ADMIN_EMAIL);
+    await page.goto("/admin/content");
+
+    // --- FAQ ---
+    await page.getByRole("button", { name: "Yeni sual" }).click();
+    const faqForm = page.getByRole("form", { name: "Yeni FAQ formu" });
+    await faqForm.getByLabel("Sual").fill(question);
+    await faqForm.getByLabel("Cavab").fill("E2E cavabı.");
+    await faqForm.getByLabel("Kateqoriya").selectOption("PLATFORM");
+    await faqForm.getByRole("button", { name: "Yarat" }).click();
+
+    await expect
+      .poll(async () => prisma.faq.count({ where: { question } }), {
+        message: "FAQ yaradılmadı",
+      })
+      .toBe(1);
+
+    const faq = await prisma.faq.findFirstOrThrow({
+      where: { question },
+      select: { id: true, category: true },
+    });
+    expect(faq.category).toBe("PLATFORM");
+    expect(
+      await prisma.auditLog.count({
+        where: { action: "CREATE", entityType: "Faq", entityId: faq.id },
+      }),
+    ).toBe(1);
+
+    // --- GuidePlace ---
+    await page.reload();
+    await page.getByRole("button", { name: "Yeni məkan" }).click();
+    const placeForm = page.getByRole("form", { name: "Yeni bələdçi məkanı formu" });
+
+    // 11 kateqoriyanın hamısı seçicidədir.
+    const categorySelect = placeForm.getByLabel("Kateqoriya");
+    expect(await categorySelect.locator("option").count()).toBe(11);
+
+    await categorySelect.selectOption("HEALTH");
+    await placeForm.getByLabel("Başlıq").fill(placeTitle);
+    await placeForm.getByLabel("Təsvir").fill("E2E təsviri.");
+    await placeForm.getByLabel("Enlik (latitude)").fill("39.8154");
+    await placeForm.getByLabel("Uzunluq (longitude)").fill("46.7519");
+    await placeForm.getByLabel(/Təcili əlaqə məkanıdır/).check();
+    await placeForm.getByRole("button", { name: "Yarat" }).click();
+
+    await expect
+      .poll(async () => prisma.guidePlace.count({ where: { title: placeTitle } }), {
+        message: "məkan yaradılmadı",
+      })
+      .toBe(1);
+
+    const place = await prisma.guidePlace.findFirstOrThrow({
+      where: { title: placeTitle },
+      select: {
+        id: true,
+        category: true,
+        isEmergency: true,
+        latitude: true,
+        longitude: true,
+      },
+    });
+
+    expect(place.category).toBe("HEALTH");
+    expect(place.isEmergency).toBe(true);
+    expect(place.latitude).toBeCloseTo(39.8154, 4);
+    expect(place.longitude).toBeCloseTo(46.7519, 4);
+    expect(
+      await prisma.auditLog.count({
+        where: { action: "CREATE", entityType: "GuidePlace", entityId: place.id },
+      }),
+    ).toBe(1);
+  } finally {
+    const faqs = await prisma.faq.findMany({ where: { question }, select: { id: true } });
+    const places = await prisma.guidePlace.findMany({
+      where: { title: placeTitle },
+      select: { id: true },
+    });
+
+    for (const row of [...faqs, ...places]) {
+      await prisma.auditLog.deleteMany({ where: { entityId: row.id } });
+    }
+    await prisma.faq.deleteMany({ where: { question } });
+    await prisma.guidePlace.deleteMany({ where: { title: placeTitle } });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 6c. `/admin/stats` SİNİF FİLTRİ (Blok 12B)
+//
+// 🔴 SUAL: seçim URL-ə düşür və SERVER yenidən işləyirmi? `shallow: true`
+// olsaydı URL dəyişər, rəqəmlər isə köhnə qalardı — səssiz nasazlıq.
+// ---------------------------------------------------------------------------
+
+test("analitikada sinif filtri URL-ə yazılır və panel yenidən yüklənir", async ({
+  page,
+}) => {
+  const cohort = await prisma.cohort.findFirstOrThrow({
+    orderBy: [{ admissionYear: "desc" }, { displayName: "asc" }],
+    select: { id: true, displayName: true },
+  });
+
+  await login(page, ADMIN_EMAIL);
+  await page.goto("/admin/stats");
+
+  // Defolt: universitet miqyası, URL-də `?cohort=` YOXDUR.
+  const select = page.getByLabel("Sinif", { exact: true });
+  await expect(select).toHaveValue("");
+  expect(new URL(page.url()).searchParams.get("cohort")).toBeNull();
+
+  await select.selectOption(cohort.id);
+
+  // 🔴 URL yazılır (nuqs).
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("cohort"))
+    .toBe(cohort.id);
+
+  // 🔴 Server yenidən işlədi: xülasə kartının izahı SEÇİLMİŞ sinfin adını
+  // daşıyır (universitet miqyasında orada «Bütün universitet» yazılır).
+  // ⚠️ Sadəcə `getByText(displayName)` YARAMIR — ad `<option>` içində də var
+  // və seçici bağlı olduğu üçün gizli sayılır.
+  await expect(
+    page.getByText(`${cohort.displayName} · razılıq verən və görünən qeydlər`),
+  ).toBeVisible();
+
+  // Paylaşılan link birbaşa açılır və seçim qorunur.
+  await page.goto(`/admin/stats?cohort=${cohort.id}`);
+  await expect(page.getByLabel("Sinif", { exact: true })).toHaveValue(cohort.id);
+
+  // 🔴 Naməlum id 404 VERMİR — universitet miqyasına düşür.
+  const response = await page.goto("/admin/stats?cohort=yoxdur-belə-sinif");
+  expect(response?.status()).toBe(200);
+  await expect(page.getByLabel("Sinif", { exact: true })).toHaveValue("");
 });
 
 // ---------------------------------------------------------------------------

@@ -40,12 +40,19 @@ import {
   updateCohort,
 } from "@/services/admin-cohorts.service";
 import {
+  CONTENT_CREATE_FAILURE_MESSAGES,
   CONTENT_FAILURE_MESSAGES,
+  GUIDE_PLACE_CREATE_FAILURE_MESSAGES,
+  createContentPage,
+  createFaq,
+  createGuidePlace,
   updateContentPage,
   updateFaq,
   updateGuidePlace,
 } from "@/services/admin-content.service";
 import {
+  BULK_DECISION_LIMIT,
+  bulkDecideReports,
   decideReport,
   hideReportedContent,
   openModerationReview,
@@ -58,9 +65,13 @@ import {
 } from "@/services/sis-import.service";
 import {
   activationSchema,
+  bulkDecideSchema,
   cohortRoleSchema,
   contentPageSchema,
   createCohortSchema,
+  createContentPageSchema,
+  createFaqSchema,
+  createGuidePlaceSchema,
   decideReportSchema,
   faqSchema,
   guidePlaceSchema,
@@ -179,6 +190,50 @@ export async function decideReportAction(input: unknown): Promise<AdminActionRes
 
     revalidateModeration();
     return { ok: true, message: "Qərar yazıldı və şikayətçiyə bildiriş göndərildi." };
+  });
+}
+
+/**
+ * Toplu qərar — seçilmiş şikayətlərin HAMISI eyni statusa keçir.
+ *
+ * ⚠️ Servis HAMISINI BİR `$transaction`-da yazır və HƏR element üçün AYRICA
+ * AuditLog sətri qoyur (bax `moderation.service.ts` → `bulkDecideReports`).
+ * Qismən uğur YOXDUR: biri sınsa heç biri tətbiq olunmur.
+ */
+export async function bulkDecideReportsAction(
+  input: unknown,
+): Promise<AdminActionResult<{ count: number }>> {
+  return run("bulkDecideReportsAction", async () => {
+    const viewer = await getViewer();
+    const parsed = bulkDecideSchema.safeParse(input);
+    if (!parsed.success) {
+      return invalid(parsed.error.issues[0]?.message ?? undefined);
+    }
+
+    const result = await bulkDecideReports(viewer, {
+      reportIds: parsed.data.reportIds,
+      decision: parsed.data.decision,
+      resolution: parsed.data.resolution ?? null,
+    });
+
+    if (!result.ok) {
+      const messages: Record<typeof result.reason, string> = {
+        EMPTY_SELECTION: "Heç bir şikayət seçilməyib.",
+        TOO_MANY: `Bir dəfəyə ən çox ${BULK_DECISION_LIMIT} şikayət seçilə bilər.`,
+        RESOLUTION_REQUIRED: "Qərarın səbəbini yazın.",
+        NOT_FOUND: "Seçilmiş şikayətlərdən biri tapılmadı — siyahını yeniləyin.",
+        ALREADY_CLOSED:
+          "Seçilmiş şikayətlərdən biri artıq bağlanıb. Heç biri dəyişdirilmədi — siyahını yeniləyin.",
+      };
+      return { ok: false, message: messages[result.reason] };
+    }
+
+    revalidateModeration();
+    return {
+      ok: true,
+      message: `${result.value.count} şikayət üçün qərar yazıldı və hər biri üçün ayrıca audit sətri yaradıldı.`,
+      value: { count: result.value.count },
+    };
   });
 }
 
@@ -487,6 +542,115 @@ export async function updateGuidePlaceAction(
     revalidatePath("/admin/content");
     revalidatePath("/khankendi");
     return { ok: true, message: "Bələdçi məkanı yeniləndi." };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// CMS — YARATMA (Blok 12B)
+//
+// ⚠️ Sxemlər redaktə ilə PAYLAŞILIR (`schemas.ts` → `contentPageFields` və s.),
+// yəni yaratma yolu redaktədən zəif ola bilməz.
+//
+// ⚠️ TƏLƏ T3 qaydası: forma ədədləri SƏTİR göndərir, çevirmə MƏHZ BURADADIR.
+// ---------------------------------------------------------------------------
+
+/** `""` → `0`; sxem onsuz da yalnız rəqəm buraxıb. */
+function toOrder(value: string): number {
+  return value === "" ? 0 : Number.parseInt(value, 10);
+}
+
+/** `""` → `null` (koordinat verilməyib); qalanı onluq ədəd. */
+function toCoordinate(value: string): number | null {
+  return value === "" ? null : Number(value);
+}
+
+export async function createContentPageAction(
+  input: unknown,
+): Promise<AdminActionResult<{ slug: string }>> {
+  return run("createContentPageAction", async () => {
+    const viewer = await getViewer();
+    const parsed = createContentPageSchema.safeParse(input);
+    if (!parsed.success) {
+      return invalid(parsed.error.issues[0]?.message ?? undefined);
+    }
+
+    const result = await createContentPage(viewer, {
+      title: parsed.data.title,
+      excerpt: parsed.data.excerpt?.trim() || null,
+      body: parsed.data.body,
+      section: parsed.data.section,
+      order: toOrder(parsed.data.order),
+      isPublished: parsed.data.isPublished,
+    });
+
+    if (!result.ok) {
+      return { ok: false, message: CONTENT_CREATE_FAILURE_MESSAGES[result.reason] };
+    }
+
+    revalidatePath("/admin/content");
+    revalidatePath("/admin/audit");
+    revalidatePath("/", "layout");
+    return {
+      ok: true,
+      message: `Səhifə yaradıldı: /${result.value.slug}`,
+      value: { slug: result.value.slug },
+    };
+  });
+}
+
+export async function createFaqAction(input: unknown): Promise<AdminActionResult> {
+  return run("createFaqAction", async () => {
+    const viewer = await getViewer();
+    const parsed = createFaqSchema.safeParse(input);
+    if (!parsed.success) {
+      return invalid(parsed.error.issues[0]?.message ?? undefined);
+    }
+
+    await createFaq(viewer, {
+      question: parsed.data.question,
+      answer: parsed.data.answer,
+      category: parsed.data.category,
+      order: toOrder(parsed.data.order),
+      isPublished: parsed.data.isPublished,
+    });
+
+    revalidatePath("/admin/content");
+    revalidatePath("/admin/audit");
+    revalidatePath("/faq");
+    return { ok: true, message: "Sual əlavə edildi." };
+  });
+}
+
+export async function createGuidePlaceAction(
+  input: unknown,
+): Promise<AdminActionResult> {
+  return run("createGuidePlaceAction", async () => {
+    const viewer = await getViewer();
+    const parsed = createGuidePlaceSchema.safeParse(input);
+    if (!parsed.success) {
+      return invalid(parsed.error.issues[0]?.message ?? undefined);
+    }
+
+    const result = await createGuidePlace(viewer, {
+      category: parsed.data.category,
+      title: parsed.data.title,
+      description: parsed.data.description,
+      address: parsed.data.address?.trim() || null,
+      phone: parsed.data.phone?.trim() || null,
+      latitude: toCoordinate(parsed.data.latitude),
+      longitude: toCoordinate(parsed.data.longitude),
+      isEmergency: parsed.data.isEmergency,
+      order: toOrder(parsed.data.order),
+    });
+
+    if (!result.ok) {
+      return { ok: false, message: GUIDE_PLACE_CREATE_FAILURE_MESSAGES[result.reason] };
+    }
+
+    revalidatePath("/admin/content");
+    revalidatePath("/admin/audit");
+    revalidatePath("/khankendi");
+    return { ok: true, message: "Bələdçi məkanı əlavə edildi." };
   });
 }
 

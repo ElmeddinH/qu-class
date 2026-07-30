@@ -17,7 +17,8 @@ import { toast } from "sonner";
 import { VisibilitySelector } from "@/components/shared/VisibilitySelector";
 import { VISIBILITY_META, VISIBILITY_OPTIONS } from "@/components/shared/visibility-meta";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeading } from "@/components/kuds/SectionCard";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -95,7 +96,7 @@ export function PrivacySettings({ initialLevels }: PrivacySettingsProps) {
         <Card key={section.id}>
           <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex flex-col gap-1">
-              <CardTitle>{section.title}</CardTitle>
+              <CardHeading>{section.title}</CardHeading>
               <CardDescription>{section.description}</CardDescription>
             </div>
 
@@ -177,7 +178,7 @@ export function PrivacySettings({ initialLevels }: PrivacySettingsProps) {
             <ShieldCheck className="h-5 w-5 text-ku-dark" />
           </span>
           <div className="flex flex-col gap-1">
-            <CardTitle className="text-h4">Nəzərə alın</CardTitle>
+            <CardHeading className="text-h4">Nəzərə alın</CardHeading>
             <CardDescription>
               Ad və soyadınız həmişə görünür — platformanın işləməsi üçün minimum
               məlumatdır. «Yalnız mən» səviyyəsindəki sahəni universitet

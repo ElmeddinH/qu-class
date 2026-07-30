@@ -25,7 +25,8 @@ import {
 import { StatCard } from "@/components/shared/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeading } from "@/components/kuds/SectionCard";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { auditActionLabel } from "@/lib/labels";
 import { getViewer } from "@/lib/auth";
 import { getAdminActivitySeries, getAdminDashboardStats } from "@/services/admin.service";
@@ -111,7 +112,7 @@ export async function AdminDashboard() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Son 12 həftə</CardTitle>
+            <CardHeading>Son 12 həftə</CardHeading>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <p className="text-small text-text-secondary">
@@ -124,7 +125,7 @@ export async function AdminDashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Növbələr</CardTitle>
+            <CardHeading>Növbələr</CardHeading>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             {QUEUE_LINKS.map((link) => (
@@ -141,7 +142,7 @@ export async function AdminDashboard() {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0">
-          <CardTitle>Son audit sətirləri</CardTitle>
+          <CardHeading>Son audit sətirləri</CardHeading>
           <Button asChild variant="outline" size="sm">
             <Link href="/admin/audit">Tam jurnal</Link>
           </Button>

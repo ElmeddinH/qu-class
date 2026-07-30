@@ -15,6 +15,7 @@ import { RELATIONAL_PROFILE_FIELDS, type ControlledField } from "@/lib/visibilit
 export const FIELD_LABELS: Record<ControlledField, string> = {
   // --- Əsas ---
   avatarUrl: "Profil şəkli",
+  coverUrl: "Profil banneri",
   bio: "Mənim haqqımda",
   hometown: "Doğma şəhər",
   learningGoals: "Öyrənmək istədiklərim",
@@ -55,7 +56,15 @@ export const PRIVACY_SECTIONS: readonly PrivacySection[] = [
     id: "basic",
     title: "Əsas",
     description: "Profilinizin ilk baxışda görünən hissəsi.",
-    fields: ["avatarUrl", "bio", "hometown", "learningGoals", "askMeAbout", "expectations"],
+    fields: [
+      "avatarUrl",
+      "coverUrl",
+      "bio",
+      "hometown",
+      "learningGoals",
+      "askMeAbout",
+      "expectations",
+    ],
   },
   {
     id: "contact",

@@ -8,7 +8,7 @@
 // iki siyahı saxlansaydı biri dəyişəndə digəri səssizcə ayrılardı (T13-ün
 // eyni səhvi).
 //
-// ⚠️ `PROFILE_FIELD_CONTROLS` `Record<ControlledField, …>`-dur: 21 sahənin
+// ⚠️ `PROFILE_FIELD_CONTROLS` `Record<ControlledField, …>`-dur: 22 sahənin
 // hamısı burada olmalıdır, yoxsa `tsc` dayanır. Yeni idarə olunan sahə əlavə
 // edən adam formanı doldurmağı unuda bilməz.
 //
@@ -63,6 +63,7 @@ export type ProfileFieldControl =
 export const PROFILE_FIELD_CONTROLS: Record<ControlledField, ProfileFieldControl> = {
   // --- Əsas ---
   avatarUrl: { kind: "image" },
+  coverUrl: { kind: "image" },
   bio: { kind: "story" },
   hometown: { kind: "text", placeholder: "Məsələn: Gəncə", autoComplete: "address-level2" },
   learningGoals: { kind: "story" },
@@ -118,6 +119,8 @@ export const STORY_QUESTIONS: Partial<Record<ControlledField, string>> = {
 /** Formada sahənin altında göstərilən köməkçi mətn. */
 export const FIELD_HINTS: Partial<Record<ControlledField, string>> = {
   avatarUrl: "Şəkil ünvanı yapışdırın. Profil şəkli olmayanda ad-soyadın baş hərfləri göstərilir.",
+  coverUrl:
+    "Profil səhifənizin yuxarısındakı geniş şəkil. Boş qalsa KUDS qradiyenti göstərilir.",
   bio: "Bir-iki cümlə kifayətdir — sinif yoldaşların səni tanısın.",
   learningGoals: "Hansı fənlər, bacarıqlar və ya sahələr səni maraqlandırır?",
   askMeAbout: "Hansı mövzularda kömək edə bilərsən? Bu sahə tanışlıq kartlarında göstərilir.",

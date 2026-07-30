@@ -67,6 +67,16 @@ export interface AdminUserCohort {
   slug: string;
   displayName: string;
   role: string;
+  /**
+   * Əsas (birinci) üzvlükdürmü?
+   *
+   * ⚠️ İSTİFADƏÇİ BİRDƏN ÇOX SİNİFDƏ OLA BİLƏR (ikinci ixtisas, magistratura,
+   * fakültə-səviyyəli cohort). Admin paneli əvvəl yalnız `cohorts[0]`-ı
+   * göstərirdi, yəni ikinci dərəcəli sinifdə rol dəyişmək MÜMKÜN DEYİLDİ —
+   * Blok 12B-də bağlanan borc. Bayraq lazımdır ki, UI hansının əsas olduğunu
+   * ETİKETLƏYƏ bilsin (sıra özü kifayət deyil: sıralama dəyişə bilər).
+   */
+  isPrimary: boolean;
   /** Cohort tarixlərindən HESABLANIR — `User.stage` keşinə güvənilmir. */
   stage: string;
 }
@@ -103,6 +113,7 @@ const ADMIN_USER_SELECT = {
     select: {
       role: true,
       cohortId: true,
+      isPrimary: true,
       cohort: {
         select: {
           id: true,
@@ -186,6 +197,7 @@ function toAdminUserRow(row: AdminUserDbRow, viewer: Viewer, now: Date): AdminUs
       slug: m.cohort.slug,
       displayName: m.cohort.displayName,
       role: m.role,
+      isPrimary: m.isPrimary,
       stage: resolveStage(
         { academicStartsAt: m.cohort.academicStartsAt, graduatesAt: m.cohort.graduatesAt },
         now,
@@ -535,19 +547,24 @@ export async function setUserActivation(
 /** Filtr seçicisi üçün cohort siyahısı (ad + slug + üzv sayı). */
 export async function listAdminCohortOptions(
   viewer: Viewer,
-): Promise<Array<{ slug: string; displayName: string; count: number }>> {
+): Promise<Array<{ id: string; slug: string; displayName: string; count: number }>> {
   await assertFreshAdmin(viewer);
 
   const cohorts = await prisma.cohort.findMany({
     orderBy: [{ admissionYear: "desc" }, { displayName: "asc" }],
     select: {
+      id: true,
       slug: true,
       displayName: true,
       _count: { select: { members: true } },
     },
   });
 
+  // ⚠️ `id` DƏ qaytarılır: `/admin/users` filtri SLUG işlədir (URL oxunaqlı
+  // olsun deyə), `/admin/stats` isə `cohortId` — `getCareerOutcomeStats`
+  // Prisma `where`-inə məhz onu qoyur. İki ayrı sorğu saxlamağa dəyməz.
   return cohorts.map((c) => ({
+    id: c.id,
     slug: c.slug,
     displayName: c.displayName,
     count: c._count.members,

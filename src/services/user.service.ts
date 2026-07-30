@@ -145,6 +145,7 @@ export interface FullProfileView extends ProfileView {
 
   // --- İdarə olunan skalyar sahələr (User sütunları) ---
   avatarUrl: string | null;
+  coverUrl: string | null;
   hometown: string | null;
   currentCity: string | null;
   currentCountry: string | null;
@@ -186,12 +187,13 @@ export interface ProfileResult {
   cohorts: ProfileCohort[];
   isOwner: boolean;
   /**
-   * Hekayə başlığındakı dekorativ banner.
+   * Hekayə başlığındakı banner.
    *
-   * ⚠️ `CONTROLLED_PROFILE_FIELDS`-də DEYİL (22-ci idarə olunan sahə yaratmaq
-   * bütün məxfilik panelini və miqrasiyanı dəyişərdi), amma sahibsiz də
-   * qalmır: `avatarUrl` sahəsinin görünürlüyünə BAĞLANIB. Profil şəklini
-   * gizlədən istifadəçinin banneri də göstərilmir (bax `getProfile`).
+   * ⚠️ Blok 12B-dən etibarən `CONTROLLED_PROFILE_FIELDS`-in ÜZVÜDÜR (22-ci
+   * sahə) və öz `FieldVisibility` sətri var. Əvvəl `avatarUrl`-in
+   * görünürlüyünə yamaqla bağlanmışdı — yəni banneri ayrıca gizlətmək mümkün
+   * deyildi. Bu sahə artıq TÖRƏMƏDİR: `redactProfile`-dan çıxan `profile`
+   * obyektində açar varsa dolur, yoxdursa `null`. İkinci qərar yolu YOXDUR.
    */
   coverUrl: string | null;
   support: ProfileSupport;
@@ -220,7 +222,6 @@ export async function buildProfileView(
   stage: UserStageType | null;
   cohorts: ProfileCohort[];
   fieldVisibility: Array<{ field: string; level: string }>;
-  coverUrl: string | null;
   support: ProfileSupport;
 } | null> {
   const user = await prisma.user.findUnique({
@@ -335,6 +336,10 @@ export async function buildProfileView(
     cohortIds: user.memberships.map((m) => m.cohort.id),
 
     avatarUrl: user.avatarUrl,
+    // ⚠️ T40: banner `view`-a YAZILMALIDIR, yoxsa `redactProfile`
+    // `if (!(field in user)) continue` şərti ilə sahəni sadəcə ATLAYIR və
+    // «coverUrl» məxfilik açarı SƏSSİZCƏ işləməz.
+    coverUrl: user.coverUrl,
     hometown: user.hometown,
     currentCity: user.currentCity,
     currentCountry: user.currentCountry,
@@ -370,7 +375,9 @@ export async function buildProfileView(
 
   return {
     view,
-    coverUrl: user.coverUrl,
+    // ⚠️ `coverUrl` BURADA AYRICA QAYTARILMIR — `view`-un içindədir və yalnız
+    // `redactProfile`-dan keçərək çıxır. Xam nüsxə saxlasaq redaksiyanı yan
+    // keçən ikinci yol yaranardı (T40 dərsi).
     support: {
       openToSupport: user.openToSupport,
       // Bayraq sönülüdürsə kənar baxış üçün siyahı BOŞDUR — `listSupportOffers`
@@ -426,9 +433,9 @@ export async function getProfile(
     stage: built.stage,
     cohorts: built.cohorts,
     isOwner: viewer.kind === "USER" && viewer.userId === userId,
-    // Banner `avatarUrl` sahəsinin görünürlüyünü izləyir: açar redaksiyadan
-    // sağ çıxmayıbsa şəkil ÜMUMİYYƏTLƏ qaytarılmır (bax `ProfileResult`).
-    coverUrl: "avatarUrl" in profile ? built.coverUrl : null,
+    // Banner ARTIQ öz məxfilik açarına malikdir: `redactProfile` onu
+    // gizlədibsə açar obyektdə YOXDUR və burada `null` qalır.
+    coverUrl: profile.coverUrl ?? null,
     support: built.support,
   };
 }
@@ -1453,6 +1460,7 @@ export async function getProfileDraft(viewer: Viewer): Promise<ProfileDraft | nu
       where: { id: viewer.userId },
       select: {
         avatarUrl: true,
+        coverUrl: true,
         hometown: true,
         currentCity: true,
         currentCountry: true,

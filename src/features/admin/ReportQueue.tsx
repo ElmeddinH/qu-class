@@ -16,6 +16,10 @@
 // ⚠️ `ACCESSIBILITY` qeydləri AYRI VİZUAL TONDADIR (`ku-blue` zolaq): onlarda
 // `entityId` DB sətri deyil, SƏHİFƏ YOLUDUR (Blok 11A qərarı) və qeyd «məzmunu
 // gizlət» ilə həll olunmur — texniki nasazlıq biletidir.
+//
+// ⚠️ TOPLU ƏMƏLİYYAT (Blok 12B) client adasındadır (`BulkModeration.tsx`):
+// seçim vəziyyəti brauzerdədir, siyahı isə SERVERDƏ render olunmağa davam edir
+// (TƏLƏ A qorunur — məzmun cavaba düşmür). Yalnız AÇIQ şikayətlər seçilə bilir.
 // ============================================================================
 
 import Link from "next/link";
@@ -51,6 +55,11 @@ import {
 import { exactDateTime } from "@/utils/date";
 
 import { AdminPageHeader } from "./AdminPageHeader";
+import {
+  BulkActionBar,
+  ModerationSelectionProvider,
+  ReportSelectCheckbox,
+} from "./BulkModeration";
 import { ReportActions } from "./ReportActions";
 import { ReportFilters } from "./ReportFilters";
 
@@ -73,6 +82,12 @@ export async function ReportQueue({ filters }: ReportQueueProps) {
 
   const pageCount = adminPageCount(total, MODERATION_PAGE_SIZE);
 
+  // Yalnız AÇIQ şikayətlər toplu əməliyyata girə bilər — bağlanmış status
+  // geri açılmır (`decideReport` → `ALREADY_CLOSED`).
+  const selectableIds = items
+    .filter((item) => !CLOSED_STATUSES.includes(item.status))
+    .map((item) => item.id);
+
   return (
     <div className="flex flex-col gap-6">
       <AdminPageHeader
@@ -90,10 +105,12 @@ export async function ReportQueue({ filters }: ReportQueueProps) {
           action={{ href: "/admin/moderation", label: "Filtrləri sıfırla" }}
         />
       ) : (
-        <>
+        <ModerationSelectionProvider selectableIds={selectableIds}>
           <p className="text-small text-text-secondary">
             {total} şikayət · səhifə {Math.min(filters.page, pageCount)} / {pageCount}
           </p>
+
+          <BulkActionBar />
 
           <ul className="flex flex-col gap-4">
             {items.map((item) => (
@@ -107,7 +124,7 @@ export async function ReportQueue({ filters }: ReportQueueProps) {
             hrefFor={(page) => moderationHref({ ...filters, page })}
             label="Şikayət səhifələri"
           />
-        </>
+        </ModerationSelectionProvider>
       )}
     </div>
   );
@@ -126,6 +143,15 @@ function ReportRow({ item }: { item: ReportQueueItem }) {
         accessibility ? "border-ku-blue bg-ku-blue/20" : "border-border",
       )}
     >
+      {/* Bağlanmış şikayət seçilə bilmir — serverin rədd edəcəyi seçimi
+          UI-da mümkün göstərmək mənasız gözləntidir (qoruma yenə serverdədir). */}
+      {closed ? null : (
+        <ReportSelectCheckbox
+          reportId={item.id}
+          label={`Toplu əməliyyat üçün seç — ${reportEntityTypeLabel(item.entityType)}`}
+        />
+      )}
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">

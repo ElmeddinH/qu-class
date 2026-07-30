@@ -124,6 +124,139 @@ test("Azərbaycan xəritəsi ayrıca tabda render olunur", async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
+// 2b. Zoom / pan — Blok 12B
+//
+// 🔴 SUAL: yaxınlaşdırma YALNIZ siçan təkəri ilə deyil, KLAVİATURA ilə də
+// mümkündürmü? `ZoomableGroup` d3-zoom işlədir və d3-zoom heç bir düymə
+// hadisəsinə qulaq asmır — ona görə «+ / − / sıfırla» əsl `<button>` olmalıdır
+// (WCAG 2.1.1). Test məhz klaviatura yolunu ölçür.
+// ---------------------------------------------------------------------------
+
+/** `ZoomableGroup` `transform="translate(x y) scale(k)"` yazır — `k` oxunur. */
+async function zoomScaleOf(map: import("@playwright/test").Locator): Promise<number> {
+  const transform = await map.locator("g.rsm-zoomable-group").getAttribute("transform");
+  const match = /scale\(([\d.]+)\)/.exec(transform ?? "");
+  return match ? Number(match[1]) : Number.NaN;
+}
+
+test("xəritə klaviatura düymələri ilə yaxınlaşır, uzaqlaşır və sıfırlanır", async ({ page }) => {
+  await login(page, ALUMNI_EMAIL);
+  await page.goto(`/class/${slug}/map`);
+
+  const map = page.getByTestId("world-map");
+  await expect(map).toBeVisible();
+  await expect.poll(async () => map.locator("g.rsm-zoomable-group").count()).toBe(1);
+
+  const zoomIn = page.getByRole("button", { name: "Yaxınlaşdır" });
+  const zoomOut = page.getByRole("button", { name: "Uzaqlaşdır" });
+  const reset = page.getByRole("button", { name: "Sıfırla" });
+
+  // Başlanğıc: miqyas 1, «uzaqlaşdır» və «sıfırla» PASSİVDİR (aşağı hədd).
+  await expect.poll(() => zoomScaleOf(map)).toBe(1);
+  await expect(zoomOut).toBeDisabled();
+  await expect(reset).toBeDisabled();
+
+  // 🔴 Klaviatura yolu: Enter ilə (siçan kliki deyil).
+  await zoomIn.focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => zoomScaleOf(map)).toBeGreaterThan(1);
+  await expect(zoomOut).toBeEnabled();
+  await expect(reset).toBeEnabled();
+
+  const afterZoomIn = await zoomScaleOf(map);
+
+  await zoomOut.click();
+  await expect.poll(() => zoomScaleOf(map)).toBeLessThan(afterZoomIn);
+
+  await zoomIn.click();
+  await zoomIn.click();
+  await reset.click();
+  await expect.poll(() => zoomScaleOf(map)).toBe(1);
+  await expect(reset).toBeDisabled();
+});
+
+test("zoom hüdudları [1, 8] aşılmır", async ({ page }) => {
+  await login(page, ALUMNI_EMAIL);
+  await page.goto(`/class/${slug}/map?tab=azerbaijan`);
+
+  const map = page.getByTestId("azerbaijan-map");
+  await expect(map).toBeVisible();
+  await expect.poll(async () => map.locator("g.rsm-zoomable-group").count()).toBe(1);
+
+  const zoomIn = page.getByRole("button", { name: "Yaxınlaşdır" });
+
+  // Yuxarı hədd: addım 1.6×, yəni 1 → 8 üçün 5 klik bəs edir. Artıq klikləmək
+  // 8-i AŞMAMALIDIR və düymə passivləşməlidir.
+  for (let index = 0; index < 8; index += 1) {
+    if (await zoomIn.isDisabled()) break;
+    await zoomIn.click();
+  }
+
+  await expect(zoomIn).toBeDisabled();
+  await expect.poll(() => zoomScaleOf(map)).toBeLessThanOrEqual(8);
+  await expect.poll(() => zoomScaleOf(map)).toBeGreaterThan(4);
+});
+
+// ---------------------------------------------------------------------------
+// 2c. Donut kontrastı — Blok 12B
+//
+// 🔴 SUAL: bitişik dilimlər YALNIZ rənglə fərqlənirmi? Cavab "xeyr" olmalıdır:
+// faiz etiketi, leqenda (ad + say + faiz) və hover/fokus vurğusu — üç ayrı
+// kanal. Rənglərin özü də `--slice-*` tokenlərindən gəlir (hardcode hex yox).
+// ---------------------------------------------------------------------------
+
+test("donut dilimləri rəngdən başqa kanallarla da fərqlənir", async ({ page }) => {
+  await login(page, ALUMNI_EMAIL);
+  await page.goto(`/class/${slug}/map?tab=industries`);
+
+  const donut = page.locator("svg .recharts-pie");
+  await expect(donut).toBeVisible();
+
+  // 1. Hər dilimin ÜZƏRİNDƏ faiz etiketi.
+  const sliceCount = await page.locator("svg .recharts-pie-sector").count();
+  expect(sliceCount).toBeGreaterThan(0);
+
+  const labels = page.locator("svg .recharts-pie-label-text");
+  await expect.poll(async () => labels.count()).toBe(sliceCount);
+  await expect(labels.first()).toHaveText(/^\d+%$/);
+
+  // 2. Leqenda: hər dilim üçün klaviatura ilə gəzilə bilən düymə.
+  const legendButtons = page.locator("button[aria-pressed]");
+  await expect.poll(async () => legendButtons.count()).toBe(sliceCount);
+  // Ad + say + faiz — rəngdən tam asılı olmayan kanal.
+  await expect(legendButtons.first()).toHaveText(/\d+ · \d+%$/);
+
+  // 3. 🔴 Dilim rəngləri TOKEN-dəndir (CLAUDE.md §2 — hardcode hex yoxdur).
+  const fills = await page.locator("svg .recharts-pie-sector path").evaluateAll(
+    (nodes) => nodes.map((node) => node.getAttribute("fill") ?? ""),
+  );
+  expect(fills.length).toBeGreaterThan(0);
+  for (const fill of fills) expect(fill).toMatch(/^var\(--slice-\d\)$/);
+  // Hər dilim FƏRQLİ pillədədir — təkrarlanan ton ayırdedilməni sıfırlayardı.
+  expect(new Set(fills).size).toBe(fills.length);
+
+  // 4. Fokus vurğusu: Tab ilə leqendaya girəndə dilimin konturu qalınlaşır.
+  const firstSlice = page.locator("svg .recharts-pie-sector path").first();
+  await expect(firstSlice).toHaveAttribute("stroke-width", "2");
+
+  await legendButtons.first().focus();
+  await expect(firstSlice).toHaveAttribute("stroke-width", "4");
+  // Qalan dilimlər sönükləşir — vurğu tək əlamətlə verilmir.
+  if (sliceCount > 1) {
+    await expect(page.locator("svg .recharts-pie-sector path").nth(1)).toHaveAttribute(
+      "fill-opacity",
+      "0.45",
+    );
+  }
+
+  // Klik vurğunu SABİTLƏYİR (toxunma cihazında hover yoxdur).
+  await legendButtons.first().click();
+  await expect(legendButtons.first()).toHaveAttribute("aria-pressed", "true");
+  await legendButtons.first().click();
+  await expect(legendButtons.first()).toHaveAttribute("aria-pressed", "false");
+});
+
+// ---------------------------------------------------------------------------
 // 3. 🔴 MƏXFİLİK SƏRHƏDİ — ad sızmır
 // ---------------------------------------------------------------------------
 

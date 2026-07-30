@@ -344,6 +344,13 @@ export const DEFAULT_PRIVATE_FIELDS = ["phone", "personalEmail"] as const;
 /** `User` cədvəlində birbaşa sütun kimi mövcud olan idarə olunan sahələr */
 export const SCALAR_PROFILE_FIELDS = [
   "avatarUrl",
+  // ⚠️ Blok 12B — `coverUrl` ARTIQ idarə olunan sahədir (22-ci).
+  // Əvvəl `avatarUrl`-in görünürlüyünə "yamaqla" bağlanmışdı
+  // (`user.service.ts` → `getProfile`), yəni banneri ayrıca gizlətmək mümkün
+  // deyildi. İndi öz sətri var; DB sətri olmayan KÖHNƏ istifadəçilər üçün
+  // `defaultLevelFor()` CLASS qaytarır — yeni sahə heç vaxt PUBLIC olmur
+  // (CLAUDE.md §"Məxfilik": "Yeni sahə əlavə edirsənsə default CLASS").
+  "coverUrl",
   "hometown",
   "currentCity",
   "currentCountry",

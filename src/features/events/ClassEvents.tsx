@@ -162,7 +162,15 @@ async function EventsBody({ cohort, filters }: ClassEventsProps) {
       <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
         <EventFilters facets={facets} />
 
-        <div className="flex flex-col gap-4">
+        {/* ⚠️ WCAG 1.3.1 — `<h2>` MƏCBURİDİR: səhifənin `<h1>`-i «Tədbirlər»dir,
+            `EventCard` isə hər tədbiri `<h3>` ilə başlıqlandırır. Aralıq başlıq
+            olmasa iyerarxiya h1 → h3 ATLAYIR. `sr-only`, çünki `<h1>` eyni
+            mənanı ekranda onsuz da verir. */}
+        <section aria-labelledby="event-results" className="flex flex-col gap-4">
+          <h2 id="event-results" className="sr-only">
+            Tədbir siyahısı
+          </h2>
+
           <EventActiveFilters facets={facets} />
 
           <p className="text-small text-text-secondary" aria-live="polite">
@@ -193,7 +201,7 @@ async function EventsBody({ cohort, filters }: ClassEventsProps) {
             hrefFor={(page) => classEventsHref(cohort.slug, { ...filters, page })}
             label="Tədbir səhifələri"
           />
-        </div>
+        </section>
       </div>
     </div>
   );

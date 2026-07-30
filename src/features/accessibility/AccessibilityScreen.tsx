@@ -9,9 +9,12 @@
 // tələbi girişsiz də ödənilir.
 //
 // ⚠️ BƏYANAT DÜRÜST OLMALIDIR: aşağıdakı "bilinən məhdudiyyətlər" bölməsi
-// layihənin ƏSL vəziyyətini yazır (xəritədə zoom yoxdur, donut rəngləri
-// kompensasiya tələb edir…). Saxta "tam uyğun" bəyanatı WCAG-ın özündən daha
-// böyük problemdir — auditdə ilk yoxlanan yerdir.
+// layihənin ƏSL vəziyyətini yazır. Saxta "tam uyğun" bəyanatı WCAG-ın özündən
+// daha böyük problemdir — auditdə ilk yoxlanan yerdir.
+//
+// ⚠️ SİYAHI BLOKLA BİRLİKDƏ YENİLƏNİR. Blok 12B-də iki maddə BAĞLANDI
+// (xəritə zoom/pan, donut kontrastı) və siyahıdan çıxarıldı — düzəldilmiş
+// boşluğu "bilinən məhdudiyyət" kimi saxlamaq da yalan bəyanatdır.
 // ============================================================================
 
 import Link from "next/link";
@@ -39,7 +42,7 @@ const COMMITMENTS = [
   },
   {
     title: "Rəng tək kanal deyil",
-    body: "Oxunmamış bildiriş həm zolaq, həm «Yeni» yazısı ilə işarələnir; təcili bələdçi yazıları həm rəng, həm «Təcili» rozeti daşıyır; diaqramlarda faiz və cədvəl alternativi var. Rəng korluğu olan istifadəçi heç bir məlumatı itirmir.",
+    body: "Oxunmamış bildiriş həm zolaq, həm «Yeni» yazısı ilə işarələnir; təcili bələdçi yazıları həm rəng, həm «Təcili» rozeti daşıyır; donut dilimlərində faiz etiketi, ad+say leqendası, hover/fokus vurğusu və cədvəl alternativi var. Bitişik dilimlərin parlaqlıq fərqi ən azı iki pillədir, yəni rəng korluğunda da ayırd edilir.",
   },
   {
     title: "Kontrast",
@@ -47,7 +50,7 @@ const COMMITMENTS = [
   },
   {
     title: "Xəritə və qrafiklər alternativlə",
-    body: "Hər vizualın altında eyni məlumatı verən cədvəl və ya siyahı var. Xəritə heç vaxt yeganə məlumat mənbəyi deyil.",
+    body: "Hər vizualın altında eyni məlumatı verən cədvəl və ya siyahı var. Xəritə heç vaxt yeganə məlumat mənbəyi deyil. Yaxınlaşdırma siçan təkərindən başqa «+ / − / sıfırla» düymələri ilə də işləyir, yəni klaviatura ilə idarə olunur.",
   },
   {
     title: "Mətn ölçüsü və responsivlik",
@@ -57,10 +60,9 @@ const COMMITMENTS = [
 
 /** Dürüstlük bölməsi — bilinən boşluqlar (bax fayl başlığı). */
 const KNOWN_GAPS = [
-  "«İndi haradayıq?» xəritəsində zoom/pan yoxdur — klaviatura fokus sırası ilə qarşılıqlı təsiri ayrıca iş tələb edir.",
-  "Donut diaqramının dilimləri KUDS palitrasının solğunluğuna görə kontrast yoxlamasını keçmir; kompensasiya olaraq dilim üzərində faiz, ad+say leqendası və cədvəl alternativi verilir.",
   "Avtomatik audit (axe-core) və Lighthouse ölçmələri Blok 12-nin keyfiyyət keçidində planlaşdırılıb.",
   "Video məzmun hazırda yoxdur; əlavə olunarsa altyazı tələbi bu bəyanata yazılacaq.",
+  "Parol sıfırlama axını qəsdən yoxdur (e-poçt xidməti qurulmayıb) — hesabı bərpa etmək üçün universitet administrasiyası ilə əlaqə saxlanılır.",
 ] as const;
 
 export function AccessibilityScreen({ isAuthenticated }: AccessibilityScreenProps) {

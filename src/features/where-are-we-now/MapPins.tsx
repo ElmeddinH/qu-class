@@ -45,6 +45,12 @@ interface MapPinsLayerProps {
   maxCount: number;
   activeId: string | null;
   onActivate: (id: string | null) => void;
+  /**
+   * Cari miqyas — `ZoomableGroup` `scale()` tətbiq etdiyinə görə radius və
+   * xətt qalınlığı ona BÖLÜNÜR. Bunsuz 8× zoom-da markerlər qitə boyda olar
+   * və altındakı xəritəni tamamilə örtər.
+   */
+  zoom: number;
 }
 
 /** Markerin ekran oxuyucusuna oxunan mətni — kartla EYNİ məzmun. */
@@ -56,11 +62,17 @@ function pinTitle(pin: MapPin): string {
   return `${pin.city}, ${pin.country} — ${pin.count} nəfər${roles}`;
 }
 
-export function MapPinsLayer({ pins, maxCount, activeId, onActivate }: MapPinsLayerProps) {
+export function MapPinsLayer({
+  pins,
+  maxCount,
+  activeId,
+  onActivate,
+  zoom,
+}: MapPinsLayerProps) {
   return (
     <>
       {pins.map((pin) => {
-        const radius = pinRadius(pin.count, maxCount);
+        const radius = pinRadius(pin.count, maxCount) / zoom;
         const isActive = activeId === pin.id;
 
         return (
@@ -82,17 +94,17 @@ export function MapPinsLayer({ pins, maxCount, activeId, onActivate }: MapPinsLa
                 görməlidir — KUDS fokus tələbi). */}
             {isActive ? (
               <circle
-                r={radius + 4}
+                r={radius + 4 / zoom}
                 fill="none"
                 stroke="var(--map-pin-active)"
-                strokeWidth={2}
+                strokeWidth={2 / zoom}
               />
             ) : null}
             <circle
               r={radius}
               fill={isActive ? "var(--map-pin-active)" : "var(--map-pin)"}
               stroke="var(--map-pin-stroke)"
-              strokeWidth={2}
+              strokeWidth={2 / zoom}
               fillOpacity={0.9}
             />
           </Marker>

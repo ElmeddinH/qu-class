@@ -78,3 +78,67 @@ export const MAP_FILLS = [
 export function categoryFill(index: number): string {
   return CATEGORY_FILLS[index % CATEGORY_FILLS.length];
 }
+
+// ---------------------------------------------------------------------------
+// DONUT DİLİMLƏRİ — ardıcıl ku-green şkalası (Blok 12B)
+// ---------------------------------------------------------------------------
+//
+// 🔴 NİYƏ AYRICA ŞKALA. `CATEGORY_FILLS` KİMLİK palitrasıdır (yaşıl, mavi,
+// krem…) və ONU ölçmüşdük — ayırdedilmə yaxşıdır, amma dilimlər arasında
+// SIRALAMA oxunmur və üç rəng səthlə 3:1-dən aşağı qalır. Donut isə hissə-bütöv
+// münasibətini göstərir; ardıcıl (sequential) şkala payın böyüklüyünü rənglə də
+// təkrarlayır və hamısı EYNİ çaların pillələri olduğu üçün rəng korluğunda
+// ayırdedilmə YALNIZ parlaqlığa qalır — bu, ən etibarlı kanaldır.
+//
+// 🔴 ŞƏRT: yan-yana duran iki dilim arasında ƏN AZI 2 pillə fərq.
+// Ona görə pillələr sıra ilə paylanmır: sıralanmış mövqelər iki yarıya bölünüb
+// NÖVBƏLƏŞDİRİLİR (aşağı yarıdan bir, yuxarı yarıdan bir). Dairə qapalıdır,
+// yəni SON dilim İLK dilimin qonşusudur — test hər iki cütü yoxlayır.
+//
+// ⚠️ Rənglər `app/globals.css`-dədir (`--slice-1…9`); burada yalnız istinad var
+// (CLAUDE.md §2 — hardcode hex yoxdur).
+
+/** Şkalanın pillə sayı — `--slice-1` … `--slice-9`. */
+export const SLICE_RAMP_SIZE = 9;
+
+/** Dilim rəngləri, ƏN AÇIQdan ƏN TÜNDə. Sıra parlaqlıq sırasıdır. */
+export const SLICE_RAMP = Array.from(
+  { length: SLICE_RAMP_SIZE },
+  (_, step) => `var(--slice-${step + 1})`,
+) as readonly string[];
+
+/**
+ * `index`-ci dilim üçün şkala PİLLƏSİ (0 = ən açıq, 8 = ən tünd).
+ *
+ * Alqoritm:
+ *   1. `count` dilim şkalaya BƏRABƏR paylanır (uclar daxil).
+ *   2. Alınan mövqelər iki yarıya bölünür və növbələşdirilir —
+ *      L0, H0, L1, H1, … Beləliklə hər qonşu cüt fərqli yarıdandır.
+ *
+ * Tək dilim halında şkalanın ƏN TÜND ucu verilir: tək pay «az» kimi
+ * oxunmamalıdır (ən açıq ton məhz onu deyərdi).
+ */
+export function sliceRampIndex(index: number, count: number): number {
+  if (count <= 1) return SLICE_RAMP_SIZE - 1;
+
+  const spread = Array.from({ length: count }, (_, position) =>
+    Math.round((position * (SLICE_RAMP_SIZE - 1)) / (count - 1)),
+  );
+
+  const half = Math.ceil(count / 2);
+  const lower = spread.slice(0, half);
+  const upper = spread.slice(half);
+
+  const interleaved: number[] = [];
+  for (let position = 0; position < half; position += 1) {
+    interleaved.push(lower[position]);
+    if (position < upper.length) interleaved.push(upper[position]);
+  }
+
+  return interleaved[index % count];
+}
+
+/** `index`-ci dilimin rəngi — `sliceRampIndex()`-in token qarşılığı. */
+export function sliceFill(index: number, count: number): string {
+  return SLICE_RAMP[sliceRampIndex(index, count)];
+}

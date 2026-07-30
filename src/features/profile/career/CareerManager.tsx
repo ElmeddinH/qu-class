@@ -31,7 +31,8 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { VisibilityBadge } from "@/components/shared/VisibilityBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeading } from "@/components/kuds/SectionCard";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { degreeLabel, industryLabel } from "@/lib/labels";
 import { shortDate } from "@/utils/date";
@@ -109,7 +110,7 @@ export function CareerManager({ workspace }: CareerManagerProps) {
       <Card id="career" className="scroll-mt-24">
         <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex flex-col gap-1">
-            <CardTitle>Karyera qeydləri</CardTitle>
+            <CardHeading>Karyera qeydləri</CardHeading>
             <CardDescription>
               İş yerləri və təcrübələr. Yalnız BİR qeyd «cari» ola bilər.
             </CardDescription>
@@ -198,7 +199,7 @@ export function CareerManager({ workspace }: CareerManagerProps) {
       <Card id="education" className="scroll-mt-24">
         <CardHeader className="gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex flex-col gap-1">
-            <CardTitle>Təhsil qeydləri</CardTitle>
+            <CardHeading>Təhsil qeydləri</CardHeading>
             <CardDescription>
               Universitetdən sonrakı və ya paralel təhsil. Bir neçə qeyd «davam edir»
               ola bilər.

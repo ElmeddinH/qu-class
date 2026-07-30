@@ -71,6 +71,28 @@
     --chart-grid: #e2e8f0;         /* border */
     --chart-axis: #64748b;         /* text-secondary */
 
+    /* --- Donut dilimləri: ARDICIL ku-green şkalası (Blok 12B) ---
+       Uclar KUDS §3-ün ÖZ tokenləridir — `ku-soft` (#D3E8BF) → `ku-dark`
+       (#16423C); aralıq yeddi pillə düz xətti interpolyasiyadır (yəni yeni
+       brend rəngi UYDURULMAYIB, `--map-fill-*` ilə eyni üsul). Şkala ku-green
+       (#44766C) bölgəsindən keçir: `--slice-7` ona praktiki olaraq bərabərdir.
+
+       🔴 ŞKALA SIRAYA GÖRƏ PAYLANMIR. Ardıcıl iki dilimə qonşu pillələr
+       verilsəydi (1, 2, 3…) fərq gözlə seçilməzdi və rəng korluğunda tamamilə
+       itərdi. `palette.ts` → `sliceRampIndex()` pillələri iki yarıya bölüb
+       NÖVBƏLƏŞDİRİR, yəni yan-yana duran hər iki dilim arasında ƏN AZI 2
+       pillə parlaqlıq fərqi qalır (dairə qapandığı üçün SON↔İLK cütü də
+       daxil olmaqla — `palette.test.ts` bunu ölçür). */
+    --slice-1: #d3e8bf;            /* ku-soft — ən açıq */
+    --slice-2: #bbd3af;
+    --slice-3: #a4bf9e;
+    --slice-4: #8caa8e;
+    --slice-5: #75957e;
+    --slice-6: #5d806d;
+    --slice-7: #456c5d;            /* ≈ ku-green */
+    --slice-8: #2e574c;
+    --slice-9: #16423c;            /* ku-dark — ən tünd */
+
     /* --- Xəritə palitrası ("İndi haradayıq?" [M11], Blok 10B) ---
        `react-simple-maps` SVG `fill` / `stroke` atributlarına Tailwind sinfi
        qəbul etmir (Recharts ilə eyni səbəb), ona görə şkala burada TOKEN kimi

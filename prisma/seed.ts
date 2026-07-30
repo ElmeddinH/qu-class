@@ -57,6 +57,10 @@ import {
 import { ACHIEVEMENT_CATEGORY_VALUES } from "@/lib/enums";
 import { buildCohortMilestones } from "@/lib/milestones";
 import { academicYearOf, resolveStage } from "@/lib/stage";
+import {
+  CONTROLLED_PROFILE_FIELDS,
+  DEFAULT_PRIVATE_FIELDS,
+} from "@/lib/visibility";
 
 import {
   ACHIEVEMENT_CONTENT,
@@ -275,31 +279,24 @@ const CAREER_VISIBILITY_PLAN: readonly VisibilityType[] = [
 
 /**
  * Profil sahələri və onların standart görünürlük səviyyəsi.
- * ⚠️ `phone` və `personalEmail` HƏMİŞƏ PRIVATE-dir (CLAUDE.md §məxfilik).
- * Blok 2-də qeydiyyat axını eyni siyahını istifadə edəcək.
+ *
+ * 🔴 SİYAHI BURADA TƏKRAR YAZILMIR (Blok 12B). Əvvəl əl ilə yazılmışdı və
+ * `futurePlans` səhvən düşmüşdü — yəni seed edilmiş 125 istifadəçinin həmin
+ * sahəsi üçün heç bir sətir yaranmırdı. `coverUrl` idarə olunan sahə olanda
+ * eyni səhv təkrarlanacaqdı. Vahid mənbə `src/lib/visibility.ts`-dir; sahə
+ * əlavə edən adam bu faylı yeniləməyi UNUDA BİLMƏZ.
+ *
+ * ⚠️ `phone` və `personalEmail` HƏMİŞƏ PRIVATE-dir — bunu `defaultLevelFor()`
+ * (yəni `DEFAULT_PRIVATE_FIELDS`) təmin edir, qalanları isə demo üçün təsadüfi
+ * səviyyə alır ki, məxfilik mühərriki real qarışıq datada sınansın.
  */
-const PROFILE_FIELDS: readonly { field: string; fixed?: VisibilityType }[] = [
-  { field: "avatarUrl" },
-  { field: "hometown" },
-  { field: "currentCity" },
-  { field: "currentCountry" },
-  { field: "phone", fixed: Visibility.PRIVATE },
-  { field: "personalEmail", fixed: Visibility.PRIVATE },
-  { field: "bio" },
-  { field: "learningGoals" },
-  { field: "askMeAbout" },
-  { field: "expectations" },
-  { field: "interests" },
-  { field: "hobbies" },
-  { field: "skills" },
-  { field: "languages" },
-  { field: "clubs" },
-  { field: "careerHistory" },
-  { field: "education" },
-  { field: "currentCompany" },
-  { field: "currentPosition" },
-  { field: "industry" },
-];
+const PROFILE_FIELDS: readonly { field: string; fixed?: VisibilityType }[] =
+  CONTROLLED_PROFILE_FIELDS.map((field) => ({
+    field,
+    fixed: (DEFAULT_PRIVATE_FIELDS as readonly string[]).includes(field)
+      ? Visibility.PRIVATE
+      : undefined,
+  }));
 
 // ============================================================================
 // 2. Wipe — FK-təhlükəsiz sıra ilə

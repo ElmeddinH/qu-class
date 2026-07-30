@@ -16,7 +16,8 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeading } from "@/components/kuds/SectionCard";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth";
 import { stageLabel } from "@/lib/labels";
 import {
@@ -52,7 +53,7 @@ export async function AdminCohorts() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Mövcud siniflər ({cohorts.length})</CardTitle>
+          <CardHeading>Mövcud siniflər ({cohorts.length})</CardHeading>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {cohorts.length === 0 ? (

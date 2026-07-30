@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Users } from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeading } from "@/components/kuds/SectionCard";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { getPrimaryCohort, requireUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
@@ -32,7 +33,10 @@ export default async function AppHomePage() {
           >
             <Users className="h-6 w-6 text-ku-dark" />
           </span>
-          <CardTitle>Sinif səhifəniz hələ təyin olunmayıb</CardTitle>
+          {/* T22: səhifənin YEGANƏ başlığıdır → `level={1}`. */}
+          <CardHeading level={1} className="text-h2">
+            Sinif səhifəniz hələ təyin olunmayıb
+          </CardHeading>
         </CardHeader>
 
         <CardContent className="flex flex-col gap-3">

@@ -464,7 +464,7 @@ test("naməlum hüquqi slug 404 verir", async ({ browser }) => {
 // 5. 🔴 KUKİ RAZILIĞI (TƏLƏ E)
 // ---------------------------------------------------------------------------
 
-test("🔴 kuki banneri ilk ziyarətdə görünür, «Qəbul et»dən sonra YENİLƏMƏDƏ görünmür", async ({
+test("🔴 kuki banneri ilk ziyarətdə görünür, «Hamısını qəbul et»dən sonra YENİLƏMƏDƏ görünmür", async ({
   browser,
 }) => {
   const { page, close } = await anonymousPage(browser);
@@ -475,7 +475,7 @@ test("🔴 kuki banneri ilk ziyarətdə görünür, «Qəbul et»dən sonra YEN�
     const banner = page.getByTestId("cookie-banner");
     await expect(banner).toBeVisible();
 
-    await page.getByRole("button", { name: "Qəbul et" }).click();
+    await page.getByRole("button", { name: "Hamısını qəbul et" }).click();
     await expect(banner).toHaveCount(0);
 
     // 🔴 ƏSL YOXLAMA: YENİLƏMƏDƏN sonra banner HTML-ə ÜMUMİYYƏTLƏ düşmür.
@@ -510,6 +510,79 @@ test("«Rədd et» də banneri bağlayır və seçimi saxlayır", async ({ brows
 
     const cookies = await page.context().cookies();
     expect(cookies.find((c) => c.name === "qu_cookie_consent")?.value).toBe("necessary");
+  } finally {
+    await close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 5b. «Seçimlər» ekranı (Blok 12B · GW-ANALİZ §1.1 №17)
+//
+// 🔴 SUAL: ekran DÜRÜSTdürmü? Uydurma «Analitika» açarı OLMAMALIDIR — layihədə
+// analitika qurulmayıb və mövcud olmayan emal üzərində nəzarət göstərmək
+// istifadəçini aldatmaqdır. Zəruri kateqoriya isə AÇIQ və PASSİV olmalıdır.
+// ---------------------------------------------------------------------------
+
+test("«Seçimlər» kateqoriya ekranı açılır və zəruri kuki söndürülə bilmir", async ({
+  browser,
+}) => {
+  const { page, close } = await anonymousPage(browser);
+
+  try {
+    await page.goto("/");
+    await expect(page.getByTestId("cookie-banner")).toBeVisible();
+
+    await page.getByRole("button", { name: "Seçimlər" }).click();
+
+    const dialog = page.getByTestId("cookie-preferences");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("heading", { name: "Kuki seçimləri" })).toBeVisible();
+
+    // 🔴 Zəruri kateqoriya: AÇIQ + PASSİV (yalan vəd yoxdur).
+    const necessary = dialog.getByRole("switch", { name: /Zəruri kukilər/ });
+    await expect(necessary).toBeVisible();
+    await expect(necessary).toBeChecked();
+    await expect(necessary).toBeDisabled();
+
+    // 🔴 UYDURMA KATEQORİYA YOXDUR: ekranda BAŞQA açar mövcud deyil.
+    // ⚠️ Mətn axtarışı ilə ölçmək OLMAZ — dürüstlük qeydinin ÖZÜ «analitika»
+    // sözünü keçirir («…analitika kukisi işlətmirik»). Ölçü AÇAR sayıdır.
+    await expect(dialog.getByRole("switch")).toHaveCount(1);
+    await expect(dialog.getByText(/Başqa kateqoriya yoxdur/)).toBeVisible();
+
+    // Məxfilik bildirişinə keçid var.
+    await expect(dialog.getByRole("link", { name: "Məxfilik bildirişi" })).toBeVisible();
+
+    // Seçim SAXLANILIR və banner bağlanır.
+    await dialog.getByRole("button", { name: "Seçimimi saxla" }).click();
+    await expect(page.getByTestId("cookie-banner")).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByTestId("cookie-banner")).toHaveCount(0);
+
+    // İxtiyari kateqoriya olmadığı üçün nəticə «yalnız zəruri»dir — kuki bunu
+    // olduğu kimi yazır, uydurma «all» yazmır.
+    const cookies = await page.context().cookies();
+    expect(cookies.find((c) => c.name === "qu_cookie_consent")?.value).toBe("necessary");
+  } finally {
+    await close();
+  }
+});
+
+test("«Seçimlər» ekranından «Hamısını qəbul et» də işləyir", async ({ browser }) => {
+  const { page, close } = await anonymousPage(browser);
+
+  try {
+    await page.goto("/");
+    await page.getByRole("button", { name: "Seçimlər" }).click();
+
+    const dialog = page.getByTestId("cookie-preferences");
+    await dialog.getByRole("button", { name: "Hamısını qəbul et" }).click();
+
+    await expect(page.getByTestId("cookie-banner")).toHaveCount(0);
+
+    const cookies = await page.context().cookies();
+    expect(cookies.find((c) => c.name === "qu_cookie_consent")?.value).toBe("all");
   } finally {
     await close();
   }

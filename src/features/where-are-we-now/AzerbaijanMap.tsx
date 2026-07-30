@@ -21,21 +21,41 @@
 // ============================================================================
 
 import { useMemo, useState } from "react";
-import { ComposableMap, Geographies, Geography } from "react-simple-maps";
+import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
 import worldTopology from "world-atlas/countries-110m.json";
 
 import { type MapPin } from "@/lib/career-stats";
 import { COUNTRY_COORDS, AZERBAIJAN } from "@/lib/geo";
 
 import { MapPinsLayer, PinDetails } from "./MapPins";
+import {
+  MAP_MAX_ZOOM,
+  MAP_MIN_ZOOM,
+  MapZoomControls,
+  useMapZoom,
+  type MapView,
+} from "./MapZoom";
 
 /** AZ poliqonunun topologiya `id`-si — cədvəldən, sətir literalı YOX. */
 const AZ_NUMERIC = COUNTRY_COORDS[AZERBAIJAN].numeric;
 
 const TOPOLOGY = worldTopology as unknown as Record<string, unknown>;
 
+const WIDTH = 800;
+const HEIGHT = 420;
+
+/**
+ * Mərkəz Azərbaycanın təxmini coğrafi ortasıdır; miqyas ölkəni tam əhatə edir
+ * (Naxçıvan daxil) və bir qədər qonşu kontekst buraxır.
+ *
+ * ⚠️ Modul səviyyəsində SABİTDİR — `useMapZoom(initial)`-in `reset`-i ondan
+ * asılıdır (bax `MapZoom.tsx`).
+ */
+const INITIAL_VIEW: MapView = { center: [48.5, 40.2], zoom: MAP_MIN_ZOOM };
+
 export function AzerbaijanMap({ pins }: { pins: MapPin[] }) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const { view, zoomIn, zoomOut, reset, handleMoveEnd, isDefault } = useMapZoom(INITIAL_VIEW);
 
   const maxPinCount = useMemo(
     () => pins.reduce((max, pin) => Math.max(max, pin.count), 0),
@@ -52,42 +72,63 @@ export function AzerbaijanMap({ pins }: { pins: MapPin[] }) {
       >
         <ComposableMap
           projection="geoMercator"
-          // Mərkəz Azərbaycanın təxmini coğrafi ortasıdır; miqyas ölkəni tam
-          // əhatə edir (Naxçıvan daxil) və bir qədər qonşu kontekst buraxır.
-          projectionConfig={{ center: [48.5, 40.2], scale: 4200 }}
-          width={800}
-          height={420}
+          projectionConfig={{ center: INITIAL_VIEW.center, scale: 4200 }}
+          width={WIDTH}
+          height={HEIGHT}
           className="h-auto w-full"
           role="img"
           aria-label="Məzunların Azərbaycan şəhərləri üzrə paylanması. Eyni məlumat aşağıdaki cədvəldədir."
         >
-          <Geographies geography={TOPOLOGY}>
-            {({ geographies }) =>
-              geographies.map((geography) => {
-                const isAz = String(geography.id) === AZ_NUMERIC;
+          <ZoomableGroup
+            center={view.center}
+            zoom={view.zoom}
+            minZoom={MAP_MIN_ZOOM}
+            maxZoom={MAP_MAX_ZOOM}
+            translateExtent={[
+              [0, 0],
+              [WIDTH, HEIGHT],
+            ]}
+            onMoveEnd={handleMoveEnd}
+          >
+            <Geographies geography={TOPOLOGY}>
+              {({ geographies }) =>
+                geographies.map((geography) => {
+                  const isAz = String(geography.id) === AZ_NUMERIC;
 
-                return (
-                  <Geography
-                    key={geography.rsmKey}
-                    geography={geography}
-                    fill={isAz ? "var(--map-fill-2)" : "var(--map-outside)"}
-                    stroke="var(--map-stroke)"
-                    strokeWidth={isAz ? 1 : 0.5}
-                    style={{ default: { outline: "none" }, hover: { outline: "none" } }}
-                  />
-                );
-              })
-            }
-          </Geographies>
+                  return (
+                    <Geography
+                      key={geography.rsmKey}
+                      geography={geography}
+                      fill={isAz ? "var(--map-fill-2)" : "var(--map-outside)"}
+                      stroke="var(--map-stroke)"
+                      // Miqyasa BÖLÜNÜR — bax `WorldMap`-dəki eyni qeyd.
+                      strokeWidth={(isAz ? 1 : 0.5) / view.zoom}
+                      style={{ default: { outline: "none" }, hover: { outline: "none" } }}
+                    />
+                  );
+                })
+              }
+            </Geographies>
 
-          <MapPinsLayer
-            pins={pins}
-            maxCount={maxPinCount}
-            activeId={activeId}
-            onActivate={setActiveId}
-          />
+            <MapPinsLayer
+              pins={pins}
+              maxCount={maxPinCount}
+              activeId={activeId}
+              onActivate={setActiveId}
+              zoom={view.zoom}
+            />
+          </ZoomableGroup>
         </ComposableMap>
       </div>
+
+      <MapZoomControls
+        zoom={view.zoom}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onReset={reset}
+        isDefault={isDefault}
+        label="Azərbaycan xəritəsi"
+      />
 
       <div className="min-h-12" aria-live="polite">
         <PinDetails pin={activePin} />

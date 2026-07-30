@@ -26,6 +26,7 @@ const VALID_PROFILE = {
   firstName: "Nərmin",
   lastName: "Quliyeva",
   avatarUrl: "",
+  coverUrl: "",
   bio: "Ekologiya üzrə araşdırma aparıram.",
   hometown: "Ucar",
   learningGoals: "",
@@ -161,7 +162,7 @@ describe("updateProfileSchema", () => {
     expect(issuePaths(result)).toContain("visibility.bio");
   });
 
-  it("🔴 21 sahənin HAMISI üçün səviyyə tələb olunur", () => {
+  it("🔴 22 sahənin HAMISI üçün səviyyə tələb olunur", () => {
     // Çatışmayan açar səssizcə defolta düşməməlidir: forma nə göndərirsə,
     // istifadəçi məhz onu görüb.
     const partial = { ...VALID_PROFILE.visibility };
@@ -208,7 +209,7 @@ describe("forma quruluşu", () => {
     }
   });
 
-  it("bölmələr 21 sahənin hamısını əhatə edir və təkrarlamır", () => {
+  it("bölmələr 22 sahənin hamısını əhatə edir və təkrarlamır", () => {
     const fields = PROFILE_FORM_SECTIONS.flatMap((section) => [...section.fields]);
 
     expect(new Set(fields).size).toBe(fields.length);

@@ -149,6 +149,89 @@ describe("seed məlumatı ilə panel DOLU qayıdır", () => {
 });
 
 // ===========================================================================
+// 1b. 🔴 `/admin/stats` SİNİF FİLTRİ (Blok 12B)
+//
+// SUALLAR:
+//   1. filtr Prisma `where`-inə düşürmü (yəni nəticə DARALIRMI)?
+//   2. 🔴 k-anonimlik FİLTRDƏN SONRA da tətbiq olunurmu? — kiçik kohortda bu,
+//      daha kritikdir: universitet miqyasında böyük görünən xana bir sinifdə
+//      2 nəfərə düşə bilər və AÇIQ QALSA konkret adamları göstərər.
+//   3. admin olmaq razılıq qapısını açırmı? (açmamalıdır)
+//
+// ⚠️ Fayl YALNIZ OXUYUR bu bölmədə.
+// ===========================================================================
+
+describe("`/admin/stats` sinif filtri", () => {
+  it("filtr nəticəni DARALDIR — sinif sayı universitet sayından böyük deyil", async () => {
+    const [universityWide, cohortScoped] = await Promise.all([
+      getCareerOutcomeStats(alumni, {}),
+      getCareerOutcomeStats(alumni, { cohortId }),
+    ]);
+
+    expect(cohortScoped.respondentCount).toBeLessThanOrEqual(
+      universityWide.respondentCount,
+    );
+
+    // `memberCount` YALNIZ sinif miqyasında məna daşıyır — universitet
+    // miqyasında `null` qalır (aqreqasiya onu hesablamır).
+    expect(universityWide.memberCount).toBeNull();
+    expect(cohortScoped.memberCount).toBeGreaterThan(0);
+  });
+
+  it("🔴 k-anonimlik FİLTRDƏN SONRA da qüvvədədir", async () => {
+    // Ən kiçik kohortu seçirik — hədd məhz orada ən çox işə düşür.
+    const cohorts = await prisma.cohort.findMany({
+      select: { id: true, _count: { select: { members: true } } },
+    });
+    const smallest = cohorts.sort((a, b) => a._count.members - b._count.members)[0];
+    expect(smallest, "seed-də ən azı bir sinif olmalıdır").toBeTruthy();
+
+    const stats = await getCareerOutcomeStats(alumni, { cohortId: smallest.id });
+
+    const counts = [
+      ...stats.countries.visible.map((bucket) => bucket.count),
+      ...stats.cities.visible.map((bucket) => bucket.count),
+      ...stats.companies.visible.map((bucket) => bucket.count),
+      ...stats.industries.visible.map((bucket) => bucket.count),
+      ...stats.jobFunctions.visible.map((bucket) => bucket.count),
+      ...stats.educationLevels.visible.map((bucket) => bucket.count),
+      ...stats.mapPins.map((pin) => pin.count),
+      ...stats.mapPins.flatMap((pin) => pin.roles.map((role) => role.count)),
+      ...stats.countryFills.map((fill) => fill.count),
+    ];
+
+    for (const count of counts) {
+      expect(count, `kiçik kohortda açıqlanan xana (${smallest.id})`).toBeGreaterThanOrEqual(
+        MIN_BUCKET_SIZE,
+      );
+    }
+
+    // Cəm invariantı filtrdən sonra da qorunur.
+    expect(cellTotal(stats.industries)).toBe(stats.respondentCount);
+  });
+
+  it("mövcud olmayan sinif id-si BOŞ nəticə verir (yalan «hamısı» YOX)", async () => {
+    // ⚠️ Bu, məhz ona görə `AdminStatsPanel`-də kataloqla tutuşdurulur: xam id
+    // servisə keçsə panel «bu sinifdə heç kim yoxdur» yazardı.
+    const stats = await getCareerOutcomeStats(alumni, { cohortId: "yoxdur-belə-sinif" });
+    expect(stats.respondentCount).toBe(0);
+  });
+
+  it("🔴 ADMİN olmaq razılıq qapısını AÇMIR", async () => {
+    const admin = await viewerOf("admin@qu.edu.az");
+
+    const [asAdmin, asMember] = await Promise.all([
+      getCareerOutcomeStats(admin, { cohortId }),
+      getCareerOutcomeStats(alumni, { cohortId }),
+    ]);
+
+    // Admin sinif üzvü deyilsə DAHA AZ görür (CLASS səviyyəli qeydlər bağlıdır),
+    // amma heç bir halda DAHA ÇOX görə bilməz.
+    expect(asAdmin.respondentCount).toBeLessThanOrEqual(asMember.respondentCount);
+  });
+});
+
+// ===========================================================================
 // 2. 🔴 RAZILIQ SÜZGƏCİ — DoD tələbi
 // ===========================================================================
 

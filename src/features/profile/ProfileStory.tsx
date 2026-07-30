@@ -26,7 +26,8 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { VisibilityBadge } from "@/components/shared/VisibilityBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CardHeading } from "@/components/kuds/SectionCard";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { UserStage } from "@/lib/enums";
 import {
   clubRoleLabel,
@@ -151,7 +152,7 @@ export function ProfileStory({ result, levels }: ProfileStoryProps) {
     (has("phone") && profile.phone) || (has("personalEmail") && profile.personalEmail) ? (
       <Card>
         <CardHeader className="flex-row items-center justify-between gap-3">
-          <CardTitle className="text-h4">Əlaqə</CardTitle>
+          <CardHeading className="text-h4">Əlaqə</CardHeading>
           {levels ? <VisibilityBadge level={levels.phone} /> : null}
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
@@ -260,10 +261,10 @@ function StoryCard({ field, title, icon, levels, skip, children }: StoryCardProp
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3">
-        <CardTitle className="flex items-center gap-2 text-h4">
+        <CardHeading className="flex items-center gap-2 text-h4">
           {icon}
           {title}
-        </CardTitle>
+        </CardHeading>
         {levels ? <VisibilityBadge level={levels[field]} /> : null}
       </CardHeader>
       <CardContent className="flex flex-col gap-2">{children}</CardContent>
@@ -342,10 +343,10 @@ function SupportOffers({
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-3">
-        <CardTitle className="flex items-center gap-2 text-h4">
+        <CardHeading className="flex items-center gap-2 text-h4">
           <HeartHandshake className="h-5 w-5 text-ku-green" aria-hidden />
           Sinfimə necə dəstək ola bilərəm?
-        </CardTitle>
+        </CardHeading>
         {isOwner && !support.openToSupport ? (
           <Badge variant="outline" className="border-warning text-warning-strong">
             Gizlidir

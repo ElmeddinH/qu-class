@@ -175,19 +175,29 @@ async function MemoriesBody({ cohort, filters }: ClassMemoriesProps) {
           />
         )
       ) : (
-        // Masonry-yə bənzər axın: kartlar müxtəlif hündürlükdədir və `columns`
-        // onları boşluqsuz yığır (paket lazım deyil).
-        <div className="columns-1 gap-6 md:columns-2">
-          {memories.map((memory) => (
-            <MemoryCard
-              key={memory.id}
-              memory={toCardView(memory, viewer, cohort.id)}
-              cohortId={cohort.id}
-              cohortSlug={cohort.slug}
-              places={placeOptions}
-            />
-          ))}
-        </div>
+        // ⚠️ WCAG 1.3.1 — `<section>` + `<h2>` MƏCBURİDİR: səhifənin `<h1>`-i
+        // «Xatirələr»dir, `MemoryCard` isə hər xatirəni `<h3>` ilə başlıqlandırır
+        // (T22 qeydi orada). Aralıq başlıq olmasa iyerarxiya h1 → h3 ATLAYIR.
+        // `sr-only`, çünki `<h1>` eyni mənanı ekranda onsuz da verir.
+        <section aria-labelledby="memory-grid">
+          <h2 id="memory-grid" className="sr-only">
+            Xatirə siyahısı
+          </h2>
+
+          {/* Masonry-yə bənzər axın: kartlar müxtəlif hündürlükdədir və
+              `columns` onları boşluqsuz yığır (paket lazım deyil). */}
+          <div className="columns-1 gap-6 md:columns-2">
+            {memories.map((memory) => (
+              <MemoryCard
+                key={memory.id}
+                memory={toCardView(memory, viewer, cohort.id)}
+                cohortId={cohort.id}
+                cohortSlug={cohort.slug}
+                places={placeOptions}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       <PagerNav

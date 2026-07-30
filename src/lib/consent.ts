@@ -44,6 +44,64 @@ export const CONSENT_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 export const CONSENT_VALUES = ["all", "necessary"] as const;
 export type ConsentValue = (typeof CONSENT_VALUES)[number];
 
+// ---------------------------------------------------------------------------
+// KATEQORİYALAR — «Seçimlər» ekranının mənbəyi (Blok 12B)
+// ---------------------------------------------------------------------------
+//
+// 🔴 BURADA UYDURMA KATEQORİYA YOXDUR. Layihədə analitika, reklam və ya
+// üçüncü tərəf izləyicisi QURULMAYIB — «Analitika» adlı söndürülə bilən açar
+// göstərsək istifadəçiyə mövcud olmayan şey üzərində nəzarət illüziyası
+// satardıq. Bu, GDPR mənasında da səhvdir: razılıq real emal əməliyyatına
+// verilir, dekorativ açara yox.
+//
+// ⚠️ STRUKTUR İSƏ HAZIRDIR: gələcəkdə real kateqoriya əlavə olunanda bura BİR
+// sətir yazılır — banner, «Seçimlər» ekranı və `consentValueFor()` avtomatik
+// onu götürür. İki yerdə siyahı saxlanmır.
+//
+// ⚠️ `required: true` olan kateqoriya UI-da AÇIQ və PASSİV göstərilir: onu
+// söndürmək mümkün deyil (sessiya kukisi olmadan giriş işləmir) və düymə bunu
+// yalan vəd etməməlidir.
+
+export interface ConsentCategory {
+  id: string;
+  title: string;
+  /** Nə üçün lazımdır — istifadəçi dilində, bir cümlə. */
+  description: string;
+  /** Söndürülə bilməzmi? (Zəruri kukilər üçün `true`.) */
+  required: boolean;
+}
+
+export const CONSENT_CATEGORIES: readonly ConsentCategory[] = [
+  {
+    id: "necessary",
+    title: "Zəruri kukilər",
+    description:
+      "Giriş sessiyası (Auth.js) və bu kuki seçiminin özü. Söndürülə bilməz — onlarsız hesabınıza daxil ola bilməzsiniz.",
+    required: true,
+  },
+];
+
+/** Söndürülə bilən kateqoriyalar. HAZIRDA BOŞDUR — bax yuxarıdakı qeyd. */
+export const OPTIONAL_CONSENT_CATEGORIES: readonly ConsentCategory[] =
+  CONSENT_CATEGORIES.filter((category) => !category.required);
+
+/**
+ * Seçilmiş ixtiyari kateqoriyalardan razılıq dəyəri qurur.
+ *
+ * ⚠️ İxtiyari kateqoriya YOXDURSA nəticə həmişə `"necessary"`-dir: «hamısını
+ * qəbul et» ilə «yalnız zəruri» bu gün EYNİ emalı bildirir və kuki bunu olduğu
+ * kimi yazır. Uydurma fərq yaratmaq jurnalı yalan edərdi.
+ */
+export function consentValueFor(acceptedOptionalIds: readonly string[]): ConsentValue {
+  if (OPTIONAL_CONSENT_CATEGORIES.length === 0) return "necessary";
+
+  return OPTIONAL_CONSENT_CATEGORIES.every((category) =>
+    acceptedOptionalIds.includes(category.id),
+  )
+    ? "all"
+    : "necessary";
+}
+
 /**
  * Xam kuki dəyərini doğrulanmış seçimə çevirir.
  * Naməlum / boş dəyər → `null` (yəni "hələ soruşulmayıb", banner göstərilir).

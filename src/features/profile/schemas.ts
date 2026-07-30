@@ -97,7 +97,7 @@ const personalEmailField = z
   });
 
 /**
- * 21 idarə olunan sahənin HƏR BİRİ üçün səviyyə.
+ * 22 idarə olunan sahənin HƏR BİRİ üçün səviyyə.
  *
  * Obyekt `CONTROLLED_PROFILE_FIELDS`-dən QURULUR, əl ilə yazılmır: yeni sahə
  * əlavə olunsa forma onu avtomatik tələb edir və unudulmuş sahə səssizcə
@@ -139,6 +139,8 @@ export const updateProfileSchema = z.object({
 
   // --- Əsas ---
   avatarUrl: imageField,
+  /** Profil banneri — `avatarUrl` ilə eyni qaydalar (yol qaçışı rədd olunur). */
+  coverUrl: imageField,
   bio: optionalText(MAX_STORY_LENGTH),
   hometown: optionalText(120),
   learningGoals: optionalText(MAX_STORY_LENGTH),

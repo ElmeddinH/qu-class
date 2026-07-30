@@ -12,6 +12,7 @@ import {
   Trophy,
 } from "lucide-react";
 
+import { CardHeading } from "@/components/kuds/SectionCard";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,6 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -174,7 +174,10 @@ export function CardsSection() {
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="shadow-sm-kuds">
           <CardHeader>
-            <CardTitle className="text-h4 text-text-primary">Sinif xronologiyası</CardTitle>
+            {/* T22: `<Section>` h2 verir → kart başlığı `level={3}`. */}
+            <CardHeading level={3} className="text-h4 text-text-primary">
+              Sinif xronologiyası
+            </CardHeading>
             <CardDescription className="text-small text-text-secondary">
               2026-2027 tədris ili
             </CardDescription>

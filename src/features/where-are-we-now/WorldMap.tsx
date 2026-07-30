@@ -24,12 +24,25 @@
 // ============================================================================
 
 import { useMemo, useState } from "react";
-import { ComposableMap, Geographies, Geography, Sphere } from "react-simple-maps";
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  Sphere,
+  ZoomableGroup,
+} from "react-simple-maps";
 import worldTopology from "world-atlas/countries-110m.json";
 
 import { fillStep, type CountryFill, type MapPin } from "@/lib/career-stats";
 
 import { MapPinsLayer, PinDetails } from "./MapPins";
+import {
+  MAP_MAX_ZOOM,
+  MAP_MIN_ZOOM,
+  MapZoomControls,
+  useMapZoom,
+  type MapView,
+} from "./MapZoom";
 import { MAP_FILLS } from "./palette";
 
 interface WorldMapProps {
@@ -40,8 +53,20 @@ interface WorldMapProps {
 /** `Geographies` `Topology` obyekti gözləyir; JSON importunun tipi genişdir. */
 const TOPOLOGY = worldTopology as unknown as Record<string, unknown>;
 
+const WIDTH = 800;
+const HEIGHT = 400;
+
+/**
+ * Başlanğıc görünüş — `projectionConfig.center` ilə EYNİ nöqtə.
+ *
+ * ⚠️ Modul səviyyəsində SABİTDİR: `useMapZoom(initial)`-in `reset` callback-i
+ * ondan asılıdır, hər render-də yeni obyekt qursaq `reset` hər dəfə dəyişər.
+ */
+const INITIAL_VIEW: MapView = { center: [15, 8], zoom: MAP_MIN_ZOOM };
+
 export function WorldMap({ pins, fills }: WorldMapProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const { view, zoomIn, zoomOut, reset, handleMoveEnd, isDefault } = useMapZoom(INITIAL_VIEW);
 
   const byNumeric = useMemo(
     () => new Map(fills.map((fill) => [fill.numeric, fill])),
@@ -66,49 +91,77 @@ export function WorldMap({ pins, fills }: WorldMapProps) {
       >
         <ComposableMap
           projection="geoNaturalEarth1"
-          projectionConfig={{ scale: 128, center: [15, 8] }}
-          width={800}
-          height={400}
+          projectionConfig={{ scale: 128, center: INITIAL_VIEW.center }}
+          width={WIDTH}
+          height={HEIGHT}
           className="h-auto w-full"
           role="img"
           aria-label="Məzunların ölkələr üzrə paylanması. Eyni məlumat aşağıdaki cədvəldədir."
         >
-          {/* Kürənin konturu — okean sahəsini kartın fonundan ayırır. */}
+          {/* Kürənin konturu — okean sahəsini kartın fonundan ayırır.
+              `ZoomableGroup`-un XARİCİNDƏDİR: çərçivə yaxınlaşdırmada da yerində
+              qalmalıdır, yoxsa kartın kənarı ilə birlikdə sürüşər. */}
           <Sphere id="world-sphere" stroke="var(--map-stroke)" strokeWidth={0.5} fill="none" />
 
-          <Geographies geography={TOPOLOGY}>
-            {({ geographies }) =>
-              geographies.map((geography) => {
-                const fill = byNumeric.get(String(geography.id));
-                const step =
-                  fill === undefined
-                    ? null
-                    : fillStep(fill.count, maxCountryCount, MAP_FILLS.length);
+          <ZoomableGroup
+            center={view.center}
+            zoom={view.zoom}
+            minZoom={MAP_MIN_ZOOM}
+            maxZoom={MAP_MAX_ZOOM}
+            // Pan çərçivə ilə məhdudlaşır — bax `MapZoom.tsx` başlığı.
+            translateExtent={[
+              [0, 0],
+              [WIDTH, HEIGHT],
+            ]}
+            onMoveEnd={handleMoveEnd}
+          >
+            <Geographies geography={TOPOLOGY}>
+              {({ geographies }) =>
+                geographies.map((geography) => {
+                  const fill = byNumeric.get(String(geography.id));
+                  const step =
+                    fill === undefined
+                      ? null
+                      : fillStep(fill.count, maxCountryCount, MAP_FILLS.length);
 
-                return (
-                  <Geography
-                    key={geography.rsmKey}
-                    geography={geography}
-                    fill={step === null ? "var(--map-empty)" : MAP_FILLS[step]}
-                    stroke="var(--map-stroke)"
-                    strokeWidth={0.5}
-                    // Doldurma HOVER-də dəyişmir: rəng SAY deməkdir, interaktiv
-                    // vəziyyət deyil (dəyişsə oxucu rəngi say kimi oxumağı dayandırar).
-                    style={{ default: { outline: "none" }, hover: { outline: "none" } }}
-                  />
-                );
-              })
-            }
-          </Geographies>
+                  return (
+                    <Geography
+                      key={geography.rsmKey}
+                      geography={geography}
+                      fill={step === null ? "var(--map-empty)" : MAP_FILLS[step]}
+                      stroke="var(--map-stroke)"
+                      // Xətt qalınlığı miqyasla BÖLÜNÜR: `ZoomableGroup`
+                      // `scale()` tətbiq etdiyi üçün sabit qalsa 8× zoom-da
+                      // sərhədlər ölkələri udardı.
+                      strokeWidth={0.5 / view.zoom}
+                      // Doldurma HOVER-də dəyişmir: rəng SAY deməkdir, interaktiv
+                      // vəziyyət deyil (dəyişsə oxucu rəngi say kimi oxumağı dayandırar).
+                      style={{ default: { outline: "none" }, hover: { outline: "none" } }}
+                    />
+                  );
+                })
+              }
+            </Geographies>
 
-          <MapPinsLayer
-            pins={pins}
-            maxCount={maxPinCount}
-            activeId={activeId}
-            onActivate={setActiveId}
-          />
+            <MapPinsLayer
+              pins={pins}
+              maxCount={maxPinCount}
+              activeId={activeId}
+              onActivate={setActiveId}
+              zoom={view.zoom}
+            />
+          </ZoomableGroup>
         </ComposableMap>
       </div>
+
+      <MapZoomControls
+        zoom={view.zoom}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onReset={reset}
+        isDefault={isDefault}
+        label="Dünya xəritəsi"
+      />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-h-12 flex-1" aria-live="polite">

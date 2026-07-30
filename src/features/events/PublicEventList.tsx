@@ -72,20 +72,33 @@ export function PublicEventList({ events, filters, total }: PublicEventListProps
         </p>
       </div>
 
-      <PublicEventCards
-        events={events}
-        // ⚠️ Detal səhifəsi AUTH ARXASINDADIR (`(app)/events/[id]`) — anonim
-        // ziyarətçi `/login?callbackUrl=/events/<id>`-ə düşür və girişdən sonra
-        // MƏHZ həmin tədbirə qayıdır. Bu, qərardır: detalda RSVP və iştirakçı
-        // siyahısı var (`routes.ts` → `PUBLIC_EXACT_PATHS` şərhi).
-        hrefFor={(event) => `/events/${event.id}`}
-        emptyTitle={upcoming ? "Açıq tədbir yoxdur" : "Keçmiş açıq tədbir yoxdur"}
-        emptyDescription={
-          upcoming
-            ? "Hazırda ictimaiyyətə açıq qarşıdan gələn tədbir elan olunmayıb. Sinif, fakültə və universitet tədbirlərini görmək üçün daxil olun."
-            : "Arxivdə ictimaiyyətə açıq tədbir qeydi yoxdur."
-        }
-      />
+      {/* T22 / WCAG 1.3.1: kart başlıqları `<h3>`-dür, ona görə siyahının
+          üstündə `<h2>` MƏCBURİDİR — yoxsa `PageHeader`-in `<h1>`-indən sonra
+          səviyyə atlanır (h1 → h3). Açılış səhifəsində eyni kartlar onsuz da
+          bölmə `<h2>`-sinin altındadır. */}
+      <section aria-labelledby="public-events-list" className="flex flex-col gap-4">
+        <h2
+          id="public-events-list"
+          className="text-h2 font-semibold text-text-primary"
+        >
+          {upcoming ? "Qarşıdan gələn tədbirlər" : "Keçmiş tədbirlər"}
+        </h2>
+
+        <PublicEventCards
+          events={events}
+          // ⚠️ Detal səhifəsi AUTH ARXASINDADIR (`(app)/events/[id]`) — anonim
+          // ziyarətçi `/login?callbackUrl=/events/<id>`-ə düşür və girişdən sonra
+          // MƏHZ həmin tədbirə qayıdır. Bu, qərardır: detalda RSVP və iştirakçı
+          // siyahısı var (`routes.ts` → `PUBLIC_EXACT_PATHS` şərhi).
+          hrefFor={(event) => `/events/${event.id}`}
+          emptyTitle={upcoming ? "Açıq tədbir yoxdur" : "Keçmiş açıq tədbir yoxdur"}
+          emptyDescription={
+            upcoming
+              ? "Hazırda ictimaiyyətə açıq qarşıdan gələn tədbir elan olunmayıb. Sinif, fakültə və universitet tədbirlərini görmək üçün daxil olun."
+              : "Arxivdə ictimaiyyətə açıq tədbir qeydi yoxdur."
+          }
+        />
+      </section>
 
       <p className="text-small text-text-secondary">
         Tədbirin təfərrüatını görmək və qeydiyyatdan keçmək üçün{" "}

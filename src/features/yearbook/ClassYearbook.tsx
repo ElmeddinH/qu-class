@@ -193,29 +193,35 @@ function CardSection({ group }: { group: YearbookGroup<YearbookEntry> }) {
                 <MapPin className="h-4 w-4 shrink-0 text-ku-green" aria-hidden />
                 {place.title}
               </h3>
-              <EntryGrid items={place.items} />
+              {/* Məkan alt-başlığı `<h3>`-dür → kartlar `<h4>`. */}
+              <EntryGrid items={place.items} level={4} />
             </div>
           ))}
         </div>
       ) : (
-        <EntryGrid items={group.items} />
+        // ⚠️ Alt-qruplaşma YOXDUR → kartlar birbaşa bölmə `<h2>`-sinin altındadır
+        // və `<h3>` olmalıdır. Sabit `<h4>` yazsaq h2 → h4 ATLANIR (WCAG 1.3.1).
+        <EntryGrid items={group.items} level={3} />
       )}
     </section>
   );
 }
 
-function EntryGrid({ items }: { items: YearbookEntry[] }) {
+/** `level` — kartın başlıq səviyyəsi; qrid harada yerləşdiyindən asılıdır. */
+function EntryGrid({ items, level }: { items: YearbookEntry[]; level: 3 | 4 }) {
   return (
     <div className="grid gap-6 md:grid-cols-2 print:grid-cols-2">
       {items.map((entry) => (
-        <EntryCard key={entry.id} entry={entry} />
+        <EntryCard key={entry.id} entry={entry} level={level} />
       ))}
     </div>
   );
 }
 
 /** Üzv kartı: avatar + ad + ixtisas + seçdiyi sitat. */
-function EntryCard({ entry }: { entry: YearbookEntry }) {
+function EntryCard({ entry, level }: { entry: YearbookEntry; level: 3 | 4 }) {
+  // Tipoqrafiya hər iki səviyyədə `text-h4`-dür — dəyişən yalnız SEMANTİKADIR.
+  const Heading = level === 3 ? "h3" : "h4";
   return (
     <article
       // Kart nə sütunlar, nə də ÇAP SƏHİFƏLƏRİ arasında bölünmür.
@@ -245,7 +251,7 @@ function EntryCard({ entry }: { entry: YearbookEntry }) {
           {memoryTypeLabel(entry.type)}
         </Badge>
 
-        <h4 className="text-h4 font-medium text-text-primary">{entry.title}</h4>
+        <Heading className="text-h4 font-medium text-text-primary">{entry.title}</Heading>
 
         <p className="whitespace-pre-line break-words text-body leading-relaxed text-text-primary">
           {entry.body}

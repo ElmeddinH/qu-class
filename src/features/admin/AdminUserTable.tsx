@@ -143,6 +143,13 @@ export async function AdminUserTable({ filters }: AdminUserTableProps) {
                           {cohortRoleLabel(user.cohorts[0].role)}
                         </span>
                       )}
+                      {/* İkinci dərəcəli üzvlüklər gizlədilmir — «İdarə et»
+                          panelində hər biri üçün ayrıca rol seçicisi var. */}
+                      {user.cohorts.length > 1 ? (
+                        <span className="block text-caption text-text-secondary">
+                          +{user.cohorts.length - 1} digər sinif
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-text-secondary">
                       {user.cohorts[0] === undefined
@@ -208,10 +215,13 @@ function toActionProps(user: AdminUserRow) {
     fullName: `${user.firstName} ${user.lastName}`,
     systemRole: user.systemRole,
     deactivated: user.deactivatedAt !== null,
+    // ⚠️ BÜTÜN üzvlüklər ötürülür, yalnız birincisi yox — `UserRowActions`
+    // hər sinif üçün ayrıca rol seçicisi göstərir (Blok 12B).
     cohorts: user.cohorts.map((c) => ({
       id: c.id,
       displayName: c.displayName,
       role: c.role,
+      isPrimary: c.isPrimary,
     })),
   };
 }
