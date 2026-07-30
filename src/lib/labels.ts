@@ -25,6 +25,7 @@
 
 import type {
   AchievementStatus,
+  AuditAction,
   ClubRole,
   CohortRole,
   ContentSection,
@@ -41,8 +42,11 @@ import type {
   NotificationType,
   PostCategory,
   ReportEntityType,
+  ReportReason,
+  ReportStatus,
   RsvpStatus,
   SupportOfferType,
+  SystemRole,
   TimelineSourceType,
   UserStage,
 } from "@/lib/enums";
@@ -464,4 +468,69 @@ export const REPORT_ENTITY_TYPE_LABELS: Record<ReportEntityType, string> = {
 
 export function reportEntityTypeLabel(value: string): string {
   return REPORT_ENTITY_TYPE_LABELS[value as ReportEntityType] ?? value;
+}
+
+// ---------------------------------------------------------------------------
+// Moderasiya & administrasiya (spec §17, Blok 11B)
+// ---------------------------------------------------------------------------
+
+/** `Report.status` — moderasiya növbəsinin dörd vəziyyəti. */
+export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
+  OPEN: "Açıq",
+  IN_REVIEW: "Baxılır",
+  RESOLVED: "Həll edildi",
+  REJECTED: "Rədd edildi",
+};
+
+/** `Report.reason` — şikayətçinin seçdiyi səbəb. */
+export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
+  SPAM: "Spam",
+  HARASSMENT: "Təhqir / təzyiq",
+  INAPPROPRIATE: "Uyğunsuz məzmun",
+  MISINFORMATION: "Yanlış məlumat",
+  PRIVACY: "Məxfilik pozuntusu",
+  OTHER: "Digər",
+};
+
+/**
+ * `AuditLog.action` — jurnalın «nə edildi» sütunu.
+ *
+ * ⚠️ `MODERATE` etiketi «Moderasiya baxışı»dır, sadəcə «Moderasiya» deyil:
+ * bu dəyər həm məzmunun GİZLƏDİLMƏSİNDƏ, həm də şikayət olunan məzmuna
+ * BAXIŞDA yazılır və ikincisi jurnalın ən həssas sətridir (TƏLƏ A).
+ */
+export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
+  CREATE: "Yaradıldı",
+  UPDATE: "Yeniləndi",
+  DELETE: "Silindi",
+  VERIFY: "Təsdiqləndi",
+  MODERATE: "Moderasiya baxışı",
+  ROLE_CHANGE: "Rol dəyişikliyi",
+};
+
+/** `User.systemRole` — cohort daxilindəki roldan FƏRQLİDİR. */
+export const SYSTEM_ROLE_LABELS: Record<SystemRole, string> = {
+  USER: "İstifadəçi",
+  UNIVERSITY_ADMIN: "Universitet administratoru",
+};
+
+export function reportStatusLabel(value: string): string {
+  return REPORT_STATUS_LABELS[value as ReportStatus] ?? value;
+}
+
+export function reportReasonLabel(value: string): string {
+  return REPORT_REASON_LABELS[value as ReportReason] ?? REPORT_REASON_LABELS.OTHER;
+}
+
+/**
+ * ⚠️ Naməlum dəyərdə XAM sətir qalır: audit jurnalında naməlum əməliyyatı
+ * «Yeniləndi» kimi göstərmək oxucunu YANILDARDI (`reportEntityTypeLabel` ilə
+ * eyni məntiq).
+ */
+export function auditActionLabel(value: string): string {
+  return AUDIT_ACTION_LABELS[value as AuditAction] ?? value;
+}
+
+export function systemRoleLabel(value: string): string {
+  return SYSTEM_ROLE_LABELS[value as SystemRole] ?? SYSTEM_ROLE_LABELS.USER;
 }

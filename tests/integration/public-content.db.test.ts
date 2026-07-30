@@ -192,7 +192,7 @@ describe("🔴 `isPublished = false` ContentPage heç kimə görünmür", () => 
   it("qaralama nə siyahıda, nə də detalda çıxır", async () => {
     const page = await prisma.contentPage.findUniqueOrThrow({
       where: { slug: "kitabxana" },
-      select: { id: true, slug: true, section: true, isPublished: true },
+      select: { id: true, slug: true, section: true, isPublished: true, updatedAt: true },
     });
 
     expect(page.isPublished, "seed sətri dərc olunmuş olmalıdır").toBe(true);
@@ -215,10 +215,16 @@ describe("🔴 `isPublished = false` ContentPage heç kimə görünmür", () => 
       expect(await getContentPage(page.slug)).toBeNull();
     } finally {
       // ⚠️ Seed determinizmi: sətir GERİ QAYTARILIR.
-      await prisma.contentPage.update({
-        where: { id: page.id },
-        data: { isPublished: true },
-      });
+      //
+      // 🔴 `updatedAt` DA (Blok 11B-də tapıldı): sxemdə `@updatedAt` var, yəni
+      // bərpa edən `update` onu TƏZƏ damğa ilə yazır — sətir sayı eyni qalır,
+      // DƏYƏRİ isə sürüşür və determinizm yoxlaması qırılır. Prisma avtomatik
+      // sahəni `data`-dan oxumadığı üçün XAM SQL işlədilir.
+      await prisma.$executeRaw`
+        UPDATE ContentPage
+           SET isPublished = 1, updatedAt = ${page.updatedAt}
+         WHERE id = ${page.id}
+      `;
     }
 
     // Bərpadan sonra yenidən görünür.

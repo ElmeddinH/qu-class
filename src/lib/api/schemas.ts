@@ -29,6 +29,7 @@ import { MIN_ADMISSION_YEAR, UNIVERSITY_EMAIL_EXAMPLE } from "@/lib/constants";
 import {
   ACHIEVEMENT_CATEGORY_VALUES,
   ACHIEVEMENT_STATUS_VALUES,
+  AUDIT_ACTION_VALUES,
   CONTENT_SECTION_VALUES,
   COHORT_ROLE_VALUES,
   ContentSectionSchema,
@@ -44,6 +45,9 @@ import {
   NotificationTypeSchema,
   POST_CATEGORY_VALUES,
   POST_KIND_VALUES,
+  REPORT_ENTITY_TYPE_VALUES,
+  REPORT_REASON_VALUES,
+  REPORT_STATUS_VALUES,
   SUPPORT_OFFER_TYPE_VALUES,
   SYSTEM_ROLE_VALUES,
   TIMELINE_SOURCE_TYPE_VALUES,
@@ -901,3 +905,171 @@ export const NotificationsQuerySchema = z.object({
 export const ContentPageParamsSchema = z.object({
   slug: z.string().min(1),
 });
+
+// ---------------------------------------------------------------------------
+// Admin səthi (spec §17, Blok 11B)
+//
+// 🔴 Bu sxemlərin hamısı `withAdmin` qapısının arxasındadır və qapı rolu
+// TOKEN-dən deyil, BAZADAN oxuyur (TƏLƏ B — bax `lib/api/guard.ts`).
+// ---------------------------------------------------------------------------
+
+/** `GET /admin/stats` — dashboard rəqəmləri. Şəxsə bağlı sıralama YOXDUR. */
+export const AdminStatsSchema = z
+  .object({
+    userCount: z.number().int(),
+    deactivatedCount: z.number().int(),
+    cohortCount: z.number().int(),
+    activeCohortCount: z.number().int(),
+    postsThisMonth: z.number().int(),
+    upcomingEventCount: z.number().int(),
+    openReportCount: z.number().int(),
+    pendingAchievementCount: z.number().int(),
+    series: z
+      .array(
+        z.object({
+          week: z.string().openapi({ example: "2026-07-27" }),
+          label: z.string().openapi({ example: "27.07" }),
+          posts: z.number().int(),
+          members: z.number().int(),
+        }),
+      )
+      .openapi({
+        description:
+          "Son 12 həftənin AQREQAT sayları. 🔴 Fərdi məlumat yoxdur: sorğu " +
+          "yalnız `createdAt` seçir, `authorId` belə gətirilmir (TƏLƏ G).",
+      }),
+  })
+  .openapi("AdminStats");
+
+/**
+ * `GET /admin/reports` — şikayət növbəsi sətri.
+ *
+ * 🔴 MƏZMUN YOXDUR (TƏLƏ A). `target` hədəfin yalnız QORUMA kontekstini daşıyır:
+ * görünürlük səviyyəsi, sinif, sahib və status. `title` / `body` sahələri
+ * SXEMDƏ də, SORĞUDA da mövcud deyil — şikayət olunan mətnə çıxış yalnız
+ * audit jurnalına yazılan «moderasiya baxışı» ilə mümkündür və o, veb
+ * interfeysindədir.
+ */
+export const AdminReportSchema = z
+  .object({
+    id: idSchema,
+    entityType: z.enum(REPORT_ENTITY_TYPE_VALUES),
+    entityId: z.string().openapi({
+      description:
+        "⚠️ `ACCESSIBILITY` NÖVÜNDƏ BU, SƏTİR ID-Sİ DEYİL — maneənin görüldüyü " +
+        "SƏHİFƏ YOLUDUR (`/khankendi/gpl-01`).",
+    }),
+    reason: z.enum(REPORT_REASON_VALUES),
+    details: z.string().nullable().openapi({
+      description: "ŞİKAYƏTÇİNİN öz mətni — şikayət olunan məzmun DEYİL.",
+    }),
+    status: z.enum(REPORT_STATUS_VALUES),
+    createdAt: dateTimeSchema,
+    resolvedAt: dateTimeSchema.nullable(),
+    resolution: z.string().nullable(),
+    reporter: memoryAuthorSchema,
+    resolvedBy: z
+      .object({ id: idSchema, firstName: z.string(), lastName: z.string() })
+      .nullable(),
+    target: z
+      .object({
+        exists: z.boolean(),
+        visibility: z.enum(VISIBILITY_VALUES).nullable(),
+        cohortId: idSchema.nullable(),
+        ownerId: idSchema.nullable(),
+        status: z.string().nullable(),
+      })
+      .openapi({
+        description:
+          "Hədəfin MODERASİYA KONTEKSTİ. Mətn sahəsi qəsdən yoxdur (TƏLƏ A).",
+      }),
+  })
+  .openapi("AdminReport");
+
+/** `POST /admin/reports/{id}/resolve` — qərar gövdəsi. */
+export const AdminResolveBodySchema = z
+  .object({
+    decision: z.enum(["IN_REVIEW", "RESOLVED", "REJECTED"]).openapi({
+      description: "Qərar. `RESOLVED` / `REJECTED` üçün `resolution` MƏCBURİDİR.",
+    }),
+    resolution: z.string().max(1000).optional().openapi({
+      description:
+        "Qərarın izahı. Şikayətçiyə bildiriş mətni kimi göndərilir və audit " +
+        "jurnalına düşür.",
+    }),
+  })
+  .openapi("AdminResolveBody");
+
+export const AdminResolveResultSchema = z
+  .object({ reportId: idSchema, status: z.enum(REPORT_STATUS_VALUES) })
+  .openapi("AdminResolveResult");
+
+/** `GET /admin/audit` — audit sətri. */
+export const AdminAuditSchema = z
+  .object({
+    id: idSchema,
+    action: z.enum(AUDIT_ACTION_VALUES),
+    entityType: z.string().openapi({
+      description:
+        "⚠️ ENUM DEYİL: sətirlər tarixən model adlarını (`Post`, `Cohort`, " +
+        "`CohortMembership`) və bəzən enum dəyərini (`ACHIEVEMENT`) daşıyır.",
+      example: "Report",
+    }),
+    entityId: z.string(),
+    metadata: z.string().nullable().openapi({
+      description:
+        "XAM JSON sətri (SQLite-da JSON tipi yoxdur). 🔴 Ağ siyahıdan keçir — " +
+        "şikayət olunan MƏZMUN buraya YAZILMIR, yoxsa `PRIVATE` mətn jurnalda " +
+        "peyda olardı.",
+    }),
+    createdAt: dateTimeSchema,
+    actor: z
+      .object({
+        id: idSchema,
+        firstName: z.string(),
+        lastName: z.string(),
+        email: z.string(),
+      })
+      .nullable(),
+  })
+  .openapi("AdminAuditEntry");
+
+/**
+ * `GET /admin/users` — cədvəl sətri.
+ *
+ * ⚠️ `currentCity` `redactProfile`-dan KEÇİR: admin olmaq `CLASS` səviyyəli
+ * sahəni görmək demək deyil. `phone` / `personalEmail` ÜMUMİYYƏTLƏ sorğulanmır.
+ */
+export const AdminUserSchema = z
+  .object({
+    id: idSchema,
+    firstName: z.string(),
+    lastName: z.string(),
+    email: z.string().openapi({
+      description: "Universitet e-poçtu — hesab açarıdır, profil sahəsi deyil.",
+      example: UNIVERSITY_EMAIL_EXAMPLE,
+    }),
+    avatarUrl: z.string().nullable(),
+    systemRole: z.enum(SYSTEM_ROLE_VALUES),
+    deactivatedAt: dateTimeSchema.nullable().openapi({
+      description: "`null` → aktiv. Deaktiv hesab girişə buraxılmır.",
+    }),
+    createdAt: dateTimeSchema,
+    lastSeenAt: dateTimeSchema.nullable(),
+    currentCity: z.string().nullable().openapi({
+      description: "🔴 `redactProfile`-dan keçmiş dəyər — gizlidirsə `null`.",
+    }),
+    cohorts: z.array(
+      z.object({
+        id: idSchema,
+        slug: z.string(),
+        displayName: z.string(),
+        role: z.enum(COHORT_ROLE_VALUES),
+        stage: z.enum(USER_STAGE_VALUES).openapi({
+          description: "Cohort TARİXLƏRİNDƏN hesablanır, `User.stage` keşindən yox.",
+        }),
+      }),
+    ),
+  })
+  .passthrough()
+  .openapi("AdminUser");

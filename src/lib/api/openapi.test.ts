@@ -76,8 +76,62 @@ describe("əməliyyatlar", () => {
     // 18 (Blok 9S) + 4 (Blok 10A: memories · yearbook · support ·
     // guide-places/{id}/memories) + 1 (Blok 10B: stats/where-are-we-now)
     // + 5 (Blok 11A: notifications · notifications/{id}/read ·
-    // notifications/read-all · content/pages/{slug} · guide-places/{id}) = 28.
-    expect(operations.length).toBe(28);
+    // notifications/read-all · content/pages/{slug} · guide-places/{id})
+    // + 5 (Blok 11B: admin/stats · admin/reports · admin/reports/{id}/resolve ·
+    // admin/audit · admin/users) = 33.
+    expect(operations.length).toBe(33);
+  });
+
+  /**
+   * 🔴 TƏLƏ D — AUDIT JURNALI YALNIZ ƏLAVƏ OLUNUR (Blok 11B).
+   *
+   * Sənəd müqavilədir: `/admin/audit` üçün YAZMA əməliyyatı elan edilsəydi,
+   * inteqrasiya yazan adam onu gözləyər və gec-tez kimsə route handler-i də
+   * əlavə edərdi. Test hər iki istiqaməti bağlayır — yolda yalnız `get` var.
+   */
+  it("🔴 `/admin/audit` yalnız OXU əməliyyatı elan edir (TƏLƏ D)", () => {
+    const auditPath = (document.paths ?? {})["/api/v1/admin/audit"];
+    expect(auditPath, "audit yolu sənəddə yoxdur").toBeTruthy();
+
+    const methods = Object.keys(auditPath ?? {});
+    expect(methods).toEqual(["get"]);
+  });
+
+  it("🔴 admin endpoint-lərinin hamısı KUKA tələb edir", () => {
+    const adminOps = operations.filter((o) => o.path.startsWith("/api/v1/admin"));
+    expect(adminOps.length).toBe(5);
+
+    for (const { label, operation } of adminOps) {
+      const security = operation.security as unknown[] | undefined;
+      expect(security, `${label} — security yoxdur`).toBeTruthy();
+      expect(security?.length ?? 0, `${label} — security boşdur`).toBeGreaterThan(0);
+    }
+  });
+
+  /**
+   * 🔴 TƏLƏ A — şikayət növbəsi sxemində MƏTN sahəsi yoxdur.
+   *
+   * `AdminReport` sxemi hədəfin yalnız qoruma kontekstini elan edir. Sənədə
+   * `title` / `body` düşsəydi, müştəri onu gözləyər və nə vaxtsa kimsə servisə
+   * həmin sahələri əlavə edərdi — məzmun audit izi olmadan sızardı.
+   */
+  it("🔴 `AdminReport` sxemində şikayət olunan MƏZMUN yoxdur (TƏLƏ A)", () => {
+    const schema = (document.components?.schemas ?? {}) as Record<
+      string,
+      { properties?: Record<string, unknown> }
+    >;
+    const target = schema.AdminReport?.properties?.target as
+      | { properties?: Record<string, unknown> }
+      | undefined;
+
+    expect(target, "AdminReport.target sənəddə yoxdur").toBeTruthy();
+
+    for (const forbidden of ["title", "body", "description", "content"]) {
+      expect(
+        Object.keys(target?.properties ?? {}),
+        `AdminReport.target-də «${forbidden}» var`,
+      ).not.toContain(forbidden);
+    }
   });
 
   it.each(operations.map((o) => [o.label, o] as const))(
@@ -299,16 +353,20 @@ describe("təhlükəsizlik sxemi", () => {
 describe("POST endpoint-ləri", () => {
   const posts = operations.filter((o) => o.method === "post");
 
-  it("beş POST var: auth × 3 + bildiriş × 2", () => {
+  it("altı POST var: auth × 3 + bildiriş × 2 + moderasiya qərarı", () => {
     // ⚠️ Siyahı SABİT gözləmədir: yeni yazma endpoint-i əlavə edən adam
     // aşağıdaki İKİ testin (JSON gövdəsi + 415) əhatəsinə düşdüyünü görsün.
-    // Blok 11A-da bildiriş işarələmə əlavə olundu (spec §15).
+    // Blok 11A-da bildiriş işarələmə, Blok 11B-də şikayət qərarı əlavə olundu.
+    //
+    // 🔴 SİYAHIDA `/admin/audit` ÜÇÜN HEÇ NƏ YOXDUR VƏ OLMAYACAQ (TƏLƏ D) —
+    // audit jurnalı yalnız əlavə olunur, yazma səthi açılmır.
     expect(posts.map((o) => o.operation.operationId).sort()).toEqual([
       "login",
       "logout",
       "markAllNotificationsRead",
       "markNotificationRead",
       "registerUser",
+      "resolveAdminReport",
     ]);
   });
 

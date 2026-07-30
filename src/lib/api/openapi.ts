@@ -53,6 +53,7 @@ import {
 } from "@/lib/event-filters";
 import {
   ACHIEVEMENT_CATEGORY_VALUES,
+  AUDIT_ACTION_VALUES,
   CONTENT_SECTION_VALUES,
   EVENT_CATEGORY_VALUES,
   EVENT_SCOPE_VALUES,
@@ -61,12 +62,23 @@ import {
   MEMORY_TYPE_VALUES,
   NOTIFICATION_TYPE_VALUES,
   POST_CATEGORY_VALUES,
+  REPORT_ENTITY_TYPE_VALUES,
+  REPORT_REASON_VALUES,
+  REPORT_STATUS_VALUES,
+  SYSTEM_ROLE_VALUES,
   TIMELINE_SOURCE_TYPE_VALUES,
   USER_STAGE_VALUES,
 } from "@/lib/enums";
 import { MIN_SEARCH_LENGTH } from "@/lib/search";
+import { ADMIN_USER_SORTS } from "@/lib/admin-filters";
 import {
   AchievementSchema,
+  AdminAuditSchema,
+  AdminReportSchema,
+  AdminResolveBodySchema,
+  AdminResolveResultSchema,
+  AdminStatsSchema,
+  AdminUserSchema,
   ApiErrorSchema,
   CohortHeaderSchema,
   ContentPageDetailSchema,
@@ -126,6 +138,14 @@ export const API_TAGS = [
       "(`recipientId = viewer.userId`).",
   },
   { name: "Search", description: "Qlobal axtarış (istifadəçi, paylaşım, tədbir, nailiyyət)." },
+  {
+    name: "Admin",
+    description:
+      "Moderasiya və administrasiya [M17]. 🔴 Qapı `withAdmin`-dir və rol " +
+      "TOKEN-dən deyil, hər sorğuda BAZADAN oxunur — rolu endirilmiş " +
+      "istifadəçinin köhnə JWT-si bu endpoint-ləri AÇA BİLMİR. " +
+      "🔴 Şikayət növbəsi məzmun QAYTARMIR; audit jurnalı YALNIZ ƏLAVƏ olunur.",
+  },
   { name: "System", description: "Sağlamlıq yoxlaması və sənəd." },
 ] as const;
 
@@ -1152,6 +1172,198 @@ path({
       envelope(GuidePlaceSchema, "GuidePlaceResponse"),
     ),
     ...commonResponses({ isPublic: true }),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Admin (Blok 11B, spec §17)
+//
+// 🔴 Hamısı `withAdmin` qapısındadır və qapı rolu TOKEN-dən deyil, BAZADAN
+// oxuyur (TƏLƏ B). Cavab 403-dür, 404 deyil: admin səthində resursun
+// mövcudluğu sirr deyil (404 qaydası GÖRÜNÜRLÜK qapısına aiddir).
+// ---------------------------------------------------------------------------
+
+/** Admin siyahılarının ortaq səhifə parametri. */
+const adminPageQuery = {
+  page: queryField(
+    z.string().openapi({ example: "1" }),
+    "Səhifə nömrəsi (1-dən). Etibarsız dəyər SƏSSİZCƏ 1-ə düşür.",
+  ),
+};
+
+path({
+  method: "get",
+  path: "/api/v1/admin/stats",
+  operationId: "getAdminStats",
+  tags: ["Admin"],
+  summary: "İdarə panelinin rəqəmləri",
+  description:
+    "Universitet miqyaslı struktur saylar + son 12 həftənin AQREQAT seriyası.\n\n" +
+    "🔴 **Şəxsə bağlı sıralama YOXDUR.** «Ən aktiv istifadəçilər» kimi lider " +
+    "cədvəli qəsdən yaradılmayıb: istifadəçi `CLASS` səviyyəli paylaşım edərkən " +
+    "adının universitet miqyaslı bir cədvəldə görünməsinə razılıq verməyib. " +
+    "Seriya sorğusu `authorId` belə seçmir.",
+  security: SECURED,
+  responses: {
+    200: jsonResponse(
+      "Panel rəqəmləri.",
+      envelope(AdminStatsSchema, "AdminStatsResponse"),
+    ),
+    ...commonResponses(),
+  },
+});
+
+path({
+  method: "get",
+  path: "/api/v1/admin/reports",
+  operationId: "listAdminReports",
+  tags: ["Admin"],
+  summary: "Şikayət növbəsi",
+  description:
+    "🔴 **CAVABDA ŞİKAYƏT OLUNAN MƏZMUN YOXDUR.** Sətir yalnız şikayətin " +
+    "özünü (səbəb, şikayətçinin mətni, tarix) və hədəfin MODERASİYA " +
+    "KONTEKSTİNİ (növ, `id`, görünürlük səviyyəsi, status) daşıyır. Servis " +
+    "hədəfin `title` / `body` sahələrini SORĞULAMIR.\n\n" +
+    "Məzmuna çıxış yalnız veb interfeysindəki «moderasiya baxışı» " +
+    "axınındadır və o, AuditLog sətrini eyni transaksiyada ƏVVƏLCƏ yazır. " +
+    "Endpoint kimi açılmayıb — toplu avtomatlaşdırılmış oxu audit izini " +
+    "praktikada mənasız edərdi.\n\n" +
+    "⚠️ `ACCESSIBILITY` növündə `entityId` sətir ID-si DEYİL, SƏHİFƏ YOLUDUR.",
+  security: SECURED,
+  request: {
+    query: z.object({
+      st: queryField(
+        z.enum(REPORT_STATUS_VALUES),
+        "Status filtri (`OPEN` · `IN_REVIEW` · `RESOLVED` · `REJECTED`).",
+      ),
+      et: queryField(
+        z.enum(REPORT_ENTITY_TYPE_VALUES),
+        "Şikayət olunan obyektin növü.",
+      ),
+      rs: queryField(z.enum(REPORT_REASON_VALUES), "Şikayət səbəbi."),
+      ...adminPageQuery,
+    }),
+  },
+  responses: {
+    200: jsonResponse(
+      "Şikayət sətirləri (məzmunsuz).",
+      listEnvelope(AdminReportSchema, "AdminReportListResponse"),
+    ),
+    ...commonResponses(),
+  },
+});
+
+path({
+  method: "post",
+  path: "/api/v1/admin/reports/{id}/resolve",
+  operationId: "resolveAdminReport",
+  tags: ["Admin"],
+  summary: "Şikayət üzrə qərar",
+  description:
+    "TƏK TRANSAKSİYA: `Report.status` + AuditLog + şikayətçiyə Notification.\n\n" +
+    "⚠️ `RESOLVED` və `REJECTED` üçün `resolution` MƏCBURİDİR — şikayətçiyə " +
+    "səbəbsiz cavab getməməlidir və jurnalı sonradan oxuyan adam qərarın " +
+    "niyəsini görməlidir.\n\n" +
+    "⚠️ Bağlanmış şikayət yenidən açılmır (422): status tarixçəsi yalnız bir " +
+    "istiqamətdə gedir.\n\n" +
+    "⚠️ `Content-Type: application/json` MƏCBURİDİR — brauzer `<form>`-u JSON " +
+    "göndərə bilmir, yəni cross-site POST kəsilir.",
+  security: SECURED,
+  request: {
+    params: z.object({
+      id: pathField(z.string(), "Şikayətin `id`-si (`GET /admin/reports`)."),
+    }),
+    body: {
+      required: true,
+      content: { [JSON_MEDIA]: { schema: AdminResolveBodySchema } },
+    },
+  },
+  responses: {
+    200: jsonResponse(
+      "Qərar yazıldı.",
+      envelope(AdminResolveResultSchema, "AdminResolveResponse"),
+    ),
+    ...commonResponses(),
+    415: UNSUPPORTED_415,
+  },
+});
+
+path({
+  method: "get",
+  path: "/api/v1/admin/audit",
+  operationId: "listAdminAudit",
+  tags: ["Admin"],
+  summary: "Audit jurnalı",
+  description:
+    "🔴 **JURNAL YALNIZ ƏLAVƏ OLUNUR.** Bu yol üçün `POST` / `PATCH` / " +
+    "`DELETE` əməliyyatı YOXDUR və olmayacaq: silinə bilən audit auditin " +
+    "özünü mənasız edərdi. Qadağa üç qatdadır — servis silmə/redaktə funksiyası " +
+    "ixrac etmir, `/admin/audit` səhifəsində düymə yoxdur, route handler-də " +
+    "yalnız `GET` var.\n\n" +
+    "⚠️ `metadata` XAM JSON sətridir və AĞ SİYAHIDAN keçir: şikayət olunan " +
+    "MƏZMUN oraya yazılmır (`PRIVATE` mətn jurnalda peyda olmamalıdır).",
+  security: SECURED,
+  request: {
+    query: z.object({
+      actor: queryField(z.string(), "Aktyorun `id`-si."),
+      et: queryField(
+        z.string(),
+        "Obyekt növü. ⚠️ ENUM DEYİL — sətirlər model adlarını da daşıyır.",
+      ),
+      ac: queryField(z.enum(AUDIT_ACTION_VALUES), "Əməliyyat növü."),
+      from: queryField(z.string().openapi({ example: "2026-01-01" }), "Tarixdən (daxil)."),
+      to: queryField(
+        z.string().openapi({ example: "2026-12-31" }),
+        "Tarixə qədər (GÜNÜN SONU daxil).",
+      ),
+      ...adminPageQuery,
+    }),
+  },
+  responses: {
+    200: jsonResponse(
+      "Audit sətirləri.",
+      listEnvelope(AdminAuditSchema, "AdminAuditListResponse"),
+    ),
+    ...commonResponses(),
+  },
+});
+
+path({
+  method: "get",
+  path: "/api/v1/admin/users",
+  operationId: "listAdminUsers",
+  tags: ["Admin"],
+  summary: "İstifadəçi cədvəli",
+  description:
+    "🔴 **CAVAB `redactProfile`-DAN KEÇİR.** Admin olmaq `PRIVATE` sahəni " +
+    "görmək demək deyil: `currentCity` istifadəçinin görünürlük seçimindən " +
+    "asılıdır və gizlidirsə `null` gəlir. `phone` / `personalEmail` " +
+    "ÜMUMİYYƏTLƏ sorğulanmır.\n\n" +
+    "⚠️ YAZMA ƏMƏLİYYATI YOXDUR: rol dəyişikliyi və deaktivasiya «son admin» / " +
+    "«özünü endirmə» qorumaları ilə birlikdə gəlir və toplu skript üçün " +
+    "nəzərdə tutulmayıb.\n\n" +
+    "⚠️ `cohorts[].stage` cohort TARİXLƏRİNDƏN hesablanır, `User.stage` " +
+    "keşindən yox.",
+  security: SECURED,
+  request: {
+    query: z.object({
+      q: queryField(z.string(), "Ad və ya e-poçt üzrə axtarış."),
+      role: queryField(z.enum(SYSTEM_ROLE_VALUES), "Sistem rolu filtri."),
+      stage: queryField(z.enum(USER_STAGE_VALUES), "Mərhələ filtri."),
+      cohort: queryField(z.string(), "Sinfin `slug`-ı."),
+      sort: queryField(
+        z.enum(ADMIN_USER_SORTS),
+        "Çeşidləmə: `name` · `email` · `recent` · `stage`.",
+      ),
+      ...adminPageQuery,
+    }),
+  },
+  responses: {
+    200: jsonResponse(
+      "İstifadəçi sətirləri.",
+      listEnvelope(AdminUserSchema, "AdminUserListResponse"),
+    ),
+    ...commonResponses(),
   },
 });
 

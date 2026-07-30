@@ -1116,3 +1116,344 @@ bayt-bayt eynidir.
   (tarixçə qalır).
 - İctimai məzmun səhifələrində axtarış yoxdur — yalnız `/faq`-da var.
 - `ContentPage` üçün admin CMS 11B-dədir; hazırda mətn yalnız seed-dən gəlir.
+
+---
+
+## Blok 11B — bitdi (Admin paneli [M17])
+
+`ADMIN_NAV`-dakı **səkkiz link də real səhifədir** — heç biri 404 vermir.
+Yeni yol `/admin/import` naviqasiyaya ƏLAVƏ EDİLMƏDİ (aşağıda səbəb).
+
+### Səhifələr
+
+| Yol | Nə edir |
+|---|---|
+| `/admin` | StatCard zolağı (6 rəqəm) + son 12 həftənin qrafiki + son 10 audit sətri + növbələrə keçidlər |
+| `/admin/moderation` | Şikayət növbəsi — 3 filtr + səhifələmə, `ACCESSIBILITY` ayrı tonda |
+| `/admin/achievements` | Universitet səviyyəli nailiyyət təsdiqi |
+| `/admin/users` | Cədvəl: axtarış · 3 filtr · 4 çeşidləmə · səhifələmə · CSV ixrac · responsive |
+| `/admin/cohorts` | Sinif siyahısı + yaratma formu + sətir-daxili redaktə |
+| `/admin/import` | SIS CSV importu (önizləmə → təsdiq) |
+| `/admin/content` | CMS: `ContentPage` (yan-yana Markdown önizləməsi) + `Faq` + `GuidePlace` |
+| `/admin/audit` | Audit jurnalı — YALNIZ OXU, 5 filtr + CSV ixrac |
+| `/admin/stats` | Universitet miqyaslı «İndi haradayıq?» (Blok 10B-nin qalan borcu bağlandı) |
+
+⚠️ **`/admin/import` NAVİQASİYADA YOXDUR və bu, qərardır:** `ADMIN_NAV` səkkiz
+bölmədən ibarətdir və import cohort idarəsinin bir ADDIMIDIR, ayrı bölmə deyil.
+Keçid `/admin/cohorts` və idarə panelindən verilir.
+
+### 🔴 TƏLƏ A — moderasiya axını, ADDIM-ADDIM
+
+CLAUDE.md: «`PRIVATE` → yalnız sahibi. Admin belə oxumur (audit log istisna).»
+Yəni admin olmaq məzmunu oxumaq HÜQUQU deyil — oxumaq AYRI, İZLƏNİLƏN hərəkətdir.
+
+1. `listReportQueue(viewer, filters)` şikayət SƏTİRLƏRİNİ qaytarır: səbəb,
+   şikayətçinin mətni (`details`), tarix, hədəfin NÖVÜ + `id`-si + GÖRÜNÜRLÜK
+   SƏVİYYƏSİ + statusu.
+   🔴 Hədəf sorğusu (`GUARD_SELECT`) yalnız `visibility` / `cohortId` / sahib /
+   `status` seçir — `title`, `body`, `description` SORĞULANMIR, yəni cavab
+   obyektində MÖVCUD DA DEYİL. «Səhvən göstərmək» struktur olaraq mümkün deyil.
+2. Moderator «Moderasiya baxışı» düyməsinə basır (`ReportActions`, client).
+3. `openModerationReview(viewer, reportId)`:
+   a. `assertFreshAdmin` — rol BAZADAN;
+   b. hədəfin QORUMA sahələri oxunur (məzmun yox) → `canModerate(viewer, r)`;
+   c. **TƏK TRANSAKSİYA: ƏVVƏLCƏ `recordAudit(action: MODERATE)`, SONRA
+      `readContent(tx, …)`.** Audit yazıla bilmirsə transaksiya geri qayıdır və
+      funksiya məzmunu QAYTARMIR — «izsiz baxış» halı mümkün deyil.
+4. Məzmun YALNIZ cavabda qayıdır: səhifə onu SERVERDƏ render ETMİR, yəni
+   düyməyə basılmayana qədər HTML-də mətnin izi yoxdur. `state`-də saxlanılır və
+   səhifə yenilənəndə itir (baxış bir dəfəlik hərəkətdir).
+
+**AuditLog `metadata`-sına MƏZMUN YAZILMIR.** `lib/admin-rules.ts` →
+`AUDIT_METADATA_KEYS` AĞ SİYAHIDIR (16 açar) və `safeAuditMetadata()` ondan
+kənar hər şeyi ATIR. Səbəb: jurnal `/admin/audit`-də GÖSTƏRİLİR — oraya düşən
+`PRIVATE` mətn qoruma qapısından YAN KEÇƏRDİ.
+
+⚠️ `ACCESSIBILITY` qeydlərində baxış YOXDUR: `entityId` DB sətri deyil, SƏHİFƏ
+YOLUDUR (11A qərarı) → `NOT_CONTENT` qayıdır və audit sətri də yazılmır
+(baxılacaq şəxsi məlumat olmadığı üçün sətir yalnız səs-küy olardı).
+
+### 🔴 TƏLƏ B — «JWT-də rol saxlamağın riski nədir?» (müdafiə cavabı)
+
+**Risk.** Sessiya JWT-dir (`Session` cədvəli YOXDUR — sxem şərhi). `systemRole`
+token-in İÇİNDƏDİR, yəni server sessiyanı LƏĞV EDƏ BİLMİR. Admin birini
+`USER`-ə endirsə, həmin adamın brauzerindəki token hələ `UNIVERSITY_ADMIN`
+deyir və o, token bitənə qədər `/admin`-ə girməyə davam edərdi. Bu, klassik
+SƏLAHİYYƏT QALXMASI PƏNCƏRƏSİDİR.
+
+**Həll — iki qat:**
+
+1. **Rol hər sorğuda BAZADAN oxunur.** `lib/viewer.ts` → yeni
+   `readSystemRole(userId)` (React `cache()` — render başına BİR sorğu);
+   `getViewer()` `systemRole`-u ondan alır, `requireAdmin()` isə onu AÇIQ
+   yenidən çağırır (imza dəyişməyib, içi bərkidilib). Servis qatı üçün ayrıca
+   `lib/admin-guard.ts` → `isFreshAdmin` / `assertFreshAdmin` var, çünki
+   `requireAdmin()` `forbidden()` çağırır və o, HTTP/səhifə kontekstinə
+   bağlıdır (API-də JSON, testdə adi xəta lazımdır). Sətir tapılmasa və ya
+   hesab DEAKTİVDİRSƏ ən aşağı səlahiyyət qaytarılır (fail closed).
+2. **İstifadəçi xəbərdar edilir.** Rol dəyişəndə hədəfə `Notification` gedir və
+   `/admin/users` səhifəsində izah zolağı var: «dəyişiklik növbəti girişdə tam
+   qüvvəyə minir».
+
+**Token-dəki rol SİLİNMƏDİ və silinməməlidir:** `middleware.ts` Edge-dədir və
+Prisma-ya çıxa bilmir, yəni BİRİNCİ süzgəc hələ də token-dədir. Middleware ucuz
+və tezdir; DB yoxlaması isə AVTORİTETDİR — köhnə token yönləndirməni yalnız
+GECİKDİRƏ bilər, səhifəni AÇA bilməz. `/api/v1` tərəfində eyni qapı
+`lib/api/guard.ts` → **`withAdmin`**-dədir (yeni, `withUser` üzərində).
+
+### 🔴 TƏLƏ C — admin özünü kilidləyə bilmir (üç qoruma)
+
+Qaydalar SAF funksiyalardadır (`lib/admin-rules.ts`), servis yalnız DB
+kontekstini yığır:
+
+1. `checkSystemRoleChange` → **`SELF_DEMOTE`** — admin ÖZ sistem rolunu endirə
+   bilməz;
+2. `checkSystemRoleChange` → **`LAST_ADMIN`** — sonuncu AKTİV admin endirilə
+   bilməz;
+3. `checkDeactivation` → **`SELF_DEACTIVATE`** — admin öz hesabını deaktiv edə
+   bilməz.
+
+**`adminCount` TRANSAKSİYANIN İÇİNDƏN oxunur.** Kənarda oxusaydıq iki eyni anlı
+sorğu (son iki admini paralel endirmək) hər ikisi «2 admin var» görüb keçərdi —
+klassik TOCTOU.
+
+⚠️ **Dürüst qeyd:** `LAST_ADMIN` ARDICIL icrada YARANMIR — əməliyyatı edən özü
+aktiv admindir, yəni hədəfdən başqa ən azı bir admin var (say ≥ 2). Say 1
+YALNIZ yarış halında görünür. Yəni qayda məhz TOCTOU qoruyucusudur; bu, saf
+funksiya testində hər kombinasiya üçün ölçülüb, inteqrasiya testi isə real
+axında sistemin adminsiz qalmadığını yoxlayır.
+
+⚠️ `targetIsActive` bayrağı sonradan əlavə olundu: onsuz qayda YALANDAN işə
+düşürdü — DEAKTİV adminin rolunu almaq bloklanırdı, halbuki o, `adminCount`-a
+onsuz da daxil deyil və sistemdə işlək admin qalırdı.
+
+**SİLMƏ YOXDUR — DEAKTİVASİYA VAR.** Sxemə `User.deactivatedAt DateTime?`
+əlavə olundu (miqrasiya `admin_deactivation`). Səbəb: `User` silinsə
+`onDelete: Cascade` onun bütün paylaşımlarını, şərhlərini, xatirələrini və
+nailiyyətlərini aparardı — yəni SİNFİN xronologiyasından BAŞQALARININ da
+xatirəsi yox olardı. Deaktivasiya İKİ QAT işləyir:
+`src/auth.ts` girişi rədd edir (vaxt kanalı da bağlıdır — bcrypt müqayisəsi
+yenə işlədilir) və `getSessionUser()` `null` qaytarır → layout
+`SESSION_EXPIRED_PATH`-ə yönləndirir, kuka silinir, açıq sessiya bağlanır.
+
+### 🔴 TƏLƏ D — audit jurnalı yalnız əlavə olunur
+
+Qadağa ÜÇ QATDADIR və hər üçü ayrıca testlidir:
+
+- `services/audit.service.ts` silmə/redaktə funksiyası **İXRAC ETMİR**
+  (`audit.service.test.ts` modul ixraclarını gəzir + mənbə mətnində
+  `auditLog.delete|update|upsert(` çağırışının olmadığını yoxlayır);
+- `/admin/audit` səhifəsində düymə yoxdur (e2e: silmə/təmizlə/redaktə düyməsi
+  və `form[method=post]` sayı = 0);
+- `/api/v1/admin/audit` yalnız `GET` ixrac edir (openapi testi yolda yalnız
+  `get` olduğunu, e2e isə POST/PUT/PATCH/DELETE üçün 405 gəldiyini yoxlayır).
+
+Yeganə yazma yolu `recordAudit(tx, …)`-dir və o, HƏMİŞƏ əməliyyatla EYNİ
+transaksiyada çağırılır (`tx` arqument kimi ötürülür — ayrı yazılsaydı
+«əməliyyat oldu, audit sınıb» halı mümkün olardı).
+
+### 🔴 TƏLƏ E — CSV import müqaviləsi
+
+**Sütunlar:** `email,firstName,lastName,facultyCode,programCode,admissionYear`
+(sıra sərbəstdir, adlar məcburidir; `facultyCode`/`programCode` = `slug`).
+
+**Fayl səviyyəsində rədd:** `EMPTY_FILE` · `MISSING_COLUMN` ·
+**`FORBIDDEN_COLUMN`** (şifrə sütunu) · `NO_DATA_ROWS`.
+**Sətir səviyyəsində rədd:** `COLUMN_COUNT` · `INVALID_EMAIL` ·
+`NOT_UNIVERSITY_EMAIL` · `MISSING_NAME` · `MISSING_CODE` · `INVALID_YEAR` ·
+`DUPLICATE_IN_FILE`.
+**DB kontekstində rədd:** `UNKNOWN_FACULTY` · `UNKNOWN_PROGRAM` · `NO_COHORT`.
+
+**Qaydalar:**
+- `previewImport` BAZAYA YAZMIR — funksiyada `create`/`update` çağırışı yoxdur
+  (inteqrasiya testi `User` sayını əvvəl/sonra müqayisə edir);
+- `commitImport` TƏK `prisma.$transaction` — QİSMƏN YAZI OLMAZ;
+- **faylda BİR rədd edilmiş sətir varsa yazı ÜMUMİYYƏTLƏ getmir**
+  (`HAS_REJECTED_ROWS`). «Yaxşıları yazaq, pisləri atalım» yolu SEÇİLMƏDİ:
+  SIS ixracında bir sətrin pozulması adətən SÜTUN SÜRÜŞMƏSİ deməkdir və
+  «yaxşı» sətirlər də səhv məlumat daşıya bilər;
+- təkrar e-poçt → mövcud istifadəçi YENİLƏNİR (yeni sətir yaranmır);
+- 🔴 **şifrə QƏBUL EDİLMİR** — parse mərhələsində. Yeni hesab
+  `UNSET_PASSWORD_HASH` (`"!unset"`, qəsdən etibarsız bcrypt hash) ilə yaradılır
+  və `src/auth.ts` onu AÇIQ ŞƏKİLDƏ rədd edir. Seed-in sabit duzu buraya
+  KOPYALANMADI — o, yalnız demo üçündür;
+- BOM kəsilir (yalnız faylın əvvəlindən), CRLF/LF ikisi də, RFC 4180 dırnaqları,
+  2 MB limit, `text/csv`;
+- bütün import → **BİR** AuditLog sətri (`entityType: "SisImport"`,
+  metadata: `created` / `updated` / `rejected`);
+- **`previewToken`** — normallaşdırılmış mətnin FNV-1a hash-ı. `commitImport`
+  onu yenidən hesablayıb müqayisə edir: admin önizlədikdən sonra başqa fayl
+  seçib «Təsdiqlə»yə basa bilməsin. Serverdə vəziyyət saxlanılmır. Yalnız sətir
+  sonu formatı fərqlənən eyni fayl EYNİ jeton verir.
+
+### 🔴 TƏLƏ F — cohort slug-ı
+
+`@@unique([scope, facultyId, programId, admissionYear])` DUBLİKATI HƏMİŞƏ
+DAYANDIRMIR: SQL-də iki `NULL` bir-birindən FƏRQLİ sayılır (sxem şərhi bunu
+açıq yazır). Əsl qoruyucu `slug @unique`-dir və o, YALNIZ slug DETERMİNİSTİK
+olduqda işləyir: `cohortSlugOf(programSlug, graduationYear)` — formul seed ilə
+EYNİDİR. Mövcudluq TRANSAKSİYA İÇİNDƏ yoxlanılır, üstəlik `P2002` də tutulur
+(DB son sözü deyəndir). Forma slug SAHƏSİ GÖSTƏRMİR — yalnız ÖNİZLƏMƏ.
+
+**SİLMƏ YOXDUR VƏ TƏKLİF EDİLMİR:** `Cohort` silinsə cascade sinfin bütün
+məzmununu aparardı; sxemdə «arxivlə» sahəsi də yoxdur, ona görə mövcud olmayan
+düymə ekranda göstərilmir. Tarix dəyişəndə `ensureCohortMilestones` (Blok 8)
+YENİDƏN çağırılır — idempotentdir, köhnə milestone-lar avtomatik düzəlir.
+
+### 🔴 TƏLƏ G — analitikada niyə ŞƏXSƏ BAĞLI SIRALAMA YOXDUR
+
+**Qərar:** dashboard struktur SAYLAR və AQREQAT zaman seriyası göstərir.
+«Ən aktiv istifadəçilər», «kim nə qədər paylaşıb» LİDER CƏDVƏLİ YARADILMADI.
+
+**Səbəb:** platformanın bütün məxfilik modeli istifadəçinin öz məzmununun
+ƏHATƏSİNİ seçməsi üzərində qurulub — `CLASS` paylaşım sinifdən kənara çıxmır.
+Universitet miqyaslı lider cədvəli həmin seçimi ARXADAN dolanardı: paylaşımın
+MƏTNİ görünməsə də, «Filankəs bu ay 42 paylaşım etdi» sətri onun davranışını
+ifşa edir və istifadəçi buna razılıq verməyib.
+
+Qərar KODA da yazılıb: `lib/admin-series.ts` → `buildWeeklySeries(postDates,
+memberDates, now)` girişi `Date[]`-dir, yəni `userId` ötürmək MÜMKÜN DEYİL;
+servis sorğusu `authorId` belə seçmir. Çıxış açarları yalnız
+`week` / `label` / `posts` / `members`-dir (test bunu bərkidir).
+
+`/admin/stats` universitet miqyaslı «İndi haradayıq?»-dır və orada k-anonimlik
+(≥ 3 nəfər), «Açıqlanmayan» xanası və `includeInStats` razılığı EYNİ qüvvədədir
+— admin olmaq bu qapıların heç birini açmır.
+
+### CSV export və `redactProfile`
+
+`/admin/users` ixracı AĞ SİYAHIDIR (10 sütun). `phone` / `personalEmail`
+ÜMUMİYYƏTLƏ SORĞULANMIR (`ADMIN_USER_SELECT`-də yoxdur) — sahə yaddaşa belə
+gəlmir. «Şəhər» sütunu isə `redactProfile(profile, viewer, fieldVisibility)`-dən
+KEÇİR: admin olmaq `CLASS` səviyyəli sahəni görmək demək deyil, admin həmin
+sinifdə deyilsə xana BOŞ qalır. Audit ixracı da yalnız OXU səthinin davamıdır.
+
+### Yeni fayllar
+
+**Saf modullar (Prisma / React yoxdur, testlə örtülü):** `lib/sis-import.ts` ·
+`lib/admin-rules.ts` · `lib/admin-filters.ts` · `lib/admin-series.ts`.
+`lib/labels.ts` → `REPORT_STATUS_LABELS`, `REPORT_REASON_LABELS`,
+`AUDIT_ACTION_LABELS`, `SYSTEM_ROLE_LABELS` + `…Label()` (T13 — vahid mənbə).
+
+**Server qapısı:** `lib/admin-guard.ts` (`isFreshAdmin` / `assertFreshAdmin` /
+`AdminForbiddenError`) · `lib/viewer.ts` → `readSystemRole` ·
+`lib/api/guard.ts` → `withAdmin`.
+
+**Servislər:** `admin.service` (dashboard) · `audit.service` (append-only) ·
+`moderation.service` (növbə · baxış · qərar · gizlətmə) · `admin-users.service` ·
+`admin-cohorts.service` · `admin-content.service` · `sis-import.service`.
+`achievement.service` → **`listUniversityModerationQueue`** +
+`countUniversityModerationQueue` (Blok 8-in `listModerationQueue`-sinə BAYRAQ
+ƏLAVƏ EDİLMƏDİ — iki icazə modeli bir funksiyada qarışanda sızma bayraq
+dəyərindən asılı olur; qərar funksiyaları isə TƏKRAR İŞLƏDİLİR).
+
+**Feature (`src/features/admin/`):** `actions.ts` · `schemas.ts` ·
+`AdminPageHeader` · `AdminDashboard` · `ActivityChart` · `ReportQueue` ·
+`ReportFilters` · `ReportActions` · `AdminUserTable` · `AdminUserFilters` ·
+`UserRowActions` · `UserExportButton` · `CsvDownloadButton` · `AdminCohorts` ·
+`CohortCreateForm` · `CohortEditForm` · `SisImportScreen` · `AdminContent` ·
+`ContentEditor` · `FaqEditor` · `GuidePlaceEditor` · `AuditTable` ·
+`AuditFilters` · `AuditExportButton` · `AdminStatsPanel`.
+
+### Yeni v1 endpoint-ləri (28 → 33)
+
+`GET /api/v1/admin/stats` · `GET /admin/reports` · `POST /admin/reports/{id}/resolve` ·
+`GET /admin/audit` · `GET /admin/users`. Hamısı **`withAdmin`** (DB-dən rol),
+yazma əməliyyatında `requireJson`, cavab `Cache-Control: private, no-store`.
+Yeni `Admin` taqı; sxemlər `lib/api/schemas.ts`-ə (`AdminStats`, `AdminReport`,
+`AdminResolveBody`, `AdminResolveResult`, `AdminAuditEntry`, `AdminUser`).
+
+⚠️ **`/admin/users`-də YAZMA əməliyyatı YOXDUR:** rol dəyişikliyi və
+deaktivasiya «son admin» / «özünü endirmə» qorumaları ilə birlikdə gəlir və
+toplu skript üçün nəzərdə tutulmayıb. Veb interfeysi tək yoldur.
+⚠️ **`/admin/reports` MƏZMUN QAYTARMIR** — «moderasiya baxışı» endpoint kimi
+AÇILMADI: toplu avtomatlaşdırılmış oxu audit izini praktikada mənasız edərdi.
+
+### Qərarlar (müdafiədə soruşula bilər)
+
+- **`(admin)` qrupunda `Providers` YOXDUR (T18) və qalır.** Admin filtrləri
+  nuqs deyil, adi `<form method="get">` + `<Link>` çipləridir — JS olmadan da
+  işləyir və vəziyyət paylaşıla bilən URL-dir. Yeganə istisna `/admin/stats`:
+  orada Blok 10B-nin `MapTabs`-ı təkrar işlədilir və o, URL vəziyyəti tələb
+  edir → **yalnız həmin ağacda** `NuqsAdapter` mount olunur (TanStack Query
+  GƏTİRİLMİR).
+- **`(admin)/layout.tsx`-ə `<Toaster />` əlavə olundu.** O, müstəqil client
+  komponentidir; onsuz server action nəticələri (rol dəyişikliyi, moderasiya
+  qərarı, import) səssizcə itərdi.
+- **`AuditLog.entityType` ENUM DEYİL** — sətirlər tarixən model adlarını
+  (`Post`, `Cohort`, `CohortMembership`, `Report`) və bəzən enum dəyərini
+  (`ACHIEVEMENT`) daşıyır. Filtr siyahısı DB-dən FACET kimi gəlir; sabit siyahı
+  yazsaydıq mövcud sətirlərin bir hissəsi filtrdə GÖRÜNMƏZ olardı.
+- **`metadata` xarab JSON-da səhifəni SINDIRMIR** — `parseAuditMetadata` `null`
+  qaytarır və UI xam mətni göstərir.
+- **CMS-də slug KİLİDİ:** `lib/content-routes.ts`-dəki `kind: "page"`
+  marşrutlarının və hüquqi sənədlərin slug-ları dəyişdirilə bilmir (input
+  `disabled` + server rədd edir). Slug dəyişsə ictimai səhifə 404 verər və bu,
+  SAKİT sınmadır. Qalan slug-larda xəbərdarlıq göstərilir.
+- **CMS gövdəsi `dangerouslySetInnerHTML` İŞLƏTMİR:** `parseMarkdown` HTML
+  QURMUR, blok siyahısı qaytarır (11A-nın `markdown.test.ts`-i bunu bərkidir).
+  Önizləmə eyni SAF funksiyanı client-də çağırır.
+- **`GuidePlace` koordinatları CMS-dən redaktə edilmir** — səhv mövqe
+  ziyarətçini mövcud olmayan ünvana aparardı.
+- **Dashboard sayları görünürlük süzgəcindən KEÇMİR və bu, qəsdli fərqdir:**
+  sinif səhifəsindəki saylar (`getCohortHeadlineStats`) İSTİFADƏÇİYƏ göstərilir,
+  buradakılar isə İDARƏETMƏ göstəriciləridir («neçə açıq şikayət var?» sualına
+  «sənin görə bildiyin qədər» cavabı mənasızdır). Qiyməti: qapı
+  `assertFreshAdmin`-dir və heç bir MƏZMUN qaytarılmır, yalnız SAYLAR.
+
+### Yol boyu tapılan iki səhv (ikisi də düzəldildi)
+
+1. 🔴 **Test təmizliyində «ən yeni N sətri sil» YANLIŞDIR.** Seed audit və
+   bildiriş sətirlərinin bir hissəsi GƏLƏCƏK tarixlidir
+   (`resolvedAt = createdAt + 1..10 gün` bugünü keçə bilər), yəni `createdAt
+   desc` sıralaması ilə silmək SEED sətirlərini aparırdı: say düz qalırdı
+   (46), MƏZMUN isə sürüşürdü (`aud-031`, `aud-035` itmişdi). Determinizm
+   yoxlaması bunu tutdu. İndi təmizlik `id` ÇOXLUĞU ilə aparılır.
+2. 🔴 **`@updatedAt` bərpanı da damğalayır — MÖVCUD TESTLƏRDƏ də.**
+   `prisma.*.update()` `@updatedAt` sahəsini AVTOMATİK yeniləyir, yəni sətri
+   «geri qaytaran» update onu təzə damğa ilə yazır. Bu, Blok 9S/11A-dan bəri
+   `api.db.test.ts` və `public-content.db.test.ts`-də (ContentPage
+   `isPublished` toggle-ı) SƏSSİZ determinizm sürüşməsi yaradırdı. Hər üç yerdə
+   bərpa XAM SQL-ə (`$executeRaw`) keçirildi — Prisma-nın avtomatik sahə
+   məntiqindən yan keçir.
+
+### Testlər
+
+vitest **1442** (1275 → +167: `sis-import` 25, `admin-filters` 26,
+`admin-rules` 21, `admin-series` 11, `audit.service` 5, `admin.db` 34,
+`openapi` +45 (3 yeni + avtomatik `it.each`)).
+playwright **148** (133 → +15: `admin.spec.ts`).
+`openapi.test.ts` və `api-docs.spec.ts`-dəki sabit endpoint sayı 28 → **33**,
+POST siyahısı 5 → **6**.
+
+`npx tsc --noEmit` · `npm run lint` · `npm run build` təmiz.
+`grep -rn "prisma\." src/app src/features` → yalnız şərhlər.
+`grep -rn "#[0-9a-f]\{3,6\}" src/features/admin src/lib/admin-*.ts` → BOŞ.
+
+🔴 **Determinizm ölçüldü:**
+- iki ardıcıl seed → 28 cədvəl **bayt-bayt eyni**;
+- TAM vitest dəstindən sonra → 28 cədvəl **bayt-bayt eyni** (yuxarıdakı iki
+  düzəlişdən sonra);
+- tam e2e dəstindən sonra → 27 cədvəl bayt-bayt eyni, `User` cədvəlinin SAYI
+  eyni (125), DƏYƏRLƏRİ isə yox. Bu, Blok 11A-da sənədləşdirilmiş MÖVCUD
+  davranışdır: giriş axını `lastSeenAt` / `stage` / `updatedAt` sütunlarını
+  yeniləyir. Yoxlanıldı: import istifadəçisi qalmayıb (0), deaktiv hesab yoxdur
+  (0), admin sayı 1-dir.
+
+### Qalan borc
+
+- **Cohort rolu YALNIZ ƏSAS sinifdə dəyişdirilir** (`user.cohorts[0]`). İki
+  sinifdə üzv olan istifadəçi üçün ikinci sinfin rolu UI-dan idarə olunmur —
+  servis (`changeCohortRole`) `cohortId` alır, yəni ekran işi qalıb.
+- **CMS-də YARATMA yoxdur, yalnız redaktə.** Yeni `ContentPage` / `Faq` /
+  `GuidePlace` seed-dən gəlir; yaratma formu marşrut xəritəsi ilə
+  uzlaşdırılmalıdır (yeni slug hansı ünvanda görünəcək?).
+- **Moderasiya növbəsində toplu əməliyyat yoxdur** (bir-bir qərar). Toplu
+  «hamısını rədd et» audit izini kütləviləşdirər və hər sətrin öz səbəbi
+  itərdi.
+- **`/admin/import` yalnız İSTİFADƏÇİ importudur.** Cohort və ixtisas importu
+  yoxdur — onlar əl ilə yaradılır (say azdır, səhvin qiyməti yüksəkdir).
+- **Şifrə bərpası axını hələ YOXDUR**, yəni SIS ilə yaradılan hesab praktikada
+  qeydiyyat formasından (eyni e-poçtla) keçməlidir. `UNSET_PASSWORD_HASH`
+  müqaviləsi hazırdır; axının özü Blok 12/13 işidir.
+- **`/admin/stats` cohort filtri daşımır** — universitet miqyası sabitdir.

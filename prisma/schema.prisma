@@ -40,6 +40,14 @@ model User {
   // Sistem rolu (cohort daxilindəki roldan FƏRQLİDİR — bax CohortMembership.role)
   systemRole String @default("USER") // USER | UNIVERSITY_ADMIN
 
+  /// Hesabın deaktiv edilmə anı — `null` = aktiv (Blok 11B, admin paneli).
+  /// 🔴 SİLMƏ ƏVƏZİNƏ DEAKTİVASİYA: `User` silinsə `onDelete: Cascade` onun
+  /// bütün paylaşımlarını, şərhlərini, xatirələrini və nailiyyətlərini aparar,
+  /// yəni SİNFİN xronologiyasından başqalarının da xatirəsi silinərdi.
+  /// Deaktiv hesab girişdə rədd olunur (src/auth.ts) və açıq sessiya növbəti
+  /// sorğuda çıxarılır (src/lib/viewer.ts → getSessionUser).
+  deactivatedAt DateTime?
+
   // Həyat dövrü mərhələsi — Incoming → Student → Alumni
   stage String @default("INCOMING") // INCOMING | STUDENT | ALUMNI
 

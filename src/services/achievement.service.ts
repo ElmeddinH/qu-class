@@ -13,6 +13,7 @@
 
 import type { Prisma } from "@prisma/client";
 
+import { assertFreshAdmin } from "@/lib/admin-guard";
 import { prisma } from "@/lib/db";
 import {
   AchievementStatus,
@@ -324,6 +325,60 @@ export async function listModerationQueue(
     take,
     select: { ...ACHIEVEMENT_SELECT, createdAt: true },
   });
+}
+
+// ---------------------------------------------------------------------------
+// 🔴 UNİVERSİTET SƏVİYYƏLİ NÖVBƏ — `listModerationQueue`-ya BAYRAQ ƏLAVƏ EDİLMİR
+// ---------------------------------------------------------------------------
+
+export interface UniversityQueueItem extends ModerationQueueItem {
+  cohortId: string;
+}
+
+/**
+ * Bütün siniflərin təsdiq gözləyən nailiyyətləri — UNİVERSİTET ADMİNİ üçün
+ * (Blok 11B, `/admin/achievements`).
+ *
+ * 🔴 NİYƏ AYRI FUNKSİYADIR (yuxarıdakı `listModerationQueue`-ya
+ * `cohortId?: string` bayrağı ƏLAVƏ ETMƏK ƏVƏZİNƏ):
+ * iki funksiyanın İCAZƏ MODELİ FƏRQLİDİR.
+ *   · `listModerationQueue` → `canModerateCohort(viewer, cohortId)` — SİNİF
+ *     səviyyəli rol (`CLASS_MODERATOR`), konkret sinifə bağlıdır;
+ *   · bu funksiya → `assertFreshAdmin(viewer)` — SİSTEM rolu, bütün siniflər.
+ *
+ * Bayraq kimi birləşdirsək, `cohortId` verilmədikdə qapı hansı olmalıdır?
+ * `canModerateCohort(viewer, null)` sinif moderatoru üçün `false` qaytarır,
+ * amma bu, susmaqla verilmiş qərardır — kimsə sonra "boş cohort = hamısı"
+ * yazsa BİR SİNFİN moderatoru BÜTÜN universitetin təsdiq gözləyən
+ * nailiyyətlərini görərdi. Blok 8-in öz dərsi: iki icazə modeli bir funksiyada
+ * qarışanda sızma bayraq dəyərindən asılı olur.
+ *
+ * ⚠️ QƏRAR funksiyaları (`verify` / `feature` / `reject`) TƏKRAR İŞLƏDİLİR —
+ * kopyalanmır. Onların qapısı `canModerateCohort`-dur və `UNIVERSITY_ADMIN`
+ * orada onsuz da bütün siniflərdə keçir.
+ */
+export async function listUniversityModerationQueue(
+  viewer: Viewer,
+  filters: { cohortId?: string } = {},
+  take: number = MODERATION_QUEUE_LIMIT,
+): Promise<UniversityQueueItem[]> {
+  await assertFreshAdmin(viewer);
+
+  return prisma.achievement.findMany({
+    where: {
+      status: AchievementStatus.SUBMITTED,
+      ...(filters.cohortId ? { cohortId: filters.cohortId } : {}),
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take,
+    select: { ...ACHIEVEMENT_SELECT, createdAt: true, cohortId: true },
+  });
+}
+
+/** Universitet miqyasında təsdiq gözləyən nailiyyət sayı. */
+export async function countUniversityModerationQueue(viewer: Viewer): Promise<number> {
+  await assertFreshAdmin(viewer);
+  return prisma.achievement.count({ where: { status: AchievementStatus.SUBMITTED } });
 }
 
 // ---------------------------------------------------------------------------

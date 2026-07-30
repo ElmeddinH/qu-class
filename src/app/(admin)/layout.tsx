@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { Toaster } from "@/components/ui/sonner";
 import { AdminShell } from "@/layouts/AdminShell";
 import { getSessionUser, requireAdmin } from "@/lib/auth";
 import { SESSION_EXPIRED_PATH } from "@/lib/routes";
@@ -31,6 +32,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       }}
     >
       {children}
+      {/* ⚠️ `Providers` (TanStack Query + nuqs) BURADA YOXDUR və olmamalıdır —
+          T18. `Toaster` isə müstəqil client komponentidir: server action
+          nəticələri (rol dəyişikliyi, moderasiya qərarı, import) onsuz
+          səssizcə itərdi. */}
+      <Toaster position="bottom-right" />
     </AdminShell>
   );
 }

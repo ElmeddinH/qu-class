@@ -18,7 +18,7 @@ import { compareSync, hashSync } from "bcryptjs";
 
 import { authConfig } from "@/auth.config";
 import { prisma } from "@/lib/db";
-import { BCRYPT_ROUNDS, normalizeEmail } from "@/lib/constants";
+import { BCRYPT_ROUNDS, isPasswordUnset, normalizeEmail } from "@/lib/constants";
 import { SystemRoleSchema } from "@/lib/enums";
 import { syncUserStage } from "@/lib/stage";
 import { credentialsSchema } from "@/features/auth/schemas";
@@ -74,10 +74,32 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const email = normalizeEmail(parsed.data.email);
         const user = await prisma.user.findUnique({
           where: { email },
-          select: { id: true, email: true, passwordHash: true, systemRole: true },
+          select: {
+            id: true,
+            email: true,
+            passwordHash: true,
+            systemRole: true,
+            deactivatedAt: true,
+          },
         });
 
         if (!user) {
+          equalizeFailureTiming(parsed.data.password);
+          return null;
+        }
+
+        // 🔴 DEAKTİV HESAB GİRİŞ EDƏ BİLMİR (Blok 11B). Vaxt kanalı burada da
+        // bağlanır: bcrypt müqayisəsi işlədilir, yəni "deaktiv hesab" ilə
+        // "səhv şifrə" cavab MÜDDƏTİNƏ görə ayırd edilmir.
+        if (user.deactivatedAt !== null) {
+          equalizeFailureTiming(parsed.data.password);
+          return null;
+        }
+
+        // 🔴 ŞİFRƏSİZ HESAB (SIS importu) girişə BURAXILMIR — istifadəçi
+        // əvvəlcə şifrə təyin etməlidir. `compareSync` etibarsız hash-da xəta
+        // ata bilər, ona görə yoxlama ondan ƏVVƏLdir.
+        if (isPasswordUnset(user.passwordHash)) {
           equalizeFailureTiming(parsed.data.password);
           return null;
         }

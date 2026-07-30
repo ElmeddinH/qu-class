@@ -1149,7 +1149,7 @@ describe("Blok 11A — ictimai tək-resurs endpoint-ləri", () => {
     currentViewer = ANONYMOUS;
     const page = await prisma.contentPage.findUniqueOrThrow({
       where: { slug: "yataqxana" },
-      select: { id: true },
+      select: { id: true, updatedAt: true },
     });
 
     const { GET } = await import("@/app/api/v1/content/pages/[slug]/route");
@@ -1169,10 +1169,15 @@ describe("Blok 11A — ictimai tək-resurs endpoint-ləri", () => {
       expect(response.status).toBe(404);
       expect((await errorOf(response)).code).toBe("NOT_FOUND");
     } finally {
-      await prisma.contentPage.update({
-        where: { id: page.id },
-        data: { isPublished: true },
-      });
+      // 🔴 `updatedAt` DA BƏRPA OLUNUR (Blok 11B-də tapıldı): sxemdə
+      // `@updatedAt` var, yəni bərpa edən `update` onu TƏZƏ damğa ilə yazır və
+      // seed determinizmi POZULUR (say eyni qalır, dəyər sürüşür). Prisma
+      // avtomatik sahəni `data`-dan oxumur → XAM SQL işlədilir.
+      await prisma.$executeRaw`
+        UPDATE ContentPage
+           SET isPublished = 1, updatedAt = ${page.updatedAt}
+         WHERE id = ${page.id}
+      `;
     }
   });
 

@@ -24,10 +24,11 @@
 import { unstable_rethrow } from "next/navigation";
 import type { z } from "zod";
 
+import { isFreshAdmin } from "@/lib/admin-guard";
 import { getViewer } from "@/lib/auth";
 import type { AuthenticatedViewer } from "@/lib/viewer";
 import type { Viewer } from "@/lib/visibility";
-import { fail, unauthenticated } from "./respond";
+import { fail, forbidden, unauthenticated } from "./respond";
 
 /**
  * Next 15 route handler-inin ikinci arqumenti. `params` PROMISE-dir
@@ -111,6 +112,37 @@ export function withUser<P extends Record<string, string> = Record<string, strin
     guarded(async () => {
       const viewer = await getViewer();
       if (viewer.kind !== "USER") return unauthenticated();
+
+      return handler({
+        request,
+        viewer,
+        params: await resolveParams(context),
+        searchParams: new URL(request.url).searchParams,
+      });
+    });
+}
+
+/**
+ * 🔴 ADMİN endpoint-i — `withUser`-in ÜZƏRİNDƏ, DB-dən rol yoxlaması ilə.
+ *
+ * TƏLƏ B (Blok 11B): sistem rolu JWT-nin İÇİNDƏDİR (`Session` cədvəli yoxdur).
+ * Admin birini `USER`-ə endirsə, həmin adamın token-i hələ `UNIVERSITY_ADMIN`
+ * deyir və token bitənə qədər admin endpoint-lərinə çıxa bilərdi. Ona görə
+ * qapı `viewer.systemRole` sahəsinə GÜVƏNMİR — `isFreshAdmin` hər sorğuda
+ * bazadan oxuyur (bir `findUnique`, ucuzdur).
+ *
+ * ⚠️ Cavab 403-dür, 404 DEYİL: admin səthində resursun MÖVCUDLUĞU sirr deyil
+ * (`/admin/*` yollarının özü sənəddədir) və 404 qaytarmaq inteqrasiya yazan
+ * adamı yanıldardı. 404 qaydası GÖRÜNÜRLÜK qapısına aiddir (bax `errors.ts`).
+ */
+export function withAdmin<P extends Record<string, string> = Record<string, string>>(
+  handler: (args: UserHandlerArgs<P>) => Promise<Response>,
+): Handler<P> {
+  return (request, context) =>
+    guarded(async () => {
+      const viewer = await getViewer();
+      if (viewer.kind !== "USER") return unauthenticated();
+      if (!(await isFreshAdmin(viewer))) return forbidden();
 
       return handler({
         request,

@@ -13,12 +13,52 @@ import { forbidden, redirect } from "next/navigation";
 
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { CohortRole, SystemRole, SystemRoleSchema, type CohortRole as CohortRoleType } from "@/lib/enums";
+import {
+  CohortRole,
+  SystemRole,
+  SystemRoleSchema,
+  type CohortRole as CohortRoleType,
+  type SystemRole as SystemRoleType,
+} from "@/lib/enums";
 import { LOGIN_PATH } from "@/lib/routes";
 import { ANONYMOUS, type Viewer } from "@/lib/visibility";
 
 /** Giriş etmiş istifadəçiyə daraldılmış `Viewer` — `require*` qapılarının çıxışı. */
 export type AuthenticatedViewer = Extract<Viewer, { kind: "USER" }>;
+
+/**
+ * 🔴 SİSTEM ROLUNUN CANLI DƏYƏRİ — TOKEN-DƏN DEYİL, BAZADAN (Blok 11B, TƏLƏ B).
+ *
+ * JWT strategiyasında `systemRole` TOKEN-İN İÇİNDƏDİR (`Session` cədvəli
+ * yoxdur — bax `prisma/schema.prisma`). Bu, klassik SƏLAHİYYƏT QALXMASI
+ * PƏNCƏRƏSİ yaradır: admin birini `USER`-ə endirdikdən sonra həmin adamın
+ * brauzerindəki token HƏLƏ DƏ `UNIVERSITY_ADMIN` deyir və o, token bitənə
+ * qədər `/admin`-ə girməyə davam edər. Sessiyanı serverdən ləğv etmək mümkün
+ * deyil, çünki saxlanılan sessiya yoxdur.
+ *
+ * Həll: rol hər sorğuda DB-dən oxunur. Qiymət bir `findUnique`-dir və
+ * `cache()` sayəsində render başına BİR dəfə ödənilir — qapı isə məhz
+ * buradadır.
+ *
+ * ⚠️ Sətir tapılmasa (hesab silinib) və ya hesab DEAKTİVDİRSƏ ən aşağı
+ * səlahiyyət qaytarılır (fail closed).
+ *
+ * ⚠️ Token-dəki `systemRole` SİLİNMİR: `src/middleware.ts` Edge-dədir və
+ * Prisma-ya çıxa bilmir, yəni BİRİNCİ süzgəc hələ də token-dədir. Middleware
+ * tez və ucuzdur, bu funksiya isə AVTORİTETDİR — köhnə token yalnız
+ * yönləndirməni "gecikdirə" bilər, səhifəni AÇA bilməz.
+ */
+export const readSystemRole = cache(async (userId: string): Promise<SystemRoleType> => {
+  const row = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { systemRole: true, deactivatedAt: true },
+  });
+
+  if (!row || row.deactivatedAt !== null) return SystemRole.USER;
+
+  // Naməlum rol dəyəri DB-də qalıbsa ən aşağı səlahiyyət (fail closed).
+  return SystemRoleSchema.catch(SystemRole.USER).parse(row.systemRole);
+});
 
 /**
  * Cari sorğunun `Viewer`-i.
@@ -27,26 +67,28 @@ export type AuthenticatedViewer = Extract<Viewer, { kind: "USER" }>;
  * DB-yə YALNIZ BİR sorğu gedir. Layout, səhifə və hər servis funksiyası onu
  * sərbəst çağıra bilər.
  *
- * `cohortIds` və `moderatedCohortIds` token-dən DEYİL, hər sorğuda
- * `CohortMembership`-dən TƏK sorğu ilə oxunur — JWT uzunömürlüdür və üzvlük /
- * rol dəyişikliyi orada dərhal əks olunmazdı (bax `src/auth.config.ts`).
+ * `cohortIds`, `moderatedCohortIds` VƏ `systemRole` token-dən DEYİL, hər
+ * sorğuda DB-dən oxunur — JWT uzunömürlüdür və üzvlük / rol dəyişikliyi orada
+ * dərhal əks olunmazdı (bax `readSystemRole` yuxarıda və `src/auth.config.ts`).
  */
 export const getViewer = cache(async (): Promise<Viewer> => {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return ANONYMOUS;
 
-  const memberships = await prisma.cohortMembership.findMany({
-    where: { userId },
-    select: { cohortId: true, role: true },
-  });
+  const [memberships, systemRole] = await Promise.all([
+    prisma.cohortMembership.findMany({
+      where: { userId },
+      select: { cohortId: true, role: true },
+    }),
+    readSystemRole(userId),
+  ]);
 
   return {
     kind: "USER",
     userId,
     cohortIds: memberships.map((m) => m.cohortId),
-    // Naməlum rol dəyəri qalıbsa ən aşağı səlahiyyət (fail closed).
-    systemRole: SystemRoleSchema.catch(SystemRole.USER).parse(session.user.systemRole),
+    systemRole,
     moderatedCohortIds: memberships
       .filter((m) => m.role === CohortRole.CLASS_MODERATOR)
       .map((m) => m.cohortId),
@@ -68,7 +110,7 @@ export const getSessionUser = cache(
     const userId = session?.user?.id;
     if (!userId) return null;
 
-    return prisma.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -78,8 +120,28 @@ export const getSessionUser = cache(
         avatarUrl: true,
         systemRole: true,
         stage: true,
+        deactivatedAt: true,
       },
     });
+
+    // 🔴 DEAKTİV HESAB "SESSİYASI OLMAYAN" KİMİ DAVRANIR (Blok 11B).
+    // `(app)` / `(admin)` layout-ları `null` gördükdə `SESSION_EXPIRED_PATH`-ə
+    // yönləndirir — o route kukini SİLİR, yəni açıq sessiya növbəti sorğuda
+    // bağlanır. Deaktivasiya yalnız girişi bağlasaydı (src/auth.ts), artıq
+    // açıq olan brauzer token bitənə qədər işləməyə davam edərdi.
+    if (!user || user.deactivatedAt !== null) return null;
+
+    // ⚠️ `deactivatedAt` ÇIXIŞA DÜŞMÜR: bu funksiyanın nəticəsi header və
+    // naviqasiya üçündür və `null` qaytarması onsuz da yeganə siqnaldır.
+    return {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      avatarUrl: user.avatarUrl,
+      systemRole: user.systemRole,
+      stage: user.stage,
+    };
   },
 );
 
@@ -120,11 +182,19 @@ export async function requireUser(): Promise<AuthenticatedViewer> {
   return viewer;
 }
 
-/** `UNIVERSITY_ADMIN` tələb edir. Əks halda 403 (`forbidden.tsx` render olunur). */
+/**
+ * `UNIVERSITY_ADMIN` tələb edir. Əks halda 403 (`forbidden.tsx` render olunur).
+ *
+ * 🔴 ROL BAZADAN OXUNUR, TOKEN-DƏN YOX (TƏLƏ B — `readSystemRole` şərhinə bax).
+ * İmza dəyişməyib; içi bərkidilib. Yoxlama `viewer.systemRole`-a GÜVƏNMİR və
+ * `readSystemRole`-u AÇIQ çağırır: qapı burada olduğu üçün o, viewer-in necə
+ * qurulduğundan asılı olmamalıdır (servis testi əl ilə `Viewer` qura bilər).
+ */
 export async function requireAdmin(): Promise<AuthenticatedViewer> {
   const viewer = await requireUser();
-  if (viewer.systemRole !== SystemRole.UNIVERSITY_ADMIN) forbidden();
-  return viewer;
+  const role = await readSystemRole(viewer.userId);
+  if (role !== SystemRole.UNIVERSITY_ADMIN) forbidden();
+  return { ...viewer, systemRole: role };
 }
 
 /**
