@@ -426,6 +426,27 @@ export const EventStatus = asEnum(EVENT_STATUS_VALUES);
 /** İctimai görünən tədbir statusları — `visibleWithStatus` üçün hazır dəst. */
 export const PUBLIC_EVENT_STATUSES = ["PUBLISHED", "COMPLETED"] as const;
 
+/**
+ * Tədbir yarada və idarə edə bilən COHORT rolları (spec §17) — VAHİD MƏNBƏ.
+ *
+ * 🔴 Üç yer bu siyahıdan oxuyur və AYRILMAMALIDIR:
+ *   · səhifə qapısı   — `requireCohortRole(cohortId, EVENT_MANAGER_ROLES)`
+ *   · servis qapısı   — `canManageEvent` (server action birbaşa çağırıla bilər)
+ *   · UI              — `canCreateEvents` ("Tədbir yarat" düyməsi)
+ *
+ * ⚠️ `CLASS_MODERATOR` BURADA YOXDUR. Moderator MƏZMUNA nəzarət edir
+ * (şikayət, nailiyyət təsdiqi), tədbir TƏŞKİLİ isə ayrı işdir. Blok 9-a qədər
+ * `class-home/catalog.ts` moderatoru da siyahıya salırdı və nəticədə moderator
+ * "Yeni tədbir" düyməsini GÖRÜR, kliklədikdə isə 403 alırdı.
+ *
+ * `UNIVERSITY_ADMIN` siyahıda deyil, çünki o, SİSTEM roludur —
+ * `requireCohortRole` və `canManageEvent` onu ayrıca buraxır.
+ */
+export const EVENT_MANAGER_ROLES = [
+  "CLASS_REPRESENTATIVE",
+  "EVENT_COORDINATOR",
+] as const satisfies readonly CohortRole[];
+
 /** EventRSVP.status */
 export const RSVP_STATUS_VALUES = [
   "INVITED",

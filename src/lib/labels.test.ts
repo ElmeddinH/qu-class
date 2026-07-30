@@ -19,9 +19,13 @@ import {
   CLUB_ROLE_VALUES,
   COHORT_ROLE_VALUES,
   DEGREE_VALUES,
+  EVENT_CATEGORY_VALUES,
+  EVENT_SCOPE_VALUES,
+  EVENT_STATUS_VALUES,
   INDUSTRY_VALUES,
   JOB_FUNCTION_VALUES,
   LANGUAGE_LEVEL_VALUES,
+  RSVP_STATUS_VALUES,
   SUPPORT_OFFER_TYPE_VALUES,
   USER_STAGE_VALUES,
 } from "./enums";
@@ -29,19 +33,26 @@ import {
   CLUB_ROLE_LABELS,
   COHORT_ROLE_LABELS,
   DEGREE_LABELS,
+  EVENT_CATEGORY_LABELS,
+  EVENT_SCOPE_LABELS,
+  EVENT_STATUS_LABELS,
   INDUSTRY_LABELS,
   JOB_FUNCTION_LABELS,
   LANGUAGE_LEVEL_HINTS,
   LANGUAGE_LEVEL_LABELS,
+  RSVP_STATUS_LABELS,
   STAGE_LABELS,
   SUPPORT_OFFER_LABELS,
   clubRoleLabel,
   cohortRoleLabel,
   degreeLabel,
+  eventCategoryLabel,
+  eventScopeLabel,
   industryLabel,
   jobFunctionLabel,
   labelOf,
   languageLevelLabel,
+  rsvpStatusLabel,
   stageLabel,
   supportOfferLabel,
 } from "./labels";
@@ -57,6 +68,10 @@ const TABLES: Array<[string, readonly string[], Record<string, string>]> = [
   ["LANGUAGE_LEVEL_LABELS", LANGUAGE_LEVEL_VALUES, LANGUAGE_LEVEL_LABELS],
   ["LANGUAGE_LEVEL_HINTS", LANGUAGE_LEVEL_VALUES, LANGUAGE_LEVEL_HINTS],
   ["SUPPORT_OFFER_LABELS", SUPPORT_OFFER_TYPE_VALUES, SUPPORT_OFFER_LABELS],
+  ["EVENT_SCOPE_LABELS", EVENT_SCOPE_VALUES, EVENT_SCOPE_LABELS],
+  ["EVENT_CATEGORY_LABELS", EVENT_CATEGORY_VALUES, EVENT_CATEGORY_LABELS],
+  ["EVENT_STATUS_LABELS", EVENT_STATUS_VALUES, EVENT_STATUS_LABELS],
+  ["RSVP_STATUS_LABELS", RSVP_STATUS_VALUES, RSVP_STATUS_LABELS],
 ];
 
 describe("etiket cədvəlləri", () => {
@@ -106,6 +121,23 @@ describe("…Label() köməkçiləri", () => {
     expect(degreeLabel("PHD")).toBe(DEGREE_LABELS.PHD);
     expect(supportOfferLabel("MENTORING")).toBe(SUPPORT_OFFER_LABELS.MENTORING);
     expect(languageLevelLabel("NATIVE")).toBe(LANGUAGE_LEVEL_LABELS.NATIVE);
+    expect(eventScopeLabel("REUNION")).toBe(EVENT_SCOPE_LABELS.REUNION);
+    expect(eventCategoryLabel("SEMINAR")).toBe(EVENT_CATEGORY_LABELS.SEMINAR);
+    expect(rsvpStatusLabel("WAITLISTED")).toBe(RSVP_STATUS_LABELS.WAITLISTED);
+  });
+
+  it("🔴 `scope` və `category` cədvəlləri KƏSİŞMİR (spec §14/§15)", () => {
+    // Reunion YALNIZ scope-dadır, `EventCategory`-də belə dəyər OLMAMALIDIR:
+    // olsaydı filtr paneli eyni anlayışı iki yerdə göstərərdi.
+    const scopes = new Set<string>(EVENT_SCOPE_VALUES);
+    const categories = new Set<string>(EVENT_CATEGORY_VALUES);
+
+    expect(scopes.has("REUNION")).toBe(true);
+    expect(categories.has("REUNION")).toBe(false);
+
+    for (const scope of scopes) {
+      expect(categories.has(scope), `${scope} hər iki siyahıdadır`).toBe(false);
+    }
   });
 
   it("naməlum dəyərdə təhlükəsiz nəticə verir", () => {
@@ -115,5 +147,9 @@ describe("…Label() köməkçiləri", () => {
     expect(jobFunctionLabel("???")).toBe(JOB_FUNCTION_LABELS.OTHER);
     expect(supportOfferLabel("???")).toBe("Dəstək");
     expect(languageLevelLabel(null)).toBeNull();
+    expect(eventCategoryLabel("???")).toBe(EVENT_CATEGORY_LABELS.OTHER);
+    // ⚠️ `eventScopeLabel` XAM dəyəri saxlayır: təşkilatçı səviyyəsi üçün
+    // mənalı defolt yoxdur (`degreeLabel` ilə eyni məntiq).
+    expect(eventScopeLabel("???")).toBe("???");
   });
 });

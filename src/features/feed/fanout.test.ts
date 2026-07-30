@@ -27,7 +27,10 @@ import { isStricter } from "@/lib/visibility";
 
 import {
   ACHIEVEMENT_TIMELINE_CATEGORY,
+  EVENT_TIMELINE_CATEGORY,
   buildAchievement,
+  buildEventTimelineEntry,
+  eventTimelineCategory,
   buildAchievementTimelineEntry,
   buildTimelineEntry,
   derivedVisibility,
@@ -399,6 +402,96 @@ describe("buildAchievementTimelineEntry", () => {
   it("xülasə başlıqla eyni olarsa `null` qaytarılır", () => {
     const entry = buildAchievementTimelineEntry(
       achievementSourceOf({ title: "Qrant", description: "Qrant" }),
+    );
+    expect(entry.summary).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Event → TimelineEntry (Blok 9 — «Class Timeline-a əlavə et»)
+// ---------------------------------------------------------------------------
+
+function eventSourceOf(overrides: Partial<Parameters<typeof buildEventTimelineEntry>[0]> = {}) {
+  return {
+    eventId: "evt-1",
+    cohortId: "cohort-1",
+    title: "Buraxılış gecəsi",
+    description: "Sinfin son görüşü.",
+    summary: null as string | null,
+    location: "Xankəndi, QU kampusu",
+    category: "CEREMONY",
+    startsAt: new Date("2026-06-20T18:00:00.000Z"),
+    visibility: Visibility.CLASS as VisibilityType,
+    ...overrides,
+  };
+}
+
+describe("eventTimelineCategory", () => {
+  it("🔴 hər `EventCategory` MÜTLƏQ `PostCategory`-yə düşür", () => {
+    // Xronologiya filtri 12 `PostCategory` üzərindədir; xam `EventCategory`
+    // yazılsaydı ("SEMINAR") qeyd heç bir filtrə düşməzdi.
+    for (const [eventCategory, postCategory] of Object.entries(EVENT_TIMELINE_CATEGORY)) {
+      expect(POST_CATEGORY_VALUES, eventCategory).toContain(postCategory);
+    }
+  });
+
+  it("naməlum kateqoriya təhlükəsiz defolta düşür", () => {
+    expect(eventTimelineCategory("SOMETHING_NEW")).toBe(PostCategory.EVENT_PHOTOS);
+    expect(POST_CATEGORY_VALUES).toContain(eventTimelineCategory("SOMETHING_NEW"));
+  });
+
+  it("səyahət və yarış öz qarşılığını tapır", () => {
+    expect(eventTimelineCategory("TRIP")).toBe(PostCategory.TRIPS);
+    expect(eventTimelineCategory("COMPETITION")).toBe(PostCategory.COMPETITION);
+  });
+});
+
+describe("buildEventTimelineEntry", () => {
+  it("`sourceType = EVENT` və `eventId` doldurulur", () => {
+    const entry = buildEventTimelineEntry(eventSourceOf());
+    expect(entry.sourceType).toBe(TimelineSourceType.EVENT);
+    expect(entry.eventId).toBe("evt-1");
+    expect(entry.cohortId).toBe("cohort-1");
+  });
+
+  it("`occurredAt` tədbirin BAŞLAMA vaxtıdır (əlavə edilmə tarixi YOX)", () => {
+    const entry = buildEventTimelineEntry(eventSourceOf());
+    expect(entry.occurredAt).toEqual(new Date("2026-06-20T18:00:00.000Z"));
+    expect(entry.academicYear).toBe(academicYearOf(entry.occurredAt));
+  });
+
+  it("🔒 görünürlük tədbirdən KOPYALANIR və ondan AÇIQ ola bilmir", () => {
+    for (const level of VISIBILITY_VALUES) {
+      const entry = buildEventTimelineEntry(eventSourceOf({ visibility: level }));
+      expect(entry.visibility).toBe(level);
+      expect(isStricter(level, entry.visibility as VisibilityType)).toBe(false);
+    }
+  });
+
+  it("🔒 tavan verilsə qeyd DARALIR, genişlənmir", () => {
+    const entry = buildEventTimelineEntry(
+      eventSourceOf({ visibility: Visibility.PUBLIC }),
+      Visibility.CLASS,
+    );
+    expect(entry.visibility).toBe(Visibility.CLASS);
+  });
+
+  it("xülasə prioriteti: yekun mətni → təsvir → məkan", () => {
+    expect(buildEventTimelineEntry(eventSourceOf({ summary: "40 nəfər gəldi." })).summary).toBe(
+      "40 nəfər gəldi.",
+    );
+    expect(buildEventTimelineEntry(eventSourceOf()).summary).toBe("Sinfin son görüşü.");
+    expect(
+      buildEventTimelineEntry(eventSourceOf({ description: null })).summary,
+    ).toBe("Xankəndi, QU kampusu");
+    expect(
+      buildEventTimelineEntry(eventSourceOf({ description: null, location: null })).summary,
+    ).toBeNull();
+  });
+
+  it("xülasə başlıqla eyni olarsa `null` qaytarılır", () => {
+    const entry = buildEventTimelineEntry(
+      eventSourceOf({ title: "Görüş", description: "Görüş" }),
     );
     expect(entry.summary).toBeNull();
   });

@@ -69,13 +69,16 @@ export async function Reunions({ cohort, headingId }: ClassHomeWidgetProps) {
                 {/* PLAN.md §4.2 — tədbir detalı `/events/[id]`. */}
                 <Link
                   href={`/events/${event.id}`}
-                  className="flex flex-col gap-1 rounded-card border border-border p-3 transition-colors hover:border-ku-green hover:bg-ku-soft/30"
+                  // 🔴 REUNION VİZUAL FƏRQİ (Blok 9): `ku-cream` accent.
+                  // KUDS §3 — `ku-cream` yalnız FON kimi işlədilir, mətn
+                  // `text-text-primary` qalır (ağ mətn 1.1:1 olardı).
+                  className="flex flex-col gap-1 rounded-card border border-ku-cream bg-ku-cream/25 p-3 transition-colors hover:border-ku-green hover:bg-ku-cream/40"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge
                       className={
                         upcoming
-                          ? "bg-ku-soft text-caption font-normal text-ku-dark hover:bg-ku-soft"
+                          ? "bg-ku-cream text-caption font-normal text-text-primary hover:bg-ku-cream"
                           : "bg-background text-caption font-normal text-text-secondary hover:bg-background"
                       }
                       variant={upcoming ? "default" : "outline"}
@@ -92,7 +95,8 @@ export async function Reunions({ cohort, headingId }: ClassHomeWidgetProps) {
                   </span>
 
                   <span className="text-caption text-text-secondary">
-                    {event.location ?? "Yer dəqiqləşdirilir"} · {event.rsvpCount} iştirakçı
+                    {event.location ?? "Yer dəqiqləşdirilir"} · {event.attendingCount}{" "}
+                    iştirakçı
                   </span>
                 </Link>
               </li>

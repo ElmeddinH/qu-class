@@ -191,3 +191,94 @@ edildi (21 milestone, hamısı `UNIVERSITY`, gələcək tarixli yoxdur).
 geri qaytarılır — baza sayları seed-lə bayt-bayt eynidir.
 `tsc --noEmit` · `lint` · `build` təmiz; `grep -rn "prisma\." src/app src/features`
 → yalnız şərhlər.
+
+---
+
+## Blok 9 — bitdi
+
+**Yeni saf modullar (Prisma YOX, testlə örtülü):**
+- `src/lib/event-filters.ts` — spec §15-in **6 filtri** (`when` · `category` ·
+  `scope` · `faculty` · `club` · `format`) + səhifə; `parseEventParams` ↔
+  `serializeEventParams` dövrəsi, `classEventsHref`, `upcomingFlagOf`,
+  `isOnlineFlagOf`. Üstəlik koordinator cədvəlinin AYRI URL vəziyyəti
+  (`ATTENDEE_PARAMS` = `q` / `st` / `ap` — tədbir siyahısının `page`-i ilə
+  toqquşmasın).
+- `src/lib/rsvp.ts` — RSVP qaydaları: `SEAT_HOLDING_RSVP_STATUSES`,
+  `resolveRsvpDecision` (niyyət → status), `isFull` / `seatsLeft`,
+  `summarizeRsvps`, `attendanceRate`, `averageRating`, `canLeaveFeedback`.
+- `src/lib/ics.ts` — RFC 5545: `buildIcsCalendar`, `escapeIcsText`,
+  `foldIcsLine` (75 OKTET, simvol yox), `toIcsDateTime`, `icsFileName`.
+- `src/lib/csv.ts` — `buildCsv` / `escapeCsvCell` / `csvFileName` +
+  **`CSV_BOM_BYTES`**.
+- `src/utils/slug.ts` — `asciiSlug`: azərbaycan hərflərini transliterasiya edir
+  ("Görüş" → "gorus"); sadəcə atsaydıq fayl adı "g-r" olardı.
+- `features/feed/fanout.ts` → **`buildEventTimelineEntry`** +
+  `EVENT_TIMELINE_CATEGORY` (`Record<EventCategory, PostCategory>`).
+
+**Yeni servis funksiyaları (`event.service.ts`):** `countEvents` ·
+`listEventFacets` · `getEventDetail` · `canManageEvent` · `createEvent` ·
+`rsvpToEvent` · `submitEventFeedback` · `addEventPhotos` / `removeEventPhoto` ·
+`addEventToTimeline` / `removeEventFromTimeline` · `listEventAttendees` ·
+`exportEventAttendees` · `confirmRegistration` · `checkInAttendee` ·
+`notifyAttendees` · `completeEvent` · `getEventReport` · `getEventForCalendar` ·
+`listContactOptions`. `academic.service` → `listFacultyOptions`.
+`utils/date.ts` → `toLocalDateTimeValue` / `toLocalDateValue` (feed/format-dan
+köçdü — `features/*` bir-birindən import etməməlidir).
+
+**Yeni komponentlər / səhifələr:** `features/events/` → `ClassEvents`,
+`EventCard`, `EventComposer` (13 sahə), `EventFilters` + `EventActiveFilters`,
+`filter-state.ts`, `EventDetail`, `RsvpPanel`, `EventAlbum`, `FeedbackForm`,
+`AttendanceChart` (Recharts), `MarkdownAgenda`, `TimelinePublishCard`,
+`catalog.ts`, `schemas.ts`, `actions.ts`, `types.ts`;
+`features/events/manage/` → `EventManager`, `AttendeeTable`, `BulkNotify`,
+`CompleteEventForm`, `EventReport`, `PrintButton`.
+Səhifələr: `/class/[slug]/events`, `/events/[id]`, `/events/[id]/manage`,
+`/events/[id]/report`, `/api/events/[id]/ics` (hamısı `force-dynamic`).
+`lib/labels.ts` → `EVENT_SCOPE_LABELS`, `EVENT_CATEGORY_LABELS`,
+`EVENT_STATUS_LABELS`, `RSVP_STATUS_LABELS` + `…Label()`.
+`globals.css` → `--chart-*` dəyişənləri (Recharts `fill` propuna Tailwind sinfi
+qəbul etmir; `#` yenə komponentə düşmür).
+
+**Düzəldilən üç səhv:**
+- **`EVENT_MANAGER_ROLES` (`lib/enums.ts`) — VAHİD MƏNBƏ.** Əvvəl
+  `class-home/catalog.ts` siyahıya `CLASS_MODERATOR`-u da salırdı, server
+  qapısı isə salmırdı: moderator "Yeni tədbir" düyməsini GÖRÜRDÜ, kliklədikdə
+  403 alırdı. İndi UI, səhifə qapısı və servis eyni sabitdən oxuyur.
+- **`attendingCount` ≠ xam RSVP sayı.** `createEvent` sinfin hər üzvünə
+  `INVITED` sətri yaradır; xam `_count.rsvps` işlədilsəydi 20 nəfərlik sinifdə
+  15 yerlik tədbir DƏRHAL "tutum dolub" görünərdi. `_count` indi
+  `SEAT_HOLDING_RSVP_STATUSES` ilə süzülür.
+- **CSV BOM MƏTNDƏ DEYİL, BAYTDA.** `buildCsv` çıxışına `"﻿"` simvolu
+  əlavə olunurdu və endirilən faylda İTİRDİ (unit test `startsWith(UTF8_BOM)`
+  ilə yazıldığı üçün səhvi tutmurdu). İndi `CSV_BOM_BYTES` `Blob`-a bayt kimi
+  verilir, test isə kod nöqtəsini yoxlayır.
+
+**Yeni tələlər (növbəti bloklar üçün):**
+- **T24 — `/events` İKİ route qrupundadır.** `(public)/events` (Blok 11,
+  ictimai siyahı) və `(app)/events/[id]`. Route qrupu URL-də görünmür, prefiks
+  uyğunluğu ikisini də tutardı → `routes.ts`-də **`PUBLIC_EXACT_PATHS`**
+  istisnası (yalnız DƏQİQ bərabərlik). Blok 11-də `(public)/events/page.tsx`
+  yaradılanda əlavə iş LAZIM DEYİL.
+- **T25 — eyni səhifədə iki «Kateqoriya» etiketi.** Kompozitorda və filtr
+  panelində. `EventComposer`-in `<form>`-una `aria-label="Yeni tədbir formu"`
+  verilib; e2e seçicisi ora daraldılır (strict mode pozuntusu idi).
+- **İştirakçı cədvəlində `redactProfile` YOXDUR — QƏSDƏN.** Bu, idarəetmə
+  axınıdır (Blok 8-dəki moderasiya növbəsi ilə eyni məntiq): koordinator
+  qeydiyyatı təsdiqləmək üçün e-poçtu görməlidir. Çıxış YALNIZ rol qapısından
+  keçən iki səhifədə işlədilir. Detal səhifəsindəki avatar zolağı isə tam
+  `redactProfile`-dan keçir.
+- **Cədvəldə çeşidləmə/səhifələmə client-dədir, süzgəc serverdə.** Bir tədbirin
+  iştirakçıları onlarladır və hamısı onsuz da koordinatora açıqdır — CLAUDE.md
+  §5-in qadağası (JS-də FİLTRLƏMƏ) pozulmur, axtarış və status filtri DB-dədir.
+- **Hesabatdakı rəylər ANONİMDİR** — `getEventReport` müəllif adını
+  ÜMUMİYYƏTLƏ qaytarmır.
+- **Reunion YALNIZ `scope = REUNION`.** `EventCategory`-də belə dəyər yoxdur və
+  `labels.test.ts` iki siyahının KƏSİŞMƏDİYİNİ bərkidir. Vizual fərq
+  (`ku-cream` accent) `EventCard`, `EventDetail`, `UpcomingEvents` və
+  `Reunions` widget-lərindədir.
+
+**Testlər:** vitest **540** (əvvəl 373 → +167: `event-filters` 30, `rsvp` 31,
+`ics` 26, `csv` 19, `routes` 13, `labels` +3, `fanout` +12, `events.db` 33),
+playwright **44** (əvvəl 38 → +6). İnteqrasiya və e2e testlərinin yazdığı hər
+sətir təmizlənir — baza sayları seed-lə bayt-bayt eynidir (event 25, RSVP 459).
+`tsc --noEmit` · `lint` · `build` təmiz.

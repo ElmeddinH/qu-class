@@ -11,6 +11,21 @@
 import { prisma } from "@/lib/db";
 import { CohortScope } from "@/lib/enums";
 
+/**
+ * Fakültə kataloqu — tədbir formasının «fakültə» seçimi (Blok 9).
+ *
+ * ⚠️ `listRegistrationCatalog`-dan FƏRQLİDİR: orada yalnız cohort-u OLAN
+ * fakültələr gəlir (qeydiyyat uyğun sinif tapmalıdır), burada isə HAMISI —
+ * fakültə səviyyəli tədbir hələ heç bir sinfi olmayan fakültədə də keçirilə
+ * bilər.
+ */
+export async function listFacultyOptions(): Promise<Array<{ id: string; name: string }>> {
+  return prisma.faculty.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+}
+
 export interface ProgramOption {
   id: string;
   name: string;

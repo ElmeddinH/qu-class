@@ -19,6 +19,7 @@ import {
   TimelineSourceType,
   Visibility,
   type AchievementCategory,
+  type EventCategory,
   type Visibility as VisibilityType,
 } from "@/lib/enums";
 import { academicYearOf } from "@/lib/stage";
@@ -287,6 +288,102 @@ export function buildAchievementTimelineEntry(
     category: source.postCategory ?? ACHIEVEMENT_TIMELINE_CATEGORY,
     occurredAt: source.awardedAt,
     academicYear: academicYearOf(source.awardedAt),
+    visibility: derivedVisibility(source.visibility, ceiling),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Event → TimelineEntry (Blok 9 — «Class Timeline-a əlavə et»)
+// ---------------------------------------------------------------------------
+
+/**
+ * `EventCategory` → `TimelineEntry.category`.
+ *
+ * ⚠️ BİRBAŞA KOPYALAMAQ OLMAZ. Xronologiya filtri 12 `PostCategory` dəyəri
+ * üzərində qurulub (`lib/timeline-filters.ts`), `EventCategory` isə tamamilə
+ * ayrı siyahıdır — `"SEMINAR"` yazılsaydı qeyd HEÇ BİR filtrə düşməzdi və
+ * istifadəçi onu yalnız filtrsiz baxışda görərdi.
+ *
+ * Xəritə `Record<EventCategory, PostCategory>`-dir: `EventCategory`-yə yeni
+ * dəyər əlavə olunsa `tsc` MƏHZ BURADA dayanır.
+ */
+export const EVENT_TIMELINE_CATEGORY: Record<EventCategory, PostCategory> = {
+  MEETING: PostCategory.GENERAL,
+  TRIP: PostCategory.TRIPS,
+  SEMINAR: PostCategory.GENERAL,
+  WORKSHOP: PostCategory.GENERAL,
+  CEREMONY: PostCategory.EVENT_PHOTOS,
+  COMPETITION: PostCategory.COMPETITION,
+  SOCIAL: PostCategory.EVENT_PHOTOS,
+  CAREER: PostCategory.INTERNSHIP,
+  OTHER: PostCategory.EVENT_PHOTOS,
+};
+
+/** DB sütunu `String`-dir — naməlum kateqoriya xronologiyanı sındırmamalıdır. */
+export function eventTimelineCategory(value: string): PostCategory {
+  return EVENT_TIMELINE_CATEGORY[value as EventCategory] ?? PostCategory.EVENT_PHOTOS;
+}
+
+/** Xronologiyaya əlavə edilən tədbirin işlədilən sahələri. */
+export interface EventTimelineSource {
+  eventId: string;
+  /** ⚠️ `Event.cohortId` NULL ola bilər — `TimelineEntry.cohortId` isə YOX. */
+  cohortId: string;
+  title: string;
+  description: string | null;
+  summary: string | null;
+  location: string | null;
+  category: string;
+  startsAt: Date;
+  /** ⚠️ Tədbirin ÖZ səviyyəsi — qeyd ondan daha açıq ola bilməz. */
+  visibility: VisibilityType;
+}
+
+/** `prisma.timelineEntry.upsert({ create })` üçün hazır obyekt. */
+export interface EventTimelineFanout {
+  cohortId: string;
+  sourceType: string;
+  eventId: string;
+  title: string;
+  summary: string | null;
+  category: string;
+  occurredAt: Date;
+  academicYear: string;
+  visibility: string;
+}
+
+/**
+ * Keçmiş tədbirdən TimelineEntry sahələri (spec §14 — «Class Timeline-a
+ * əlavə et»).
+ *
+ * · `occurredAt` — `startsAt` (əlavə edilmə tarixi DEYİL: xronologiya hadisənin
+ *   BAŞ VERDİYİ vaxta görə düzülür)
+ * · `summary` — tədbirdən sonrakı yekun mətni üstündür, yoxdursa təsvir,
+ *   o da yoxdursa məkan
+ * · `visibility` — tədbirdən KOPYALANIR (`derivedVisibility` yalnız daraldır)
+ *
+ * ⚠️ TƏLƏ T11-in analoqu: `TimelineEntry.eventId` `@unique`-dir → servis bu
+ * obyekti `create` ilə deyil, `upsert` ilə yazır (düymə iki dəfə basıla bilər).
+ */
+export function buildEventTimelineEntry(
+  source: EventTimelineSource,
+  ceiling?: VisibilityType,
+): EventTimelineFanout {
+  const title = clamp(source.title, TIMELINE_TITLE_MAX);
+
+  const rawSummary =
+    source.summary?.trim() || source.description?.trim() || source.location?.trim() || "";
+  const summary = rawSummary === "" ? null : clamp(rawSummary, TIMELINE_SUMMARY_MAX);
+
+  return {
+    cohortId: source.cohortId,
+    sourceType: TimelineSourceType.EVENT,
+    eventId: source.eventId,
+    title,
+    summary: summary === title ? null : summary,
+    category: eventTimelineCategory(source.category),
+    occurredAt: source.startsAt,
+    academicYear: academicYearOf(source.startsAt),
     visibility: derivedVisibility(source.visibility, ceiling),
   };
 }

@@ -13,6 +13,7 @@ import { CalendarX2, MapPin, Video } from "lucide-react";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { getViewer } from "@/lib/auth";
+import { EventScope } from "@/lib/enums";
 import { listEvents } from "@/services/event.service";
 import { dayMonth, timeOfDay } from "@/utils/date";
 
@@ -50,10 +51,20 @@ export async function UpcomingEvents({ cohort, headingId }: ClassHomeWidgetProps
                   altında YOX) — siyahı isə `/class/[slug]/events`. */}
               <Link
                 href={`/events/${event.id}`}
-                className="flex gap-3 rounded-card border border-border p-3 transition-colors hover:border-ku-green hover:bg-ku-soft/30"
+                // Reunion vizual fərqi (Blok 9): `ku-cream` accent. Yoxlama
+                // `scope`-a görədir — `EventCategory`-də `REUNION` YOXDUR.
+                className={
+                  event.scope === EventScope.REUNION
+                    ? "flex gap-3 rounded-card border border-ku-cream bg-ku-cream/25 p-3 transition-colors hover:border-ku-green hover:bg-ku-cream/40"
+                    : "flex gap-3 rounded-card border border-border p-3 transition-colors hover:border-ku-green hover:bg-ku-soft/30"
+                }
               >
                 <div
-                  className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-card bg-ku-soft text-ku-dark"
+                  className={
+                    event.scope === EventScope.REUNION
+                      ? "flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-card bg-ku-cream text-text-primary"
+                      : "flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-card bg-ku-soft text-ku-dark"
+                  }
                   aria-hidden
                 >
                   <span className="text-caption">{dayMonth(event.startsAt)}</span>
@@ -82,7 +93,7 @@ export async function UpcomingEvents({ cohort, headingId }: ClassHomeWidgetProps
                   </span>
 
                   <Badge variant="outline" className="w-fit text-caption font-normal">
-                    {event.rsvpCount} qeydiyyat
+                    {event.attendingCount} iştirakçı
                   </Badge>
                 </div>
               </Link>

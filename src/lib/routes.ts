@@ -19,8 +19,27 @@ export const APP_ROUTE_PREFIXES = [
   "/me",
   "/notifications",
   "/search",
+  "/events", // tədbir detalı + koordinator paneli (⚠️ istisnaya bax)
   "/kuds", // daxili dizayn sənədi — auth arxasındadır
 ] as const;
+
+/**
+ * Prefiksi qorunan siyahıda olsa da AÇIQ qalan DƏQİQ yollar.
+ *
+ * 🔴 `/events` İKİ route qrupuna bölünüb və bu, təsadüf deyil (PLAN.md §4.2):
+ *   · `(public)/events`      → ictimai tədbirlər (`visibility = PUBLIC`),
+ *                              giriş etməmiş ziyarətçi üçün
+ *   · `(app)/events/[id]`    → tədbir detalı + RSVP
+ *   · `(app)/events/[id]/manage` → koordinator paneli
+ *
+ * Route qrupu URL-də görünmür, yəni middleware `/events` ilə
+ * `/events/<id>`-ni yalnız YOLUN ÖZÜNƏ baxaraq ayırd edə bilər. Prefiks
+ * uyğunluğu (`startsWith`) ikisini də tutardı və ictimai siyahı auth arxasına
+ * düşərdi — ona görə DƏQİQ `/events` burada istisna edilir.
+ *
+ * ⚠️ Yalnız dəqiq bərabərlik yoxlanılır: `/events/abc` istisna DEYİL.
+ */
+export const PUBLIC_EXACT_PATHS = ["/events"] as const;
 
 /** Yalnız UNIVERSITY_ADMIN üçün — `(admin)` qrupu. */
 export const ADMIN_ROUTE_PREFIXES = ["/admin"] as const;
@@ -41,7 +60,13 @@ function matchesPrefix(pathname: string, prefixes: readonly string[]): boolean {
   );
 }
 
+/** Prefiks uyğun gəlsə də açıq qalan dəqiq yol — bax `PUBLIC_EXACT_PATHS`. */
+export function isPublicExactPath(pathname: string): boolean {
+  return (PUBLIC_EXACT_PATHS as readonly string[]).includes(pathname);
+}
+
 export function isAppRoute(pathname: string): boolean {
+  if (isPublicExactPath(pathname)) return false;
   return matchesPrefix(pathname, APP_ROUTE_PREFIXES);
 }
 

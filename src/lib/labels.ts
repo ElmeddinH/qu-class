@@ -28,9 +28,13 @@ import type {
   ClubRole,
   CohortRole,
   Degree,
+  EventCategory,
+  EventScope,
+  EventStatus,
   Industry,
   JobFunction,
   LanguageLevel,
+  RsvpStatus,
   SupportOfferType,
   TimelineSourceType,
   UserStage,
@@ -173,6 +177,57 @@ export const SUPPORT_OFFER_LABELS: Record<SupportOfferType, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// Events & Reunion (spec §14, §15)
+//
+// 🔴 `scope` və `category` ORTOQONALDIR — dəyər siyahıları qəsdən kəsişmir
+// (bax `lib/enums.ts` §10). `scope` təşkilatçı SƏVİYYƏSİDİR (kim elan edir),
+// `category` isə tədbirin NÖVÜDÜR (nə baş verir). Reunion YALNIZ
+// `scope = REUNION` ilə işarələnir; `EventCategory`-də belə dəyər YOXDUR və
+// əlavə EDİLMƏMƏLİDİR — filtr paneli iki ayrı süzgəc göstərir.
+// ---------------------------------------------------------------------------
+
+/** `Event.scope` — təşkilatçı səviyyəsi (spec §15 «təşkilatçı» filtri). */
+export const EVENT_SCOPE_LABELS: Record<EventScope, string> = {
+  UNIVERSITY: "Universitet",
+  FACULTY: "Fakültə",
+  CLUB: "Klub",
+  CLASS: "Sinif",
+  REUNION: "Məzunlar görüşü",
+};
+
+/** `Event.category` — tədbirin növü (spec §15 «kateqoriya» filtri). */
+export const EVENT_CATEGORY_LABELS: Record<EventCategory, string> = {
+  MEETING: "Görüş",
+  TRIP: "Səyahət",
+  SEMINAR: "Seminar",
+  WORKSHOP: "Praktikum",
+  CEREMONY: "Mərasim",
+  COMPETITION: "Yarış",
+  SOCIAL: "Sosial tədbir",
+  CAREER: "Karyera tədbiri",
+  OTHER: "Digər",
+};
+
+/** `Event.status`. İctimai siyahılarda yalnız `PUBLISHED` / `COMPLETED` görünür. */
+export const EVENT_STATUS_LABELS: Record<EventStatus, string> = {
+  DRAFT: "Qaralama",
+  PUBLISHED: "Elan olunub",
+  CANCELLED: "Ləğv edilib",
+  COMPLETED: "Tamamlanıb",
+};
+
+/** `EventRSVP.status` — dəvət → qəbul/rədd → qeydiyyat → iştirak axını. */
+export const RSVP_STATUS_LABELS: Record<RsvpStatus, string> = {
+  INVITED: "Dəvət olunub",
+  ACCEPTED: "Qəbul edib",
+  DECLINED: "Rədd edib",
+  REGISTERED: "Qeydiyyatdan keçib",
+  WAITLISTED: "Gözləmə siyahısında",
+  ATTENDED: "İştirak edib",
+  NO_SHOW: "Gəlməyib",
+};
+
+// ---------------------------------------------------------------------------
 // Oxu köməkçiləri — naməlum dəyər UI-nı sındırmır
 // ---------------------------------------------------------------------------
 
@@ -233,4 +288,20 @@ export function achievementStatusLabel(value: string): string {
 
 export function timelineSourceLabel(value: string): string {
   return TIMELINE_SOURCE_LABELS[value as TimelineSourceType] ?? value;
+}
+
+export function eventScopeLabel(value: string): string {
+  return EVENT_SCOPE_LABELS[value as EventScope] ?? value;
+}
+
+export function eventCategoryLabel(value: string): string {
+  return EVENT_CATEGORY_LABELS[value as EventCategory] ?? EVENT_CATEGORY_LABELS.OTHER;
+}
+
+export function eventStatusLabel(value: string): string {
+  return EVENT_STATUS_LABELS[value as EventStatus] ?? value;
+}
+
+export function rsvpStatusLabel(value: string): string {
+  return RSVP_STATUS_LABELS[value as RsvpStatus] ?? value;
 }

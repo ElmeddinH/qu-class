@@ -11,7 +11,12 @@
 //   · rol QAYDALARI (kim tədbir yarada bilər — etiket deyil, davranış)
 // ============================================================================
 
-import { CohortRole, UserStage, type CohortRole as CohortRoleType } from "@/lib/enums";
+import {
+  CohortRole,
+  EVENT_MANAGER_ROLES,
+  UserStage,
+  type CohortRole as CohortRoleType,
+} from "@/lib/enums";
 import { STAGE_LABELS } from "@/lib/labels";
 
 export interface StageMeta {
@@ -53,13 +58,14 @@ export function isSpecialRole(value: string): boolean {
  * Tədbir yarada bilən cohort rolları (spec §17).
  *
  * ⚠️ Bu, YALNIZ düymənin göstərilməsi üçündür. Əsl icazə server tərəfdə
- * `requireCohortRole()` ilə yoxlanılır — düyməni gizlətmək qoruma deyil.
+ * `requireCohortRole()` və `canManageEvent` ilə yoxlanılır — düyməni gizlətmək
+ * qoruma deyil.
+ *
+ * 🔴 Siyahı BURADA TƏYİN OLUNMUR. Blok 9-a qədər burada `CLASS_MODERATOR` da
+ * vardı və server qapısında yox idi: moderator düyməni görürdü, kliklədikdə
+ * 403 alırdı. İndi vahid mənbə `lib/enums.ts` → `EVENT_MANAGER_ROLES`-dur.
  */
-export const EVENT_CREATOR_ROLES: readonly CohortRoleType[] = [
-  CohortRole.CLASS_REPRESENTATIVE,
-  CohortRole.EVENT_COORDINATOR,
-  CohortRole.CLASS_MODERATOR,
-];
+export const EVENT_CREATOR_ROLES: readonly CohortRoleType[] = EVENT_MANAGER_ROLES;
 
 export function canCreateEvents(viewerRole: string | null): boolean {
   return viewerRole !== null && EVENT_CREATOR_ROLES.includes(viewerRole as CohortRoleType);

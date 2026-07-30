@@ -60,3 +60,29 @@ export function timeOfDay(value: string | Date): string {
   if (!date) return INVALID;
   return format(date, "HH:mm", { locale: az });
 }
+
+// ---------------------------------------------------------------------------
+// Forma girişi — `<input type="datetime-local">` / `<input type="date">`
+// ---------------------------------------------------------------------------
+
+/**
+ * `<input type="datetime-local">` üçün dəyər: "YYYY-MM-DDTHH:mm".
+ *
+ * ⚠️ `toISOString()` İŞLƏTMƏ — o, UTC-yə çevirir və istifadəçinin saat
+ * qurşağında saat sürüşür. Yerli komponentlərdən əl ilə qurulur.
+ *
+ * ⚠️ Yuxarıdakı formatlayıcılardan fərqli olaraq bu funksiya `Date` TƏLƏB
+ * EDİR: forma dəyəri həmişə koddan gəlir (defolt tarix), API cavabından yox.
+ */
+export function toLocalDateTimeValue(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
+}
+
+/** `<input type="date">` üçün dəyər: "YYYY-MM-DD" (eyni səbəb — yerli vaxt). */
+export function toLocalDateValue(date: Date): string {
+  return toLocalDateTimeValue(date).slice(0, 10);
+}

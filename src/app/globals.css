@@ -54,6 +54,23 @@
 
     --radius: 8px;
 
+    /* --- Qrafik palitrası (Recharts) ---
+       Recharts `fill` / `stroke` proplarına Tailwind SİNFİ qəbul etmir, xam
+       CSS dəyəri gözləyir. Ona görə KUDS §3 tokenləri burada bir dəfə CSS
+       dəyişəni kimi açılır; komponentlərdə yenə `#` yazılmır, `var(--chart-*)`
+       işlədilir (CLAUDE.md §2 — hardcode rəng qadağandır). Yeni qrafik rəngi
+       lazımdırsa MƏHZ BURAYA əlavə et. */
+    --chart-primary: #44766c;      /* ku-green */
+    --chart-primary-dark: #16423c; /* ku-dark */
+    --chart-neutral: #caeaf1;      /* ku-blue */
+    --chart-accent: #f0f3bf;       /* ku-cream */
+    --chart-success: #047857;      /* success-strong */
+    --chart-warning: #f59e0b;      /* warning */
+    --chart-danger: #b91c1c;       /* danger-strong */
+    --chart-muted: #94a3b8;        /* neytral boz — «gəlmədi» kimi sönük xanalar */
+    --chart-grid: #e2e8f0;         /* border */
+    --chart-axis: #64748b;         /* text-secondary */
+
     /* --- KUDS §8: Layout sabitləri --- */
     --sidebar-width: 280px;
     --header-height: 72px;
