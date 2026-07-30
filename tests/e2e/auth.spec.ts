@@ -118,7 +118,14 @@ test("anonim istifadəçi /admin-ə buraxılmır", async ({ page }) => {
 test("/ açıqdır, /kuds isə auth arxasındadır", async ({ page }) => {
   const home = await page.goto("/");
   expect(home?.status()).toBe(200);
-  await expect(page.getByRole("heading", { name: "Sinif heç vaxt bağlanmır" })).toBeVisible();
+
+  // ⚠️ Blok 9S: açılış səhifəsinin PLACEHOLDER-i əsl Welcome Page ilə əvəz
+  // olundu, başlıq da dəyişdi ("Sinif heç vaxt bağlanmır" → dəyər təklifi).
+  // Bu test yalnız `/`-ın AÇIQ olduğunu yoxlayır; bölmələrin məzmunu
+  // `tests/e2e/landing.spec.ts`-dədir.
+  await expect(
+    page.getByRole("heading", { level: 1, name: /Sinfin bir yerdə/ }),
+  ).toBeVisible();
 
   // Route qrupu URL-i dəyişmir: /kuds yenə də /kuds-dur, amma indi qorunur.
   await page.goto("/kuds");

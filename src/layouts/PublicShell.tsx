@@ -87,9 +87,20 @@ export function PublicShell({ children }: PublicShellProps) {
             <p className="text-caption text-text-secondary">
               © {new Date().getFullYear()} Qarabağ Universiteti. Bütün hüquqlar qorunur.
             </p>
-            <p className="text-caption text-text-secondary">
-              Xankəndi, Azərbaycan
-            </p>
+
+            <div className="flex flex-wrap items-center gap-4">
+              {/* ⚠️ `FOOTER_NAV`-a YAZILMIR — o siyahı ZİYARƏTÇİ naviqasiyasıdır
+                  (universitet, tələbələr, Xankəndi). `/docs` isə inteqrasiya
+                  sənədidir: auditoriyası fərqlidir və sütun başlığı altında
+                  yeri yoxdur. Alt zolaq belə "meta" linklərin adi yeridir. */}
+              <Link
+                href="/docs"
+                className="text-caption text-text-secondary transition-colors hover:text-ku-green"
+              >
+                API sənədləri
+              </Link>
+              <p className="text-caption text-text-secondary">Xankəndi, Azərbaycan</p>
+            </div>
           </div>
         </div>
       </footer>

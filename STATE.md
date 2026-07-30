@@ -343,3 +343,177 @@ onsuz da ödənilib — `ClassEvents`, `ClassAchievements`, `ClassTimeline` və
 linki ya 200 səhifədir, ya da açılışda MÖVCUD anchor; «Tədbirlər» linki ayrıca;
 hər bölmə başlıqla render olunur; naməlum ünvan azərbaycanca 404 verir).
 vitest **540** dəyişməyib. `tsc` · `lint` · `build` təmiz.
+
+---
+
+## Blok 9S — bitdi (sprint gate: REST API + OpenAPI/Swagger + Landing)
+
+⚠️ Bu blok PLAN.md-də YOXDUR — sprint deadline-ı üçün əlavə olunub. Blok 10A/10B
+və 11 bundan SONRA gəlir. Plan sırası qəsdən dəyişdirilib.
+
+### `/api/v1` — 18 endpoint
+
+**Auth:** `POST /auth/register` (201) · `POST /auth/login` (200 + kuka) ·
+`POST /auth/logout` (204) · `GET /auth/session` (anonimdə **200 + `data: null`**).
+**İctimai** (viewer ALMIR): `GET /health` · `/faculties` · `/content/pages?section=` ·
+`/faq` · `/guide-places?category=`.
+**Sinif** (kuka MƏCBURİ): `GET /cohorts` · `/cohorts/{slug}` ·
+`/cohorts/{slug}/members` (13 filtr) · `/posts` (kursor) · `/timeline` (3 filtr) ·
+`/achievements` · `/cohorts/{slug}/events` (6 filtr).
+**Qalan:** `GET /events/{id}` · `GET /search?q=` · `GET /openapi.json`.
+
+### `src/lib/api/` quruluşu (beş fayl)
+
+- `errors.ts` — 7 xəta kodu + `Record<ApiErrorCode, number>` status və mesaj
+  cədvəlləri (yeni kod əlavə edən adam cədvəli doldurmağı unutsa `tsc` dayanır).
+- `respond.ts` — `ok` / `created` / `noContent` / `fail` + `unauthenticated` /
+  `notFound` / `forbidden`. **v1 altında `NextResponse.json` BİRBAŞA çağırılmır** —
+  yoxsa OpenAPI-dəki zərf yalan olur.
+- `guard.ts` — `withViewer` / `withUser` / `requireJson` / `parseJsonBody` /
+  `parseQuery` + `azErrorMap` (Zod-un ingiliscə mesajlarını əvəz edir).
+- `rate-limit.ts` — login cəhd sayğacı (e-poçt+IP, 10 dəq / 5 cəhd).
+- `cohort-scope.ts` — `resolveCohortScope`: icazəsiz VƏ mövcud olmayan sinif üçün
+  EYNİ 404.
+- `schemas.ts` + `openapi.ts` — sənədin mənbəyi (aşağıda).
+
+### OpenAPI Zod-dan TÖRƏYİR — mexanizm
+
+`schemas.ts` `extendZodWithOpenApi(z)` çağırır və MÖVCUD sxemləri işlədir:
+`features/auth/schemas.ts` (`universityEmailSchema`, `passwordSchema`,
+`loginSchema`), `lib/enums.ts` (bütün enum siyahıları), `lib/search.ts`
+(limitlər), `lib/constants.ts` (domen). `openapi.ts` `OpenAPIRegistry`-ə yolları
+yazır, `OpenApiGeneratorV3` sənədi qurur, `/api/v1/openapi.json` (`force-static`)
+onu verir.
+
+**Query parametrləri DƏ törəmədir:** `DIRECTORY_FILTERS` (13 filtr),
+`TIMELINE_PARAMS`, `ACHIEVEMENT_PARAMS`, `EVENT_PARAMS` — adlar sənədə həmin
+modullardan gəlir. UI-a yeni filtr əlavə edilsə sənəd özü yenilənir.
+
+### Yeni tələlər (növbəti bloklar üçün)
+
+- **T27 — `RouteConfig.parameters` massivinə ZOD QOYMA.** O sahə xam OpenAPI
+  `ParameterObject` gözləyir; Zod sxemi ÇEVRİLMİR və sənədə `{"_def": …}` daxili
+  Zod strukturu düşür. Generasiya SINMIR, Swagger UI parametri "boş" göstərir.
+  Düzgün yol: `request: { params, query }` Zod obyektləri + `.openapi({ param:
+  { description } })`. `openapi.test.ts` → «sənəddə XAM ZOD obyekti YOXDUR».
+  ⚠️ Yol parametrini `request.params` VƏ `parameters`-də İKİ DƏFƏ elan etmə —
+  OpenAPI-də dublikat parametr etibarsızdır (bu da testlə bərkidilib).
+- **T28 — `signIn`-dən SONRA `getViewer()` İŞLƏMİR.** Auth.js kukini CAVAB
+  başlıqlarına yazır, `auth()` isə SORĞU kukilərini oxuyur → eyni sorğuda viewer
+  hələ anonimdir və login 500 verirdi. Həll: `services/auth.service.ts` →
+  **`getAuthenticatedSummary(email)`** (yalnız uğurlu `signIn`-dən sonra
+  çağırılmalıdır).
+- **T29 — vitest `next-auth`-u INLINE etməlidir.** `vitest.config.ts` →
+  `server.deps.inline: ["next-auth", "@auth/core"]`. Bunsuz
+  `next-auth/lib/env.js` → `import "next/server"` Node resolver-ində sınır
+  (*Did you mean "next/server.js"?*) və route handler-ləri import edən HEÇ BİR
+  test işləmir.
+- **T30 — ESLint `public/` qovluğunu ÖZÜ görür.** `.gitignore` ESLint-ə təsir
+  ETMİR: `public/swagger/` (1.5 MB minifikasiya olunmuş bundle) `npm run lint`-ə
+  165 xəta + 3280 xəbərdarlıq gətirirdi. `eslint.config.mjs` → `ignores`-a
+  `public/swagger/**` əlavə olundu.
+- **Vaxt kanalı bağlandı.** `src/auth.ts` → `equalizeFailureTiming()`: istifadəçi
+  tapılmasa da bcrypt müqayisəsi işlədilir (əvvəl mövcud olmayan e-poçt ~1 ms,
+  mövcud olan ~80 ms cavab verirdi — mətn eyni olsa da MÜDDƏT sızdırırdı).
+  Hash tənbəl qurulur və keşlənir.
+- **`SESSION_COOKIE_NAME` `auth.config.ts`-dədir və AUTHORITATIVDİR.** Sabit
+  yalnız ixrac edilmir — `authConfig.cookies.sessionToken.name` MƏHZ onu
+  işlədir, yəni sənəddəki `cookieAuth` adı təxmin deyil. HTTPS-də `__Secure-`
+  prefiksi `AUTH_URL` sxeminə görə əlavə olunur.
+
+### Qərarlar (müdafiədə soruşula bilər)
+
+- **v1 qatı UI-dan DAHA MƏHDUDDUR.** `(app)/class/[slug]/*` səhifələri yalnız
+  cohort-un MÖVCUDLUĞUNU yoxlayır və üzv olmayana boş siyahı göstərir; v1 isə
+  404 qaytarır (`cohort-scope.ts`). Səbəb: API xarici inteqrasiya səthidir və ən
+  az səlahiyyət prinsipi ilə işləyir. Fərq README-də və sənəddə yazılıb.
+- **Qeydiyyat REST-də AVTOMATİK GİRİŞ ETMİR.** Server Action variantı edir (forma
+  istifadəçini `/home`-a aparmalıdır), REST müştərisi isə açıq `POST /auth/login`
+  addımı gözləyir.
+- **`/search` qısa sorğuda 422 verir**, köhnə `/api/search` isə BOŞ NƏTİCƏ
+  (palitra hər hərfdə çağırır, orada xəta göstərmək olmaz).
+- **401 HƏR əməliyyatda sənədləşdirilib** — v1-in xəta zərfi vahiddir və müştəri
+  tək error handler yazır. İctimai endpoint-lərdə cavabın TƏSVİRİ "praktikada
+  qaytarılmır" deyir; forma sənədləşdirilir, davranış zəmanəti verilmir.
+- **Rate limit TƏK PROSES üçündür** (modul səviyyəsində `Map`). Horizontal
+  scale-də Redis lazımdır — şərhdə açıq yazılıb. Alternativ (cəhdləri DB-yə
+  yazmaq) brute-force-u DB-yə yönləndirərdi.
+
+### Landing / Home səhifəsi
+
+`(public)/page.tsx` NAZİKDİR → `features/welcome/WelcomePage.tsx`.
+**Doqquz bölmə:** Hero (`<h1>`, ku-dark→ku-green gradient, «Daxil ol» primary +
+«Qeydiyyat» outline) · `about` (`listContentPages(UNIVERSITY)`) · `faculties`
+(akkordeon, `listRegistrationCatalog`) · `numbers` (StatCard zolağı) ·
+`campus-life` (`listContentPages(CAMPUS)`) · `events` (`listEvents(ANONYMOUS)`) ·
+`khankendi` (3 GuidePlace) · `faq` (akkordeon, 6 sual) · bağlanış CTA.
+
+- 🔴 **Səhifə ANONİM viewer ilə oxuyur** — hətta giriş etmiş istifadəçi üçün də.
+  `getViewer()` ÇAĞIRILMIR, `ANONYMOUS` sabiti ötürülür. Bu, "girişdən sonra
+  açılışda sinif postu göründü" sızmasını STRUKTUR olaraq bağlayır.
+- ⚠️ **«Qarşıdan gələn tədbirlər» bölməsi BOŞ HALDA DA render olunur** (EmptyState
+  ilə). Sprint tapşırığı "boşdursa gizlət" deyirdi, amma bölmə həm də `/#events`
+  naviqasiya linkinin HƏDƏFİDİR: gizlətsək link mövcud olmayan anchor-a apararlı
+  (404-dən pisdir, çünki səssizdir) və `public-nav.spec.ts` qırılardı. Qərar
+  komponentin şərhində yazılıb.
+- ⚠️ **`campus-life` bölməsi tapşırıqdaki 8 bölmə siyahısında YOX İDİ**, amma
+  `LANDING_SECTIONS`-də var və `PUBLIC_NAV`/`FOOTER_NAV`-dan ona link gedir →
+  buraxılsaydı naviqasiya sınardı. Əlavə olundu (`ContentPage` CAMPUS bölməsi).
+- ⚠️ **«Rəqəmlərlə» ilə akkordeon fərqli sayır və bu, QƏSDƏNDİR:**
+  `getStructureCounts()` BÜTÜN fakültələri sayır (4), `listRegistrationCatalog()`
+  isə yalnız cohort-u OLANLARI göstərir (3). Akkordeonun üstündə izah sətri var
+  — iki sorğunu "uyğunlaşdırmaq" yanlış olardı, çünki qeydiyyat forması eyni
+  kataloqu işlədir.
+- **Yeni servis funksiyaları:** `content.service` → `listFaqs` · `listGuidePlaces`;
+  `academic.service` → `getStructureCounts`; `cohort.service` →
+  `listViewerCohorts`; `auth.service` → `getAuthenticatedSummary`.
+  `lib/labels.ts` → `FAQ_CATEGORY_LABELS`, `GUIDE_CATEGORY_LABELS` + `…Label()`.
+
+### nav.ts — anchor vəziyyəti DƏYİŞMƏYİB
+
+`PUBLIC_NAV` və `FOOTER_NAV` linkləri hələ də `LANDING_SECTIONS` anchor-larıdır
+(Blok 9 əlavəsində belə qurulub). **Blok 11-də real səhifələr (`/about`,
+`/faculties`, `/campus-life`, `/khankendi`, `/faq`, `/events`) gələndə yalnız
+`nav.ts`-dəki `href`-lər geri qaytarılacaq** — bölmələr və `id`-lər qalır,
+`routes.ts` → `PUBLIC_EXACT_PATHS`-dəki `/events` istisnasına toxunmaq lazım
+deyil. `/docs` linki `FOOTER_NAV`-a YAZILMADI (auditoriyası fərqlidir) —
+`PublicShell` alt zolağındadır.
+
+### Swagger UI
+
+`scripts/copy-swagger.mjs` üç aktivi (`swagger-ui.css`,
+`swagger-ui-bundle.js`, `swagger-ui-standalone-preset.js`) `public/swagger/`-ə
+köçürür; `predev` / `prebuild` hook-ları onu özü işlədir, `.gitignore` isə
+qovluğu repodan kənarda saxlayır (törəmədir). **CDN İŞLƏDİLMİR** — müdafiə
+otağında internet olmaya bilər (e2e testi xarici sorğu olmadığını yoxlayır).
+`features/docs/ApiDocs.tsx` → `withCredentials: true` (bunsuz «Try it out»
+sessiya kukisini GÖNDƏRMİR və hər qorunan endpoint 401 verər),
+`persistAuthorization: true`, standalone preset-in üst paneli `.slice(1)` ilə
+atılır (URL sahəsi demoda footgun-dur).
+
+**Brauzerdə yoxlanıldı:** `/docs` → «Try it out» ilə `POST /auth/login` real
+cavab verir, ardından `GET /cohorts` **200** qaytarır (kuka işləyir), brauzer
+konsolunda xəta yoxdur.
+
+### Testlər
+
+vitest **791** (əvvəl 540 → +251: `api/respond` 22, `api/rate-limit` 15,
+`api/openapi` 167, `api.db` 47). playwright **84** (əvvəl 48 → +36:
+`landing.spec` 20, `api.spec` 10, `api-docs.spec` 6).
+`auth.spec.ts`-dəki bir gözləmə yeniləndi (açılış `<h1>`-i placeholder-dən əsl
+dəyər təklifinə keçdi).
+`tsc --noEmit` · `lint` · `build` (prebuild hook ilə) təmiz.
+`grep -rn "prisma\." src/app src/features` → yalnız şərhlər.
+İnteqrasiya və e2e testlərinin yazdığı hər sətir geri qaytarılır — **28 cədvəlin
+sayları seed-lə bayt-bayt eynidir** (yoxlanıldı: test dəstindən sonraki sayğaclar
+təzə seed ilə identikdir).
+
+### Qalan borc
+
+- Moderasiya növbəsi, RSVP, paylaşım yaratmaq və digər YAZMA əməliyyatları v1-də
+  YOXDUR — bu blok OXU səthini və auth-u verdi.
+- `/docs` səhifəsi auth arxasında deyil; istehsalda sənədi bağlamaq lazım olsa
+  `routes.ts` → `APP_ROUTE_PREFIXES`-ə `/docs` əlavə etmək kifayətdir.
+- Rate limit yalnız login-dədir (qeydiyyat və axtarış açıqdır).
+- `ApiMeta` sabit sxemdir: xronologiyanın `academicYears` siyahısı v1-də
+  qaytarılmır (UI-da filtr paneli üçün lazımdır, API-də deyil).
