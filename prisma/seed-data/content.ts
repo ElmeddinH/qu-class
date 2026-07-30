@@ -742,6 +742,88 @@ export const POSITIONS = [
   "İnsan resursları üzrə mütəxəssis", "Məhsul meneceri",
 ] as const;
 
+// ---------------------------------------------------------------------------
+// 10b. "İndi haradayıq?" [M11] — KÜMƏLƏNMİŞ karyera planları (Blok 10B)
+// ---------------------------------------------------------------------------
+//
+// 🔴 NİYƏ AYRI SİYAHILAR VAR (yuxarıdaki `COUNTRIES` / `COMPANIES` / `POSITIONS`
+// SİLİNMƏYİB, hər ikisi işlədilir):
+//
+// Yuxarıdaki geniş siyahılar PROFİL və KATALOQ üçündür — orada çeşidlilik
+// dəyərlidir (13 filtrin hər biri nəticə qaytarsın, `User.currentCity` müxtəlif
+// olsun).
+//
+// Aqreqasiya isə k-anonimlikdən keçir: `MIN_BUCKET_SIZE = 3`. 15 ölkəyə və 40
+// şirkətə BƏRABƏR səpələnmiş ~20 razılıq verən məzun HƏR xananı 3-dən kiçik
+// saxlayır və "İndi haradayıq?" paneli TAM BOŞ görünür. Bu ölçülüb: köhnə
+// bölgü ilə şirkət xanalarının hamısı ≤ 2 idi.
+//
+// Real məzun axını onsuz da KÜMƏLƏNİR: bir sinfin məzunları bir-iki şəhərdə və
+// bir neçə böyük işəgötürəndə toplaşır. Aşağıdaki planlar bunu modelləşdirir —
+// yəni seed HƏM daha realdır, HƏM də məxfilik mühərrikinin işlədiyini GÖRÜNƏN
+// məlumatla nümayiş etdirir.
+//
+// ⚠️ PLAN ÖLÇÜSÜ QAYDASI: bir sinfin planındaki fərqli mərkəz sayı
+// `təxmini razılıq verən üzv sayı / 3`-dən ÇOX OLMAMALIDIR. Əks halda hər xana
+// yenidən eşiyin altına düşür. Kiçik sinfin planı ona görə YALNIZ iki mərkəzdən
+// ibarətdir — bu, səhv deyil, hesablamadır.
+
+export interface CareerPlacement {
+  city: string;
+  country: string;
+}
+
+const BAKI: CareerPlacement = { city: "Bakı", country: "Azərbaycan" };
+const XANKENDI: CareerPlacement = { city: "Xankəndi", country: "Azərbaycan" };
+const ISTANBUL: CareerPlacement = { city: "İstanbul", country: "Türkiyə" };
+const BERLIN: CareerPlacement = { city: "Berlin", country: "Almaniya" };
+const LONDON: CareerPlacement = { city: "London", country: "Böyük Britaniya" };
+
+/**
+ * Məzun sinifləri üzrə yerləşmə planları — sinfin sırasına görə seçilir.
+ * Təkrarlanan mərkəz daha çox çəki alır (Bakı hər iki dəfə → ~2× say).
+ */
+export const CAREER_PLACEMENT_PLANS: readonly (readonly CareerPlacement[])[] = [
+  // Böyük məzun sinfi: dörd mərkəz, Bakı ikiqat çəkili.
+  [BAKI, BAKI, XANKENDI, ISTANBUL],
+  // Kiçik məzun sinfi: yalnız iki mərkəz (bax yuxarıdaki PLAN ÖLÇÜSÜ QAYDASI).
+  [BERLIN, LONDON],
+] as const;
+
+export interface CareerTrack {
+  position: string;
+  industry: string;
+  company: string;
+}
+
+/**
+ * Karyera "yolları" — vəzifə, sahə və işəgötürən BİRLİKDƏ seçilir.
+ *
+ * ⚠️ Köhnə bölgüdə `position`, `industry` və `company` MÜSTƏQİL cycle-lənirdi və
+ * "Aqronom · TECHNOLOGY · Microsoft" kimi mənasız birləşmələr yaranırdı. Panel
+ * bu üçlüyü yan-yana göstərdiyi üçün uyğunsuzluq müdafiədə dərhal görünərdi.
+ *
+ * `jobFunction` BURADA YAZILMIR — `seed.ts` → `POSITION_JOB_FUNCTIONS` xəritəsi
+ * onu `position`-dan törədir (Blok 7B qaydası: iki mənbə saxlanılmır).
+ *
+ * ⚠️ PLAN UZUNLUQLARI QƏSDƏN QARŞILIQLI SADƏDİR (4 mərkəz × 3 yol). Bərabər
+ * olsaydılar şəhər və vəzifə BİR-BİRİNƏ TAM UYĞUN düşərdi ("Bakıdaki hər kəs
+ * maliyyəçidir") — pin tooltip-i mənasız, bölgü isə qeyri-real olardı.
+ */
+export const CAREER_TRACK_PLANS: readonly (readonly CareerTrack[])[] = [
+  // Maliyyə / texnologiya sinfi — üç yol (4 mərkəzlə qarışsın).
+  [
+    { position: "Maliyyə analitiki", industry: "FINANCE", company: "Kapital Bank" },
+    { position: "Məlumat analitiki", industry: "TECHNOLOGY", company: "Azercell" },
+    { position: "Layihə meneceri", industry: "ENERGY", company: "SOCAR" },
+  ],
+  // Təhsil / psixologiya sinfi.
+  [
+    { position: "Məktəb psixoloqu", industry: "EDUCATION", company: "Qarabağ Universiteti" },
+    { position: "Tədris koordinatoru", industry: "EDUCATION", company: "ADA Universiteti" },
+  ],
+] as const;
+
 export const CAREER_DESCRIPTIONS = [
   "Komanda ilə birgə məhsulun yeni modullarının hazırlanmasında iştirak edirəm.",
   "Gündəlik hesabatların avtomatlaşdırılması və məlumat keyfiyyətinə nəzarət mənim məsuliyyətimdədir.",

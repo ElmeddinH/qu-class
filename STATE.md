@@ -676,3 +676,231 @@ sonra 28 cədvəlin sayları təzə seed ilə **bayt-bayt eynidir** (yoxlanıld�
   `section` sahəsi (zərf sabit qalsın deyə).
 - Dəstək səthində yazma əməliyyatı yoxdur: redaktə `/me/career`-dəki MÖVCUD
   bölməyə yönləndirilir (yeni forma yaradılmadı).
+
+---
+
+## Blok 10B — bitdi (Where Are We Now: karyera nəticələri xəritəsi [M11])
+
+Müəllimin birbaşa tələbi (GW referansı): «tələbələrimizin gələcək karyerasında
+hansı yerdə, hansı konumda çalışdığını xəritədə görmək». Route `/class/[slug]/map`
+— `nav.ts`-dəki mövcud link MƏHZ ora gedir (`/where-are-we-now` YARADILMADI).
+
+### `aggregateCareerStats` — imza və dörd addım
+
+```ts
+// src/lib/career-stats.ts — SAF (prisma / React importu YOXDUR)
+aggregateCareerStats(
+  rows: CareerStatsRow[],          // { userId, city, country, company, industry, jobFunction, degree }
+  options?: {
+    memberCount?: number;          // sinif ölçüsü — "N/M razılıq verib"
+    totalConsented?: number;       // razılıq verən və GÖRÜNƏN üzv sayı
+    viewerId?: string;             // «sənin məlumatın iştirak edir/etmir»
+    strictCrossDimension?: boolean; // aşağıdaki «iki rejim» bölməsi
+  },
+): WhereAreWeNow
+```
+
+Dörd addım (sıra pozulmamalıdır):
+**a)** sətirlər `userId` üzrə təkləşdirilir (bir nəfər = bir sətir; `isCurrent`
+təkliyi Blok 7-dədir, təkrar yoxlanılmır) →
+**b)** YER ölçüsü eskalasiya edilir →
+**c)** digər ölçülər eyni eşiklə açıqlanan/açıqlanmayan kimi bölünür →
+**d)** yalnız BUNDAN SONRA saylar hesablanır.
+
+### ESKALASİYA qaydası (generalizasiya iyerarxiyası)
+
+```
+şəhər xanası < 3  →  sətir ÖLKƏ səviyyəsinə yığılır (şəhəri açıqlanmır)
+ölkə xanası  < 3  →  sətir tamamilə "Açıqlanmayan" (nə şəhər, nə ölkə)
+```
+Şəhəri gizlədilən sətir İTMİR: `cities.undisclosedCount`-a düşür və `countries`
+xanasında NORMAL sayılır. Dəyər gizlədilmir, KOBUDLAŞDIRILIR.
+
+### 🔴 ÇARPAZ suppress məntiqi (TƏLƏ A) — addım-addım
+
+**Tapılan əsl səhv:** köhnə `getWhereAreWeNowStats` xanaları BEŞ ayrı `groupBy`
+sorğusundan yığırdı və sorğuların `where`-i EYNİ DEYİLDİ
+(`{ industry: { not: null } }`, `{ country: { not: null } }`, `degrees` isə
+`EducationEntry` SƏTİRLƏRİNİ sayırdı). Yəni hər xana FƏRQLİ sətir çoxluğu
+üzərində hesablanırdı → cəmlər bir-birinə uyğun gəlmirdi → oxucu iki xananı
+çıxıb qalıq alır və onu üçüncü ilə kəsişdirib fərdə çata bilirdi.
+
+**Həll — üç struktur qayda:**
+1. TƏK DATASET (bir nəfər = bir sətir),
+2. TƏK KEÇİD (bütün ölçülər eyni sətir çoxluğundan),
+3. HƏR ÖLÇÜ SƏTİRLƏRİN HAMISINI ÖRTÜR:
+   `Σ visible[].count + undisclosedCount + unknownCount = respondentCount`.
+
+Üçüncü qayda TƏLƏ A-nın həndəsi bağlanışıdır: heç bir sətir heç bir xanadan
+itmədiyi üçün xanaları çıxmaqla qalıq çıxarmaq mümkün deyil. `undisclosedCount`
+= dəyəri VAR, qrupu kiçikdir; `unknownCount` = bu ölçü üzrə məlumat yoxdur.
+İkisi UI-da ayrı-ayrı izah olunur.
+
+**İKİ REJİM və niyə `MARGINAL` defaultdur (müdafiə sualı).**
+`strictCrossDimension: true` daha sərt qayda tətbiq edir: sətir ƏN AZI BİR
+ölçüdə açıqlanmırsa BÜTÜN ölçülərdə "Açıqlanmayan"a düşür (sabit nöqtəyə qədər
+dövr edir, çünki sətir çıxarmaq başqa xanaları da eşiyin altına salır). Rejim
+yazıldı və TESTLƏ ÖLÇÜLDÜ — real məlumatda HƏR ŞEYİ silir: 20 fərqli şirkət
+arasında bölünmüş 19 respondentin hər biri «bir ölçüdə açıqlanmır» şərtinə
+düşür və panel TAM BOŞ qalır. Yüksək kardinallıqlı sərbəst mətn sahəsi (şirkət
+adı) bütün panelə veto qoyur.
+
+Səhifə `MARGINAL` işlədir. Əsas: biz MİKROMƏLUMAT deyil, MARJİNAL bölgü nəşr
+edirik (hər ölçü ayrı qrafik, birgə cədvəl HEÇ VAXT göstərilmir) — marjinal
+nəşrdə tələb «hər açıqlanan xana ≥ k»-dır və üç qayda ilə tam ödənilir.
+«Açıqlanmayan» atribut DƏYƏRİ deyil, ona görə kəsişdirməyə yarayan məlumat
+daşımır. Hər iki rejim `career-stats.test.ts`-də bərkidilib.
+
+**Yeganə birgə cədvəl (cross-tab) — pin tooltip-i** (şəhər × vəzifə) AYRICA
+eşikdən keçir: yalnız həmin şəhərdə ≥ 3 nəfər olan istiqamətlər adlandırılır.
+«Bakı · 2 müəllim» marjinal xanalar təmiz olsa da konkret iki nəfəri göstərərdi.
+
+### `geo.ts` niyə STATİKDİR (TƏLƏ B)
+
+Heç bir sorğu `latitude` / `longitude` seçmir — sxemdə belə sütun YOXDUR və
+əlavə edilməməlidir. `src/lib/geo.ts` ~49 Azərbaycan (Qarabağ və Şərqi Zəngəzur
+daxil) + ~50 dünya şəhəri, 63 ölkə mərkəzi saxlayır; `prisma` importu yoxdur.
+Pin ŞƏHƏR MƏRKƏZİNƏ qoyulur, yəni eyni şəhərdəki iki nəfər eyni nöqtədə
+birləşir — bu, xəritəni «insan izləyicisi» olmaqdan qoruyan struktur qərardır.
+Tanınmayan şəhər pin YARATMIR (ölkə səviyyəsində sayılır); tanınmayan ölkə
+doldurma yaratmır (siyahıda var, xəritədə yox).
+
+`normalizeCityKey` `az` lokalını `lib/text-search.ts` → **`AZ_LOCALE`**-dan
+İMPORT EDİR (Blok 6, T14) — iki modul öz lokalını yazsaydı «İstanbul» bir yerdə
+`istanbul`, başqa yerdə `ıstanbul` olardı. Üstəlik diakritik qatlama var
+(ə→e, ı→i, ş→s, ğ→g, ö→o, ü→u, ç→c) və ayırıcılar atılır: «Nyu-York» = «Nyu York».
+
+⚠️ `world-atlas` poliqonunun `id`-si ISO NUMERIC-dir («031»), `properties.name`
+isə İNGİLİSCƏ. Uyğunlaşdırma `CountryCoord.numeric` ilə gedir, ADLA DEYİL.
+Sinqapur 110m topologiyasında YOXDUR (şəhər dövləti) — pin çəkilir, doldurma yox.
+
+### 🔴 MAAŞ İMTİNASI — səbəb (Blok 13-ün README-si buna istinad edəcək)
+
+Heç bir yerdə maaş/bonus sahəsi yaradılmadı, hesablanmadı, göstərilmədi.
+Səbəb: 14–28 nəfərlik sinifdə **aqreqasiya olunmuş maaş belə fərdiləşdirilə
+bilər** — öz rəqəmini bilən bir nəfər ortadan qalanları çıxarır, iki nəfər
+praktiki olaraq üçüncünü tapır. k-anonimlik bunu HƏLL ETMİR, çünki problem
+xananın ölçüsündə deyil, göstəricinin arifmetikasındadır (orta / medianın özü
+sızdırır). Qərar İKİ yerdə sübut olunur: `WhereAreWeNow` sxemi
+`additionalProperties: false`-dur və `openapi.test.ts` sənəddə `salary`/`bonus`
+sözünün olmadığını yoxlayır; `career-stats.test.ts` isə çıxış obyektinin
+açarlarını rekursiv gəzir. README-nin «üç məxfilik qərarı» bölməsi eyni izahı
+daşıyır.
+
+### Yeni fayllar
+
+**Saf modullar (testlə örtülü, Prisma yoxdur):** `lib/geo.ts` ·
+`lib/career-stats.ts` · `lib/map-filters.ts` (`MAP_TAB_VALUES` — 8 görünüş,
+parse ↔ serialize ↔ `mapHref` dövrəsi).
+
+**Servis:** `stats.service` → `fetchCareerStatsRows` (private) ·
+`countConsentedMembers` (private) · **`getCareerOutcomeStats(viewer, filters)`**.
+`getWhereAreWeNowStats` və `listCoarseLocations` İMZASINI SAXLADI, amma daxildən
+eyni TƏK aqreqasiyaya delegasiya edir — Blok 5 widget-i və mövcud testlər
+dəyişmədən işləyir. ⚠️ `degrees` xanası artıq SƏTİR yox, NƏFƏR sayır
+(`pickHighestDegree` nəfər başına bir pillə seçir) — köhnə davranış üç diplomlu
+adamı üç dəfə sayırdı.
+
+**Feature (`src/features/where-are-we-now/`):** `WhereAreWeNowPanel` (server) ·
+`ConsentNotice` · `MapTabs` (client, Radix Tabs + nuqs + `dynamic({ssr:false})`) ·
+`WorldMap` · `AzerbaijanMap` · `MapPins` · `MapPanel` · `MapSkeleton` ·
+`ChartFrame` · `StatsTable` · `BucketBarChart` · `CitiesChart` ·
+`CountriesChart` · `CompaniesChart` · `IndustriesChart` (donut) ·
+`JobFunctionsChart` · `EducationLevelsChart` · `catalog.ts` · `palette.ts` ·
+`filter-state.ts`.
+
+**Səhifə:** `/class/[slug]/map` (`force-dynamic`). **v1:**
+`GET /api/v1/cohorts/{slug}/stats/where-are-we-now` (`withUser`,
+`Cache-Control: private, no-store`, 22 → **23** endpoint).
+
+### Qərarlar (müdafiədə soruşula bilər)
+
+- **`shallow: true` — və bu, xronologiya/xatirə filtrlərindən FƏRQLİDİR.** Orada
+  süzgəc DB-dədir → server yenidən işləməlidir. Burada aqreqasiya TƏK keçiddə
+  bir dəfə hesablanır və səkkiz görünüş EYNİ nəticənin təsviridir; server sorğusu
+  yeni məlumat gətirməz. Qeyd hər iki faylın başlığındadır.
+- **Donut rəngləri ölçülüb seçilib.** Sıra (ku-green → ku-blue → ku-dark →
+  ku-cream → orta yaşıl → ku-soft) OKLab məsafəsi ilə yoxlandı: ən yaxın qonşu
+  cüt ΔE 17.8 (protanopiya) / 18.5 (normal görmə). «Gözəl gradient» variantı
+  ΔE 9.2 verir — dilimlər ayırd edilmir. KUDS palitrası solğun olduğu üçün
+  kontrast yoxlaması KEÇMİR; kompensasiya MƏCBURİDİR və verilib: dilim üzərində
+  faiz, ad+say leqendası, `<table>` alternativi. Rəng heç vaxt yeganə kanal deyil.
+- **Sütun diaqramları ÜFÜQİDİR** — «Birləşmiş Ərəb Əmirlikləri» kimi etiketlər
+  şaquli sütunda 45° əyilib oxunmur. Tək seriya olduğu üçün leqenda YOXDUR.
+- **Xəritə TƏK məlumat mənbəyi DEYİL** (KUDS §21 / WCAG 2.2): hər vizualın altında
+  «Cədvəl kimi göstər» açılışı var, cədvəldə «Açıqlanmayan» və «Cəmi» sətirləri
+  oxucuya invarianti YOXLAMAQ imkanı verir. Pinlər `tabIndex={0}` ilə klaviatura
+  fokusuna düşür və `<title>` daşıyır.
+- **`world-atlas` OFLAYN gəlir** (paketdən, bundle-a girir) — CDN İŞLƏDİLMİR,
+  Swagger UI aktivləri ilə eyni qərar (müdafiə otağında internet olmaya bilər).
+- **Dünya xəritəsi `geoNaturalEarth1`, Azərbaycan `geoMercator`.** Mercator
+  yüksək enliklərdə sahəni şişirdir və «doldurma = say» oxunuşunu pozar; kiçik
+  enlik aralığında (38…42° N) isə təhrif yoxdur və mövqelər tanış görünür.
+- **Ölkə doldurması HOVER-də dəyişmir** — rəng SAY deməkdir, interaktiv vəziyyət
+  deyil.
+
+### 🔴 Seed dəyişikliyi (prisma) və SƏBƏBİ
+
+Panel əvvəlki seed ilə TAM BOŞ qayıdırdı və bu ölçüldü: 19 respondent 15 ölkəyə
+və 20 şirkətə bərabər səpildiyi üçün hər xana 3 nəfərdən kiçik idi. Yəni
+məxfilik mühərriki işləyirdi, amma DoD-un «7 vizual real seed məlumatı ilə DOLU
+görünür» tələbi ödənilmirdi.
+
+`seed-data/content.ts` → **`CAREER_PLACEMENT_PLANS`** (sinif üzrə 4 / 2 mərkəz)
+və **`CAREER_TRACK_PLANS`** (vəzifə + sahə + işəgötürən BİRLİKDƏ seçilir).
+Plan uzunluqları QARŞILIQLI SADƏDİR (4 mərkəz × 3 yol), yoxsa şəhər və vəzifə
+tam üst-üstə düşərdi («Bakıdaki hər kəs maliyyəçidir»).
+⚠️ PLAN ÖLÇÜSÜ QAYDASI: bir sinfin planındaki fərqli mərkəz sayı
+`razılıq verən üzv sayı / 3`-dən çox olmamalıdır.
+
+Razılıq və görünürlük DETERMİNİSTİK oldu (`careerIndex % 7`,
+`CAREER_VISIBILITY_PLAN`) — təsadüfi süzgəc kümələri gah 3-ə çatdırır, gah
+altına salırdı və panel «gah dolu, gah sınmış» görünürdü. PRNG axını
+**`keepRandomStep`** ilə qorundu, yəni **28 cədvəlin sayları DƏYİŞMƏDİ**
+(yoxlanıldı: 72 CareerEntry · 25 EducationEntry · 40 SupportOffer ·
+207 Notification — hamısı eyni).
+
+Nəticə (Maliyyə 2022, məzun viewer): 15 respondent · Bakı 9 / Xankəndi 3 /
+İstanbul 3 · Azərbaycan 12, Türkiyə 3 · 3 işəgötürən · 3 sahə · 3 vəzifə
+istiqaməti. Bakı pin-i vəzifə bölgüsü göstərir (3 Data · 3 Maliyyə · 3 Məhsul),
+Xankəndi və İstanbul pinləri isə «vəzifə bölgüsü açıqlanmır» yazır — hər iki hal
+demoda görünür.
+
+### Testlər
+
+vitest **1030** (951 → +79: `career-stats` 28, `geo` 18, `map-filters` 12,
+`stats.db` 13, `openapi` +8 avtomatik `it.each` + 2 yeni). playwright **105**
+(95 → +10: `map.spec.ts`). `api-docs.spec.ts` və `openapi.test.ts`-dəki sabit
+endpoint sayı 22 → 23 yeniləndi.
+
+`tsc --noEmit` · `lint` · `build` təmiz.
+`grep -rn "latitude\|longitude" src/features/where-are-we-now` → BOŞ.
+`grep -rn "prisma\." src/app src/features` → yalnız şərhlər.
+`grep -rn "#[0-9a-f]\{3,6\}" src/features/where-are-we-now` → BOŞ.
+Test dəstindən sonra 28 cədvəlin sayları təzə seed ilə **bayt-bayt eynidir**.
+
+### Yol boyu tapılan tələlər
+
+- **T31 — JS `\b` AZƏRBAYCAN HƏRFLƏRİNDƏ SƏHV İŞLƏYİR.** `\w` = `[A-Za-z0-9_]`,
+  yəni «ş», «ə», «ı» SÖZ SƏRHƏDİ sayılır. `\bAyan\b` seed adı «yaşayan» sözünə
+  uyğun gəlirdi və ad-sızma e2e testi YALANDAN qırılırdı. Düzgün forma:
+  `(?<![\p{L}\p{N}])ad(?![\p{L}\p{N}])` + `u` bayrağı.
+- **T32 — üst-üstə düşən pinlərdə `hover()` İŞLƏMİR.** Dünya miqyasında Bakı və
+  Xankəndi markerləri kəsişir və Playwright «başqa element pointer hadisəsini
+  tutur» deyib dayanır. `focus()` işlədilir — həm stabildir, həm də əsl tələbi
+  (klaviatura ilə açılma) yoxlayır.
+- **`viewerIncluded` `viewerId` OLMADAN həmişə `false`-dur** — aqreqasiya baxanın
+  kim olduğunu təxmin etmir. Səhifə və v1 endpoint-i onu açıq ötürür.
+
+### Qalan borc
+
+- Panel YALNIZ cohort miqyasındadır. Universitet miqyaslı görünüş (`cohortId`
+  verilmədən) servisdə DƏSTƏKLƏNİR, amma UI-ı yoxdur — admin analitikası
+  (`/admin/stats`) üçün təbii yerdir.
+- Xəritədə zoom/pan yoxdur (`ZoomableGroup` əlavə edilmədi): klaviatura fokus
+  sırası ilə qarşılıqlı təsiri ayrıca əlçatanlıq işi tələb edir.
+- `strictCrossDimension` rejimi UI-dan seçilə bilmir — funksiya səviyyəsində
+  seçimdir və müdafiə üçün ölçmə alətidir.
+- Təhsil pilləsi yalnız CARİ İŞ QEYDİ OLAN üzvlər üçün sayılır (dataset karyera
+  qeydinə bağlıdır); yalnız təhsil qeydi olan üzv `totalConsented`-də görünür,
+  bölgüdə yox.

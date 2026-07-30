@@ -609,6 +609,160 @@ export const SupportOfferEntrySchema = z
   .passthrough()
   .openapi("SupportOfferEntry");
 
+// ---------------------------------------------------------------------------
+// "İndi haradayıq?" aqreqasiyası (Blok 10B, spec §13)
+// ---------------------------------------------------------------------------
+//
+// 🔴 SXEM ÖZÜ MƏXFİLİK SƏNƏDİDİR — üç şeyi SÜBUT EDİR:
+//
+//   1. MAAŞ SAHƏSİ YOXDUR (TƏLƏ D). Cavabda `salary`, `bonus`, `income` adlı
+//      sahə nə var, nə də ola bilər — sxem `.strict()`-dir (aşağıya bax) və
+//      `career-stats.test.ts` çıxış obyektində belə açar OLMADIĞINI yoxlayır.
+//   2. AD / PROFİL LİNKİ YOXDUR. Cavab tamamilə aqreqatdır: heç bir sahə
+//      istifadəçi kimliyinə aparmır.
+//   3. KOORDİNAT SƏTİRDƏN GƏLMİR. `lat` / `lon` YALNIZ şəhər mərkəzləridir
+//      (`lib/geo.ts` statik cədvəli) — `CareerEntry`-də belə sütun yoxdur.
+//
+// ⚠️ Bu sxemlər `.strict()`-dir, digər cavab sxemləri kimi `.passthrough()`
+// DEYİL. Səbəb: `passthrough` "əlavə sahələr ola bilər" deyir və maaş sahəsinin
+// OLMADIĞINI sənədləşdirməyi mənasız edərdi. Profil sxemlərində `passthrough`
+// lazımdır (`redactProfile` sahələri silir), aqreqatda isə forma SABİTDİR.
+
+const StatsBucketSchema = z
+  .object({
+    key: z.string().openapi({
+      description:
+        "Xam dəyər: enum açarı (`TECHNOLOGY`, `ENGINEERING`, `MASTER`) və ya " +
+        "sərbəst mətn (ölkə, şirkət adı). Azərbaycanca etiket UI-dadır — API " +
+        "dəyəri qaytarır ki, müştəri öz dilində göstərə bilsin.",
+    }),
+    count: z.number().int().min(3).openapi({
+      description:
+        "Nəfər sayı. HƏMİŞƏ ≥ 3-dür: kiçik qruplar k-anonimliklə " +
+        "`undisclosedCount`-a yığılır (spec §13).",
+    }),
+  })
+  .strict()
+  .openapi("StatsBucket");
+
+const CityBucketSchema = z
+  .object({
+    city: z.string(),
+    country: z.string().openapi({
+      description: "Xana açarı şəhər + ölkə cütüdür — eyni adlı şəhərlər qarışmasın.",
+    }),
+    count: z.number().int().min(3),
+  })
+  .strict()
+  .openapi("CityBucket");
+
+function statsCellSchema<S extends z.ZodTypeAny>(item: S, name: string) {
+  return z
+    .object({
+      visible: z.array(item).openapi({
+        description: "Açıqlanan xanalar — say azalan sıra ilə, hər biri ≥ 3 nəfər.",
+      }),
+      undisclosedCount: z.number().int().nonnegative().openapi({
+        description:
+          "Dəyəri OLAN, amma qrupu 3 nəfərdən kiçik olduğu üçün açıqlanmayan sətirlər.",
+      }),
+      unknownCount: z.number().int().nonnegative().openapi({
+        description: "Bu ölçü üzrə məlumat bildirməyən sətirlər.",
+      }),
+    })
+    .strict()
+    .openapi(name, {
+      description:
+        "🔴 İNVARİANT: `Σ visible[].count + undisclosedCount + unknownCount` " +
+        "HƏMİŞƏ `respondentCount`-a bərabərdir. Xanalar bir-birindən çıxılıb " +
+        "qalıq (deməli fərd) alına bilməz — bütün ölçülər TƏK dataset üzərində, " +
+        "TƏK keçiddə hesablanır.",
+    });
+}
+
+const MapPinSchema = z
+  .object({
+    id: z.string().openapi({ description: "Stabil açar: normallaşdırılmış `ölkə|şəhər`." }),
+    city: z.string(),
+    country: z.string(),
+    lat: z.number().openapi({
+      description:
+        "ŞƏHƏR MƏRKƏZİNİN enliyi — `lib/geo.ts` statik cədvəlindən. " +
+        "İstifadəçinin yeri DEYİL və `CareerEntry`-də koordinat sütunu YOXDUR.",
+    }),
+    lon: z.number(),
+    count: z.number().int().min(3),
+    roles: z
+      .array(StatsBucketSchema)
+      .openapi({
+        description:
+          "Şəhər × vəzifə bölgüsü. 🔴 Bu BİRGƏ CƏDVƏLDİR və AYRICA k-anonimlikdən " +
+          "keçir: yalnız həmin şəhərdə ≥ 3 nəfər olan istiqamətlər var. Boş massiv " +
+          "«bölgü açıqlanmır» deməkdir, «vəzifə yoxdur» demək DEYİL.",
+      }),
+    undisclosedRoles: z.number().int().nonnegative(),
+  })
+  .strict()
+  .openapi("MapPin");
+
+const CountryFillSchema = z
+  .object({
+    numeric: z.string().openapi({
+      description:
+        "ISO 3166-1 numeric — `world-atlas` (countries-110m) topologiyasındaki " +
+        "poliqonun `id`-si. Xəritə doldurması bununla bağlanır.",
+      example: "031",
+    }),
+    iso2: z.string().length(2).openapi({ example: "AZ" }),
+    country: z.string(),
+    count: z.number().int().min(3),
+  })
+  .strict()
+  .openapi("CountryFill");
+
+export const WhereAreWeNowSchema = z
+  .object({
+    respondentCount: z.number().int().nonnegative().openapi({
+      description:
+        "Bölgüdə sayılan NƏFƏR sayı (sətir yox). Üç süzgəcdən keçir: görünürlük, " +
+        "`includeInStats` razılığı, `isCurrent`.",
+    }),
+    totalConsented: z.number().int().nonnegative().openapi({
+      description:
+        "Aqreqasiyaya razılıq vermiş və viewer-ə görünən üzv sayı. " +
+        "`respondentCount`-dan böyük ola bilər: yalnız təhsil qeydinə razılıq " +
+        "verən, cari iş qeydi olmayan üzv bölgüyə düşmür.",
+    }),
+    memberCount: z.number().int().nonnegative().nullable().openapi({
+      description: "Sinif ölçüsü — razılıq nisbətini («N/M») göstərmək üçün.",
+    }),
+    suppressedCount: z.number().int().nonnegative().openapi({
+      description: "Ən azı bir ölçüdə bölgüsü tam açıqlanmayan nəfər sayı (şəffaflıq).",
+    }),
+    viewerIncluded: z.boolean().openapi({
+      description: "Sorğu edən istifadəçinin öz məlumatı bu bölgüdə iştirak edirmi?",
+    }),
+
+    countries: statsCellSchema(StatsBucketSchema, "CountryStatsCell"),
+    cities: statsCellSchema(CityBucketSchema, "CityStatsCell"),
+    companies: statsCellSchema(StatsBucketSchema, "CompanyStatsCell"),
+    industries: statsCellSchema(StatsBucketSchema, "IndustryStatsCell"),
+    jobFunctions: statsCellSchema(StatsBucketSchema, "JobFunctionStatsCell"),
+    educationLevels: statsCellSchema(StatsBucketSchema, "EducationStatsCell"),
+
+    mapPins: z.array(MapPinSchema).openapi({
+      description: "Dünya xəritəsinin şəhər markerləri — tanınmayan şəhər pin YARATMIR.",
+    }),
+    azPins: z.array(MapPinSchema).openapi({
+      description: "Azərbaycan görünüşünün markerləri — `mapPins`-in alt çoxluğu.",
+    }),
+    countryFills: z.array(CountryFillSchema).openapi({
+      description: "Ölkə doldurması. Tanınmayan ölkə burada YOXDUR (siyahıda var, xəritədə yox).",
+    }),
+  })
+  .strict()
+  .openapi("WhereAreWeNow");
+
 const SearchHitSchema = z
   .object({
     id: idSchema,

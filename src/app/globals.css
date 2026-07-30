@@ -71,6 +71,31 @@
     --chart-grid: #e2e8f0;         /* border */
     --chart-axis: #64748b;         /* text-secondary */
 
+    /* --- Xəritə palitrası ("İndi haradayıq?" [M11], Blok 10B) ---
+       `react-simple-maps` SVG `fill` / `stroke` atributlarına Tailwind sinfi
+       qəbul etmir (Recharts ilə eyni səbəb), ona görə şkala burada TOKEN kimi
+       açılır. Komponentlərdə yalnız `var(--map-*)` yazılır — `#` yoxdur.
+
+       Şkala KUDS §3-ün öz iki rəngi ARASINDADIR: `ku-soft` (#D3E8BF, ən az
+       say) → `ku-green` (#44766C, ən çox say). Aralıq üç pillə düz xətti
+       interpolyasiyadır — yeni brend rəngi UYDURULMAYIB.
+
+       ⚠️ Şkalanın üzərinə MƏTN yazılmır (say tooltip-də və cədvəldədir), ona
+       görə kontrast tələbi doldurmaya tətbiq olunmur. Xəritə həm də TƏK
+       məlumat mənbəyi deyil — hər xəritənin `<table>` alternativi var
+       (KUDS §21 / WCAG 2.2). */
+    --map-fill-1: #d3e8bf;
+    --map-fill-2: #afcbaa;
+    --map-fill-3: #8caf96;
+    --map-fill-4: #689281;
+    --map-fill-5: #44766c;
+    --map-empty: #eef2f6;          /* məlumatı olmayan ölkə */
+    --map-outside: #f4f7fa;        /* Azərbaycan görünüşündə qonşu ərazilər */
+    --map-stroke: #ffffff;         /* sərhəd xətti */
+    --map-pin: #16423c;            /* ku-dark */
+    --map-pin-active: #44766c;     /* ku-green — hover / fokus */
+    --map-pin-stroke: #ffffff;
+
     /* --- KUDS §8: Layout sabitləri --- */
     --sidebar-width: 280px;
     --header-height: 72px;

@@ -64,6 +64,8 @@ import {
   ASK_ME_ABOUT,
   BIOS,
   CAREER_DESCRIPTIONS,
+  CAREER_PLACEMENT_PLANS,
+  CAREER_TRACK_PLANS,
   CLUBS,
   COHORTS,
   COMMENT_BODIES,
@@ -246,6 +248,31 @@ function randomVisibility(): VisibilityType {
   if (roll < 0.95) return Visibility.CLASS;
   return Visibility.PRIVATE;
 }
+
+/**
+ * Karyera və təhsil qeydləri üçün DETERMİNİSTİK görünürlük bölgüsü (Blok 10B).
+ *
+ * 🔴 NİYƏ TƏSADÜFİ DEYİL: "İndi haradayıq?" aqreqasiyası k-anonimlikdən keçir
+ * (3 nəfər). Görünürlük təsadüfi olanda bir kümənin 3 üzvündən 1-i PRIVATE
+ * düşür və xana gah açılır, gah bağlanır — panel seed-dən seed-ə "sınmış" kimi
+ * görünür. Bölgü `randomVisibility()`-nin nisbətlərinə YAXINDIR (1/8 PUBLIC,
+ * 2/8 UNIVERSITY, 4/8 CLASS, 1/8 PRIVATE), amma təkrarlanandır.
+ *
+ * ⚠️ PUBLIC və PRIVATE hər ikisi PLANDA QALIR: inteqrasiya testləri anonim
+ * viewer-in sayının sinif üzvündən KİÇİK olduğunu və PRIVATE sətrin
+ * aqreqasiyaya düşmədiyini yoxlayır — plandan birini çıxarsan həmin testlər
+ * mənasız yaşıl olar.
+ */
+const CAREER_VISIBILITY_PLAN: readonly VisibilityType[] = [
+  Visibility.CLASS,
+  Visibility.UNIVERSITY,
+  Visibility.CLASS,
+  Visibility.PUBLIC,
+  Visibility.CLASS,
+  Visibility.UNIVERSITY,
+  Visibility.CLASS,
+  Visibility.PRIVATE,
+];
 
 /**
  * Profil sahələri və onların standart görünürlük səviyyəsi.
@@ -1328,38 +1355,81 @@ async function main(): Promise<void> {
   const careerRows: Prisma.CareerEntryCreateManyInput[] = [];
   let careerIndex = 0;
 
+  // -------------------------------------------------------------------------
+  // 🔴 KARYERA BÖLGÜSÜ KÜMƏLƏNMİŞDİR (Blok 10B) — səbəbi
+  // `seed-data/content.ts` → `CAREER_PLACEMENT_PLANS` başlığında yazılıb.
+  //
+  // Qısası: yerləşmə və karyera yolu `careerIndex`-ə görə DEYİL, məzunun ÖZ
+  // SİNFİ daxilindəki sırasına görə seçilir. Beləliklə bir sinfin məzunları
+  // bir-iki mərkəzdə və bir neçə işəgötürəndə toplaşır və "İndi haradayıq?"
+  // paneli k-anonimlik eşiyindən (3 nəfər) KEÇƏN xanalar qaytarır.
+  // Köhnə bölgü (15 ölkə × 40 şirkət bərabər səpələnmiş) paneli tam boş
+  // saxlayırdı — ölçülüb.
+  // -------------------------------------------------------------------------
+  const cohortPlanIndex = new Map<string, number>();
+  const alumniRankInCohort = new Map<string, number>();
+
+  const planIndexOf = (cohortKey: string): number => {
+    const existing = cohortPlanIndex.get(cohortKey);
+    if (existing !== undefined) return existing;
+    const next = cohortPlanIndex.size;
+    cohortPlanIndex.set(cohortKey, next);
+    return next;
+  };
+
   alumniUsers.forEach((user) => {
     const cohort = cohortByKey.get(user.cohortKey)!;
+    const planIndex = planIndexOf(user.cohortKey);
+    const rank = alumniRankInCohort.get(user.cohortKey) ?? 0;
+    alumniRankInCohort.set(user.cohortKey, rank + 1);
+
+    const placementPlan = cycle(CAREER_PLACEMENT_PLANS, planIndex);
+    const trackPlan = cycle(CAREER_TRACK_PLANS, planIndex);
+
     const entryCount = randInt(1, 3);
     let cursor = addDays(cohort.graduatesAt, randInt(10, 120));
 
     for (let e = 0; e < entryCount; e += 1) {
       careerIndex += 1;
       const isCurrent = e === entryCount - 1;
-      const placement = cycle(COUNTRIES, careerIndex);
       const startDate = cursor;
       const endDate = isCurrent ? null : addDays(startDate, randInt(300, 900));
       cursor = endDate ? addDays(endDate, randInt(5, 60)) : startDate;
       if (!isCurrent && cursor > NOW) break;
 
-      const position = cycle(POSITIONS, careerIndex);
+      // Cari qeyd sinfin planından, keçmiş qeydlər isə plandaki NÖVBƏTİ
+      // mərkəzdən gəlir — "əvvəl başqa şəhərdə işləmişəm" hekayəsi qalır,
+      // amma CARİ bölgü (statistikanın saydığı) kümələnmiş olur.
+      const placement = cycle(placementPlan, isCurrent ? rank : rank + e + 1);
+      const track = cycle(trackPlan, isCurrent ? rank : rank + e + 1);
+
+      // ⚠️ PRNG axını qorunur (`keepRandomStep` — bax funksiyanın şərhi):
+      // razılıq və görünürlük artıq DETERMİNİSTİKDİR, çünki təsadüfi razılıq
+      // kümələri təsadüfən 3-dən kiçik saxlayır və panel gah dolu, gah boş
+      // görünür. Addımlar yerində qalır ki, ondan SONRAKI hər şey (dəstək
+      // təklifləri, bildirişlər…) eyni dəyərləri alsın.
+      const description = chance(0.7) ? cycle(CAREER_DESCRIPTIONS, careerIndex) : null;
+      keepRandomStep(chance(0.7));
+      keepRandomStep(randomVisibility());
 
       careerRows.push({
         id: `car-${String(careerIndex).padStart(3, "0")}`,
         userId: user.id,
-        company: cycle(COMPANIES, careerIndex),
-        position,
-        jobFunction: POSITION_JOB_FUNCTIONS[position] ?? null,
-        industry: cycle(INDUSTRY_VALUES, careerIndex),
-        city: cycle(placement.cities, careerIndex),
+        company: track.company,
+        position: track.position,
+        jobFunction: POSITION_JOB_FUNCTIONS[track.position] ?? null,
+        industry: track.industry,
+        city: placement.city,
         country: placement.country,
         startDate,
         endDate,
         isCurrent,
-        description: chance(0.7) ? cycle(CAREER_DESCRIPTIONS, careerIndex) : null,
+        description,
         // ⚠️ Aqreqasiya AYRICA razılıqdır — görünürlük səviyyəsi kifayət etmir.
-        includeInStats: chance(0.7),
-        visibility: randomVisibility(),
+        // Hər 7-ci qeyd razılıq VERMİR: "razılıq universal deyil" faktı
+        // inteqrasiya testində (`withoutConsent > withConsent`) yoxlanılır.
+        includeInStats: careerIndex % 7 !== 0,
+        visibility: cycle(CAREER_VISIBILITY_PLAN, careerIndex),
       });
     }
   });
@@ -1393,6 +1463,12 @@ async function main(): Promise<void> {
     prisma.careerEntry.createMany({ data: chunk }),
   );
 
+  // ⚠️ Təhsil qeydləri də DETERMİNİSTİK razılıq/görünürlük işlədir (karyera ilə
+  // eyni səbəb): "təhsil pillələri" qrafiki nəfər sayır və təsadüfi süzgəc
+  // kümələri eşiyin altına salırdı. Pillə bölgüsü də dəyişdi — köhnə
+  // [MASTER, MASTER, PHD, CERTIFICATE] bölgüsü `pickHighestDegree` ilə
+  // birləşəndə praktikada TƏK xana (MASTER) verirdi, çünki bir nəfərin magistr
+  // + doktorantura qeydi ən yükseyə yığılır.
   const educationRows = Array.from({ length: 25 }, (_, i) => {
     const user = cycle(alumniUsers, i);
     const cohort = cohortByKey.get(user.cohortKey)!;
@@ -1402,14 +1478,17 @@ async function main(): Promise<void> {
       id: `edu-${String(i + 1).padStart(2, "0")}`,
       userId: user.id,
       institution: cycle(INSTITUTIONS, i),
-      degree: cycle([Degree.MASTER, Degree.MASTER, Degree.PHD, Degree.CERTIFICATE], i),
+      degree: cycle(
+        [Degree.BACHELOR, Degree.MASTER, Degree.MASTER, Degree.PHD, Degree.CERTIFICATE],
+        i,
+      ),
       field: cycle(EDUCATION_FIELDS, i),
       country: cycle(COUNTRIES, i).country,
       startYear,
       endYear: isCurrent ? null : startYear + 2,
       isCurrent,
-      includeInStats: chance(0.7),
-      visibility: randomVisibility(),
+      includeInStats: keepRandomStep(chance(0.7)) ?? i % 6 !== 0,
+      visibility: keepRandomStep(randomVisibility()) ?? cycle(CAREER_VISIBILITY_PLAN, i),
     };
   });
   await insertMany("EducationEntry", educationRows, (chunk) =>

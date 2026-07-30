@@ -74,8 +74,8 @@ describe("əməliyyatlar", () => {
     // Sayı SABİT gözləmə kimi yazılır: yeni endpoint əlavə edən adam sənədə
     // yazmağı unutsa test dayanır.
     // 18 (Blok 9S) + 4 (Blok 10A: memories · yearbook · support ·
-    // guide-places/{id}/memories) = 22.
-    expect(operations.length).toBe(22);
+    // guide-places/{id}/memories) + 1 (Blok 10B: stats/where-are-we-now) = 23.
+    expect(operations.length).toBe(23);
   });
 
   it.each(operations.map((o) => [o.label, o] as const))(
@@ -143,6 +143,54 @@ describe("əməliyyatlar", () => {
       expect(successCodes.length, `${label} üçün 2xx cavab yoxdur`).toBeGreaterThan(0);
     },
   );
+
+  /**
+   * 🔴 TƏLƏ D (Blok 10B) — ƏMƏK HAQQI QƏSDƏN YOXDUR.
+   *
+   * Qərar kodda deyil, MÜQAVİLƏDƏ sübut olunur: sənəd maaş sahəsi elan etmirsə
+   * heç bir müştəri onu gözləmir və heç bir gələcək endpoint onu "geri
+   * uyğunluq üçün" əlavə edə bilməz. 14-28 nəfərlik sinifdə aqreqasiya olunmuş
+   * maaş belə fərdiləşdirilə bilər (bir nəfər öz rəqəmini bilirsə qalanları
+   * çıxarır) — səbəb README və STATE.md-dədir.
+   */
+  it("🔴 sənəddə maaş / bonus sahəsi YOXDUR (TƏLƏ D)", () => {
+    expect(JSON.stringify(document)).not.toMatch(
+      /"(salary|salaryRange|bonus|wage|income|compensation)"/i,
+    );
+  });
+
+  /**
+   * Aqreqasiya sxemi `additionalProperties: false` olmalıdır — əks halda
+   * yuxarıdaki test "sahə yoxdur" deyər, sxem isə "istənilən sahə ola bilər"
+   * deyər və müqavilə mənasız qalar.
+   */
+  it("🔴 «İndi haradayıq?» sxemi ƏLAVƏ SAHƏYƏ İCAZƏ VERMİR", () => {
+    const schemas = document.components?.schemas as
+      | Record<string, { additionalProperties?: unknown; properties?: Record<string, unknown> }>
+      | undefined;
+
+    const schema = schemas?.WhereAreWeNow;
+    expect(schema, "WhereAreWeNow sxemi sənəddə yoxdur").toBeTruthy();
+    expect(schema?.additionalProperties).toBe(false);
+
+    // Səkkiz xana + beş sayğac.
+    expect(Object.keys(schema?.properties ?? {})).toEqual([
+      "respondentCount",
+      "totalConsented",
+      "memberCount",
+      "suppressedCount",
+      "viewerIncluded",
+      "countries",
+      "cities",
+      "companies",
+      "industries",
+      "jobFunctions",
+      "educationLevels",
+      "mapPins",
+      "azPins",
+      "countryFills",
+    ]);
+  });
 
   it("bütün xəta kodları sənəddəki `ApiError` enum-unda var", () => {
     const schemas = document.components?.schemas as

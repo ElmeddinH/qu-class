@@ -84,6 +84,7 @@ import {
   SupportOfferEntrySchema,
   TimelineItemSchema,
   ViewerCohortSchema,
+  WhereAreWeNowSchema,
   YearbookEntrySchema,
   envelope,
   listEnvelope,
@@ -857,6 +858,44 @@ path({
     200: jsonResponse(
       "Təkliflər — hər sətir bir istifadəçi + bir növ.",
       listEnvelope(SupportOfferEntrySchema, "SupportOfferListResponse"),
+    ),
+    ...commonResponses(),
+  },
+});
+
+path({
+  method: "get",
+  path: "/api/v1/cohorts/{slug}/stats/where-are-we-now",
+  operationId: "getCohortWhereAreWeNow",
+  tags: ["Cohorts"],
+  summary: "«İndi haradayıq?» aqreqasiyası",
+  description:
+    "Spec §13 [M11] — məzunların yer, işəgötürən, sektor, vəzifə istiqaməti və " +
+    "təhsil pilləsi üzrə bölgüsü.\n\n" +
+    "🔴 ÜÇ MÜSTƏQİL SÜZGƏC: (1) görünürlük — `visibilityWhereForUserOwned`; " +
+    "(2) AYRICA aqreqasiya razılığı — `includeInStats` (görünürlük səviyyəsi " +
+    "KİFAYƏT DEYİL); (3) k-anonimlik — 3 nəfərdən kiçik xana açıqlanmır.\n\n" +
+    "🔴 BÜTÜN ÖLÇÜLƏR TƏK DATASET ÜZƏRİNDƏ, TƏK KEÇİDDƏ hesablanır və hər ölçü " +
+    "sətirlərin HAMISINI örtür: `Σ visible[].count + undisclosedCount + " +
+    "unknownCount = respondentCount`. Yəni iki xananı çıxıb qalıq (deməli fərd) " +
+    "almaq mümkün deyil — ölçülər arası kəsişmə qapalıdır.\n\n" +
+    "🔴 YER ESKALASİYASI: şəhər xanası 3-dən kiçikdirsə sətir ÖLKƏ səviyyəsinə " +
+    "yığılır; ölkə də kiçikdirsə tamamilə açıqlanmır. Sətir heç bir halda İTMİR.\n\n" +
+    "⚠️ CAVABDA ƏMƏK HAQQI SAHƏSİ YOXDUR və bu, QƏSDƏN qərardır: 14-28 nəfərlik " +
+    "sinifdə aqreqasiya olunmuş maaş belə fərdiləşdirilə bilər. Sxem " +
+    "`additionalProperties: false`-dur, yəni sənəd bunu SÜBUT edir.\n\n" +
+    "⚠️ `mapPins[].lat` / `lon` ŞƏHƏR MƏRKƏZLƏRİDİR (`lib/geo.ts` statik " +
+    "cədvəli). `CareerEntry`-də koordinat sütunu YOXDUR — istifadəçinin dəqiq " +
+    "yeri nə saxlanılır, nə qaytarılır.\n\n" +
+    "⚠️ Anonim sorğu üçün MÖVCUD DEYİL (401): bu, sinif daxili analitikadır. " +
+    "Cavab `Cache-Control: private, no-store` ilə gəlir — viewer-dən asılı " +
+    "nəticə ortaq keşdə saxlanıla bilməz.",
+  security: SECURED,
+  request: { params: SlugParams },
+  responses: {
+    200: jsonResponse(
+      "Aqreqasiya nəticəsi — səkkiz xana + razılıq şəffaflığı sayğacları.",
+      envelope(WhereAreWeNowSchema, "WhereAreWeNowResponse"),
     ),
     ...commonResponses(),
   },

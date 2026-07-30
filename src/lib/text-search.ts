@@ -34,8 +34,17 @@
 // örtülüdür (`text-search.test.ts`).
 // ============================================================================
 
-/** Azərbaycan hərflərinin düzgün çevrilməsi üçün lokal (İ/ı fərqi). */
-const LOCALE = "az";
+/**
+ * Azərbaycan hərflərinin düzgün çevrilməsi üçün lokal (İ/ı fərqi).
+ *
+ * ⚠️ İXRAC OLUNUR, çünki `lib/geo.ts` (Blok 10B) şəhər/ölkə adlarını müqayisə
+ * açarına çevirəndə MƏHZ bu lokalı işlətməlidir. İki modul öz lokalını yazsaydı
+ * "İstanbul" bir yerdə `istanbul`, başqa yerdə `ıstanbul` olardı və xəritə
+ * şəhəri "tanınmayan" sayardı.
+ */
+export const AZ_LOCALE = "az";
+
+const LOCALE = AZ_LOCALE;
 
 /**
  * Sorğu sətrinin hərf variantları — dublikatsız.

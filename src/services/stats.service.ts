@@ -14,9 +14,20 @@
 //      göstərməyə razı ola, statistikaya qoşulmağa isə razı olmaya bilər.
 //      İki razılıq MÜSTƏQİLDİR və hər ikisi tələb olunur.
 //
-//   3. K-ANONİMLİK — `suppressSmallBuckets()`. 3 nəfərdən kiçik xana ("Tokioda
-//      1 məzun") faktiki olaraq konkret şəxsi göstərir; belə xanalar "Digər"ə
-//      yığılır.
+//   3. K-ANONİMLİK — `MIN_BUCKET_SIZE` (= 3). 3 nəfərdən kiçik xana ("Tokioda
+//      1 məzun") faktiki olaraq konkret şəxsi göstərir.
+//
+//      ⚠️ BLOK 10B DƏYİŞİKLİYİ: k-anonimlik artıq burada, xana-xana
+//      `suppressSmallBuckets()` ilə tətbiq OLUNMUR. Səbəb — 🔴 TƏLƏ A: hər
+//      xananı ÖZ `groupBy` sorğusundan qurmaq xanaları FƏRQLİ sətir çoxluqları
+//      üzərində hesablayır və oxucu onları çıxıb qalıq (deməli fərd) tapa bilir.
+//      Bütün məntiq TƏK saf funksiyaya köçdü: `lib/career-stats.ts` →
+//      `aggregateCareerStats` (TƏK dataset, TƏK keçid, hər xana bütün sətirləri
+//      örtür). Bu fayl yalnız xam sətirləri gətirir.
+//
+//      `suppressSmallBuckets()` / `MIN_BUCKET_SIZE` yenə `lib/visibility.ts`-in
+//      vahid həqiqət mənbəyidir və başqa səthlərdə (Blok 10A başlıq zolağı)
+//      işlədilir — silinməyib.
 //
 // Üstəlik `coarsenLocation()` proyeksiya qapısıdır: çıxışa YALNIZ şəhər/ölkə
 // buraxılır — dəqiq ünvan və koordinat heç vaxt.
@@ -24,6 +35,12 @@
 
 import type { Prisma } from "@prisma/client";
 
+import {
+  aggregateCareerStats,
+  pickHighestDegree,
+  type CareerStatsRow,
+  type WhereAreWeNow,
+} from "@/lib/career-stats";
 import { prisma } from "@/lib/db";
 import { AchievementStatus } from "@/lib/enums";
 import { isHeadlineStatsVisible } from "@/lib/headline-stats";
@@ -31,7 +48,6 @@ import {
   coarsenLocation,
   fieldVisibleWhere,
   statsConsentWhere,
-  suppressSmallBuckets,
   visibilityWhereForUserOwned,
   visibleWithStatus,
   type ControlledField,
@@ -109,95 +125,209 @@ function educationWhere(
   };
 }
 
+// ===========================================================================
+// TƏK DATASET — Blok 10B (🔴 TƏLƏ A)
+//
+// Aqreqasiya artıq BEŞ ayrı `groupBy` sorğusundan YIĞILMIR. Səbəb `lib/
+// career-stats.ts` başlığında ətraflı yazılıb, qısası: hər sorğunun `where`-i
+// fərqli idi (`{ industry: { not: null } }`, `{ country: { not: null } }`…),
+// yəni hər xana FƏRQLİ sətir çoxluğu üzərində hesablanırdı. Xanaların cəmləri
+// uyğun gəlmədiyi üçün oxucu onları çıxıb qalıq (deməli fərd) tapa bilirdi.
+//
+// İndi servis YALNIZ xam sətirləri gətirir və `aggregateCareerStats`-ı çağırır.
+// Aqreqasiya məntiqi burada TƏKRAR YAZILMIR.
+//
+// ⚠️ SORĞU `latitude` / `longitude` SEÇMİR (TƏLƏ B) — sxemdə belə sütun yoxdur
+// və əlavə edilməməlidir. Koordinat `lib/geo.ts`-dəki STATİK cədvəldəndir.
+// ⚠️ SORĞU MAAŞ SAHƏSİ SEÇMİR (TƏLƏ D) — sxemdə belə sütun QƏSDƏN yoxdur.
+// ===========================================================================
+
+/**
+ * Bir nəfər = bir sətir.
+ *
+ * `CareerEntry.isCurrent` təkliyi Blok 7-də təmin edilib (yeni cari qeyd
+ * köhnəsini keçmişə keçirir), ona görə cari qeydlər onsuz da nəfər başına
+ * birdir — bu qorumaya GÜVƏNİLİR, təkrar yoxlama yazılmır. `EducationEntry`
+ * isə çoxdur: `pickHighestDegree` nəfər başına BİRİNİ seçir, əks halda üç
+ * diplomlu adam üç dəfə sayılıb cəm invariantını sındırardı.
+ */
+async function fetchCareerStatsRows(
+  viewer: Viewer,
+  filters: StatsFilters,
+): Promise<CareerStatsRow[]> {
+  const [careerRows, educationRows] = await Promise.all([
+    prisma.careerEntry.findMany({
+      where: currentCareerWhere(viewer, filters),
+      select: {
+        userId: true,
+        city: true,
+        country: true,
+        company: true,
+        industry: true,
+        jobFunction: true,
+      },
+      // Deterministik sıra: eyni məlumat üçün eyni çıxış (test müqayisələri).
+      orderBy: { id: "asc" },
+    }),
+
+    prisma.educationEntry.findMany({
+      where: educationWhere(viewer, filters),
+      select: { userId: true, degree: true },
+      orderBy: { id: "asc" },
+    }),
+  ]);
+
+  const degreesByUser = new Map<string, string[]>();
+  for (const row of educationRows) {
+    const list = degreesByUser.get(row.userId);
+    if (list) list.push(row.degree);
+    else degreesByUser.set(row.userId, [row.degree]);
+  }
+
+  return careerRows.map((row) => ({
+    userId: row.userId,
+    city: row.city,
+    country: row.country,
+    company: row.company,
+    industry: row.industry,
+    jobFunction: row.jobFunction,
+    degree: pickHighestDegree(degreesByUser.get(row.userId) ?? []),
+  }));
+}
+
+/**
+ * Razılıq vermiş və viewer-ə GÖRÜNƏN üzv sayı.
+ *
+ * `respondentCount`-dan böyük ola bilər: yalnız təhsil qeydinə razılıq verən,
+ * cari iş qeydi olmayan üzv panelə düşmür (sual "indi haradasan?"-dır), amma
+ * razılıq şəffaflığı zolağında sayılmalıdır — əks halda "8 nəfərdən 6-sı"
+ * cümləsi yerinə "6 nəfərdən 6-sı" yazıb razılıq verib də sayılmayanları
+ * gizlətmiş olardıq.
+ *
+ * ⚠️ Say VIEWER GÖRÜNÜRLÜYÜNDƏN keçir. Görünürlükdən kənar razılıqları saysaydıq
+ * viewer "2 nəfər daha razılıq verib, amma qeydini görə bilmirsən" məlumatını
+ * alardı — bu, gizli sətrin MÖVCUDLUĞUNU sızdırır.
+ */
+async function countConsentedMembers(
+  viewer: Viewer,
+  filters: StatsFilters,
+): Promise<number> {
+  const [career, education] = await Promise.all([
+    prisma.careerEntry.groupBy({
+      by: ["userId"],
+      where: {
+        AND: [
+          statsConsentWhere,
+          visibilityWhereForUserOwned<Prisma.CareerEntryWhereInput>(viewer),
+          ...(filters.cohortId
+            ? [{ user: { memberships: { some: { cohortId: filters.cohortId } } } }]
+            : []),
+        ],
+      },
+    }),
+    prisma.educationEntry.groupBy({
+      by: ["userId"],
+      where: educationWhere(viewer, filters),
+    }),
+  ]);
+
+  return new Set([...career, ...education].map((row) => row.userId)).size;
+}
+
+export interface CareerOutcomeFilters extends StatsFilters {
+  /** Baxanın öz `userId`-si — «sənin məlumatın iştirak edir/etmir» sətri üçün. */
+  viewerId?: string;
+}
+
+/**
+ * "İndi haradayıq?" panelinin TAM nəticəsi — 8 xana + şəffaflıq sayğacları.
+ *
+ * Səhifə (`/class/[slug]/map`) və v1 endpoint-i MƏHZ bunu çağırır.
+ */
+export async function getCareerOutcomeStats(
+  viewer: Viewer,
+  filters: CareerOutcomeFilters = {},
+): Promise<WhereAreWeNow> {
+  const [rows, totalConsented, memberCount] = await Promise.all([
+    fetchCareerStatsRows(viewer, filters),
+    countConsentedMembers(viewer, filters),
+    filters.cohortId === undefined
+      ? Promise.resolve(undefined)
+      : prisma.cohortMembership.count({ where: { cohortId: filters.cohortId } }),
+  ]);
+
+  return aggregateCareerStats(rows, {
+    totalConsented,
+    memberCount,
+    viewerId: filters.viewerId,
+  });
+}
+
 /**
  * Xəritə üçün KOBUDLAŞDIRILMIŞ məkanlar.
  *
- * `coarsenLocation()` burada qəsdən sətir-sətir tətbiq olunur: sorğuya
- * gələcəkdə `address` və ya koordinat sahəsi əlavə edilsə belə, çıxışa yalnız
- * şəhər/ölkə buraxılacaq. Nəticə həm də `suppressSmallBuckets`-dən keçir —
- * tək nəfərlik şəhər xanası xəritədə həmin şəxsi göstərmiş olardı.
+ * ⚠️ Blok 10B-də ARTIQ ayrı sorğu DEYİL — `getCareerOutcomeStats`-ın şəhər
+ * xanasından törəyir (TƏK dataset qaydası). `coarsenLocation()` yenə sətir-sətir
+ * tətbiq olunur: bu, proyeksiya qapısıdır — sxemə gələcəkdə `address` və ya
+ * koordinat sahəsi əlavə edilsə də çıxışa yalnız şəhər/ölkə buraxılacaq.
  */
 export async function listCoarseLocations(
   viewer: Viewer,
   filters: StatsFilters = {},
 ): Promise<SuppressedBuckets<LocationBucket>> {
-  const rows = await prisma.careerEntry.groupBy({
-    by: ["country", "city"],
-    where: { AND: [currentCareerWhere(viewer, filters), { country: { not: null } }] },
-    _count: { _all: true },
-  });
+  const stats = await getCareerOutcomeStats(viewer, filters);
+  return toLocationBuckets(stats);
+}
 
-  return suppressSmallBuckets(
-    rows.map((row) => ({
-      ...coarsenLocation({ city: row.city, country: row.country }),
-      count: row._count._all,
+function toLocationBuckets(stats: WhereAreWeNow): SuppressedBuckets<LocationBucket> {
+  return {
+    visible: stats.cities.visible.map((bucket) => ({
+      ...coarsenLocation({ city: bucket.city, country: bucket.country }),
+      count: bucket.count,
     })),
-  );
+    otherCount: stats.cities.undisclosedCount,
+  };
 }
 
 /**
- * `groupBy` nəticəsini k-anonimlikdən keçmiş xanalara çevirir.
- * Boş/`null` açarlı sətirlər atılır — "naməlum ölkə" məlumat daşımır.
+ * "İndi haradayıq?" xülasəsi — Blok 5 widget-inin işlətdiyi FORMA.
+ *
+ * ⚠️ İMZA VƏ ÇIXIŞ FORMASI DƏYİŞMƏYİB (`features/class-home/widgets/
+ * WhereAreWeNowSummary.tsx` və mövcud inteqrasiya testləri bunu gözləyir), amma
+ * DAXİLİ tamamilə dəyişdi: rəqəmlər indi TƏK aqreqasiyadan gəlir, beş ayrı
+ * `groupBy`-dan yox.
+ *
+ * ⚠️ `otherCount` = "dəyəri var, amma açıqlanmır". Bu, əvvəlki davranışla
+ * uyğundur: `Σ visible + otherCount` = həmin ölçü üzrə DƏYƏRİ OLAN sətirlərin
+ * sayı (dəyəri olmayanlar `unknownCount`-dadır və heç vaxt "Digər"ə düşməmişdi).
+ *
+ * ⚠️ `degrees` xanası artıq SƏTİR yox, NƏFƏR sayır (bir nəfərin üç diplomu bir
+ * dəfə sayılır) — köhnə davranış cəmi şişirdirdi.
+ *
+ * ⚠️ Yeni səthlər üçün `getCareerOutcomeStats` işlədilir; bu funksiya köhnə
+ * çağıranların müqaviləsidir.
  */
-function toBuckets<T extends { _count: { _all: number } }>(
-  rows: T[],
-  keyOf: (row: T) => string | null,
-): SuppressedBuckets<StatsBucket> {
-  return suppressSmallBuckets(
-    rows
-      .map((row) => ({ key: keyOf(row), count: row._count._all }))
-      .filter((bucket): bucket is StatsBucket => Boolean(bucket.key)),
-  );
-}
-
-/** "İndi haradayıq?" panelinin bütün xanaları — tək çağırışda. */
 export async function getWhereAreWeNowStats(
   viewer: Viewer,
   filters: StatsFilters = {},
 ): Promise<WhereAreWeNowStats> {
-  const careerWhere = currentCareerWhere(viewer, filters);
+  const stats = await getCareerOutcomeStats(viewer, filters);
 
-  const [respondents, byCountry, byIndustry, byJobFunction, byDegree, locations] =
-    await Promise.all([
-      // Sətir yox, İSTİFADƏÇİ sayı — bir nəfər iki qeydlə iki dəfə sayılmasın.
-      prisma.careerEntry.groupBy({ by: ["userId"], where: careerWhere }),
-
-      prisma.careerEntry.groupBy({
-        by: ["country"],
-        where: { AND: [careerWhere, { country: { not: null } }] },
-        _count: { _all: true },
-      }),
-
-      prisma.careerEntry.groupBy({
-        by: ["industry"],
-        where: { AND: [careerWhere, { industry: { not: null } }] },
-        _count: { _all: true },
-      }),
-
-      // `jobFunction` — `industry` ilə EYNİ nümunə: üç qat (görünürlük +
-      // includeInStats + k-anonimlik) `careerWhere`-dən, `toBuckets`-dən keçir.
-      prisma.careerEntry.groupBy({
-        by: ["jobFunction"],
-        where: { AND: [careerWhere, { jobFunction: { not: null } }] },
-        _count: { _all: true },
-      }),
-
-      prisma.educationEntry.groupBy({
-        by: ["degree"],
-        where: educationWhere(viewer, filters),
-        _count: { _all: true },
-      }),
-
-      listCoarseLocations(viewer, filters),
-    ]);
+  const toLegacy = (cell: {
+    visible: Array<{ key: string; count: number }>;
+    undisclosedCount: number;
+  }): SuppressedBuckets<StatsBucket> => ({
+    visible: cell.visible.map((bucket) => ({ key: bucket.key, count: bucket.count })),
+    otherCount: cell.undisclosedCount,
+  });
 
   return {
-    respondentCount: respondents.length,
-    countries: toBuckets(byCountry, (row) => row.country),
-    industries: toBuckets(byIndustry, (row) => row.industry),
-    jobFunctions: toBuckets(byJobFunction, (row) => row.jobFunction),
-    degrees: toBuckets(byDegree, (row) => row.degree),
-    locations,
+    respondentCount: stats.respondentCount,
+    countries: toLegacy(stats.countries),
+    industries: toLegacy(stats.industries),
+    jobFunctions: toLegacy(stats.jobFunctions),
+    degrees: toLegacy(stats.educationLevels),
+    locations: toLocationBuckets(stats),
   };
 }
 

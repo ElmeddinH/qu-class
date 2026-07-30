@@ -135,7 +135,7 @@ Hamısının şifrəsi: **`Test1234!`**
 Route qrupları URL-ə təsir etmir: `(app)/kuds/page.tsx` → `/kuds`.
 Qalan route-lar blok-blok əlavə olunur (bax [PLAN.md](PLAN.md) §4.2).
 
-**`/api/v1` — 18 endpoint** (tam sənəd: `/docs`):
+**`/api/v1` — 23 endpoint** (tam sənəd: `/docs`):
 
 | Metod | Yol | Auth |
 |---|---|---|
@@ -144,11 +144,42 @@ Qalan route-lar blok-blok əlavə olunur (bax [PLAN.md](PLAN.md) §4.2).
 | GET | `/api/v1/health` · `/faculties` · `/content/pages` · `/faq` · `/guide-places` | ictimai |
 | GET | `/api/v1/cohorts` · `/cohorts/{slug}` | kuka |
 | GET | `/cohorts/{slug}/members` (13 filtr) · `/posts` (kursor) · `/timeline` (3 filtr) · `/achievements` · `/events` (6 filtr) | kuka |
-| GET | `/api/v1/events/{id}` · `/api/v1/search` | ictimai (görünürlüyə görə) |
+| GET | `/cohorts/{slug}/memories` · `/yearbook` · `/support` | kuka |
+| GET | `/cohorts/{slug}/stats/where-are-we-now` | kuka (`private, no-store`) |
+| GET | `/api/v1/events/{id}` · `/api/v1/search` · `/guide-places/{id}/memories` | ictimai (görünürlüyə görə) |
 | GET | `/api/v1/openapi.json` | ictimai |
 
 ⚠️ Mövcud `/api/feed`, `/api/search`, `/api/upload`, `/api/events/[id]/ics` **dəyişməyib** —
 onları client komponentləri işlədir (`FeedList`, ⌘K palitrası). v1 qatı onların yanındadır.
+
+---
+
+### 🔒 «İndi haradayıq?» — üç məxfilik qərarı
+
+Karyera xəritəsi ([`/class/[slug]/map`](src/app/(app)/class/%5Bslug%5D/map/page.tsx))
+sinfin ən həssas səthidir. Üç qərar sənədləşdirilir, çünki müdafiədə soruşulur:
+
+**1. ƏMƏK HAQQI QƏSDƏN YOXDUR.** Nə sxemdə sütun, nə servisdə hesablama, nə
+API cavabında sahə var. Səbəb: 14–28 nəfərlik sinifdə **aqreqasiya olunmuş maaş
+belə fərdiləşdirilə bilər** — öz rəqəmini bilən bir nəfər ortadan qalanları
+çıxarır, iki nəfər isə praktiki olaraq üçüncünü tapır. k-anonimlik bunu HƏLL
+ETMİR, çünki problem xananın ölçüsündə deyil, göstəricinin arifmetikasındadır.
+Sənəd bunu SÜBUT edir: `WhereAreWeNow` sxemi `additionalProperties: false`-dur
+və `openapi.test.ts` sənəddə `salary` / `bonus` sözünün olmadığını yoxlayır.
+
+**2. XƏRİTƏ KOORDİNATI BAZADAN GƏLMİR.** `CareerEntry`-də `latitude` /
+`longitude` sütunu yoxdur. Pin **şəhər mərkəzinə** qoyulur
+([`src/lib/geo.ts`](src/lib/geo.ts) — statik cədvəl, `prisma` importu yoxdur),
+yəni eyni şəhərdəki iki nəfər eyni nöqtədə birləşir. Tanınmayan şəhər pin
+YARATMIR — sətir ölkə səviyyəsində sayılır.
+
+**3. GİZLƏTMƏ ÖLÇÜLƏR ARASINDA UZLAŞIR.** Bütün bölgülər TƏK sətir çoxluğu
+üzərində, TƏK keçiddə hesablanır və hər ölçü sətirlərin hamısını örtür:
+`Σ açıqlanan + açıqlanmayan + bildirilməyən = respondentCount`. Buna görə iki
+qrafiki bir-birindən çıxıb qalıq (deməli fərd) almaq mümkün deyil. Şəhər xanası
+3 nəfərdən kiçikdirsə sətir ölkə səviyyəsinə yığılır; ölkə də kiçikdirsə
+tamamilə «Açıqlanmayan» olur. Alqoritm və ölçülmüş alternativlər
+[`src/lib/career-stats.ts`](src/lib/career-stats.ts) başlığındadır.
 
 ### 7. E2E testlər
 
@@ -203,6 +234,14 @@ təkrar işlədəndə eyni baza alınır. Mətnlər `prisma/seed-data/content.ts
 Həcm: 4 fakültə · 10 ixtisas · 6 cohort · 125 istifadəçi · 300 paylaşım ·
 80 nailiyyət · 60 xatirə · 25 tədbir · 30 Xankəndi bələdçi yazısı — 28 cədvəlin
 hamısı doludur.
+
+⚠️ **Karyera qeydləri QƏSDƏN KÜMƏLƏNİB** (`CAREER_PLACEMENT_PLANS` /
+`CAREER_TRACK_PLANS`). Əvvəlki bölgü 15 ölkəyə və 40 şirkətə bərabər səpilirdi;
+k-anonimlik eşiyi (3 nəfər) ilə birləşəndə «İndi haradayıq?» panelinin HƏR
+xanası gizlənirdi — yəni məxfilik mühərriki işləyirdi, amma nümayiş ediləcək bir
+şey qalmırdı. Real məzun axını onsuz da bir-iki mərkəzdə toplaşır. Sətir sayları
+DƏYİŞMƏYİB və PRNG axını qorunub (`keepRandomStep`), yəni qalan 27 cədvəl eyni
+qalır.
 
 ---
 
