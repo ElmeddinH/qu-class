@@ -572,3 +572,107 @@ bərkidilib (`api.spec.ts`: `content-type: application/json` VƏ gövdə
 `<!DOCTYPE html>` EHTİVA ETMİR).
 
 Vitest **820** (817→+3).
+
+---
+
+## Blok 10A — bitdi (Share Memories + Digital Yearbook + Dəstək səthi)
+
+⚠️ «Where Are We Now» XƏRİTƏSİ BU BLOKDA DEYİL — o, 10B-dir. `stats.service`-in
+mövcud funksiyalarına toxunulmadı; yalnız YENİ `getCohortHeadlineStats` əlavə
+olundu.
+
+**Yeni saf modullar (Prisma / React yoxdur, testlə örtülü):**
+- `lib/memory-filters.ts` — `MEMORY_PARAMS` (`type` · `place` · `page`),
+  parse ↔ serialize ↔ `memoriesHref` dövrəsi, `MEMORY_PAGE_SIZE = 12`.
+  `place` BAYRAQDIR (`?place=1`) — konkret məkan seçicisi deyil.
+- `lib/yearbook.ts` — `Record<MemoryType, YearbookSection>` xəritəsi,
+  `yearbookSectionOf` (TƏK dəyər → bir xatirə iki bölmədə görünə bilmir),
+  `groupYearbook`, `groupByPlace`.
+- `lib/headline-stats.ts` — `HEADLINE_MIN_MEMBERS` (= `MIN_BUCKET_SIZE`, yeni
+  ədəd YARADILMADI) + `isHeadlineStatsVisible`.
+- `lib/labels.ts` → **`MEMORY_TYPE_LABELS`** (T13): etiketlər `features/feed/
+  catalog.ts`-dən lib-ə köçdü, lent və xatirə kataloqu indi EYNİ mənbədən oxuyur.
+
+**🔴 TRAP A — `showInTimeline` sxem məhdudiyyəti (qərar və SƏBƏBİ):**
+`TimelineEntry.sourceType` yalnız POST|ACHIEVEMENT|EVENT|SYSTEM qəbul edir və
+Memory-yə FK YOXDUR. `sourceType`-a "MEMORY" **ƏLAVƏ EDİLMƏDİ** — yeni miqrasiya
++ yeni FK + `timelineVisibilityWhere`-in sahib şaxəsinə müdaxilə Blok 3-ün üç qat
+qorumasını riskə atardı. Əvəzinə: `showInTimeline` yalnız `showInFeed` ilə birgə
+seçilir (UI `disabled` + Zod `superRefine` + servisdə `TIMELINE_REQUIRES_FEED` —
+üç qat, çünki UI qoruma sayılmır); `showInFeed` açıqdırsa EYNİ transaksiyada Post
+yaranır (kind MEMORY, eyni visibility/occurredAt) və Blok 4-ün `buildTimelineEntry`
+köməkçisi ÇAĞIRILIR (kopyalanmır); söndürüləndə Post soft-delete +
+`timelineEntry.deleteMany({ postId })` (T4).
+
+**Yeni servis funksiyaları:**
+- `memory.service`: `countMemories` · **`listYearbook(viewer, cohortId)
+  : Promise<MemoryItem[]>`** · **`listMemoriesForPlace(viewer, guidePlaceId,
+  take = 3): Promise<PlaceMemoryItem[]>`** · `countMemoriesForPlace` ·
+  `createMemory` · `updateMemory` · `deleteMemory` · `getMemoryDraft`.
+- `cohort.service`: `listCohortSupportOffers(viewer, cohortId)` — 7 növ,
+  `openToSupport` qapısı, şirkət yalnız `CareerEntry` görünürlükdən keçirsə.
+- `stats.service`: `getCohortHeadlineStats(viewer, cohortId)` — dörd qayda
+  (yalnız saylar · hər say görünürlük şərtindən keçir · `memberCount <
+  MIN_BUCKET_SIZE` → **`null`** · nailiyyət yalnız VERIFIED+FEATURED).
+
+**🔴 Yol boyu tapılan səhv (düzəldildi):** `activeVisibleWhere` status filtrini
+SAHİBƏ tətbiq etmir, yəni müəllif öz SOFT-DELETE edilmiş xatirəsini görürdü.
+`memory.service` → **`visibleMemoryWhere`** əlavə olundu (`post.service` →
+`visiblePostWhere` ilə eyni nümunə). Yeni xatirə sorğusu `activeVisibleWhere`-i
+TƏK BAŞINA çağırmamalıdır.
+
+**Yeni komponentlər / səhifələr:** `features/memories/` → `catalog.ts` (8 növ:
+etiket lib-dən, ikon ADI, `ku-soft`/`ku-blue`/`ku-cream` FON tonu), `filter-state.ts`,
+`schemas.ts`, `actions.ts`, `MemoryComposer`, `MemoryCard`, `MemoryFilters`,
+`ClassMemories`, **`PlaceMemories`**, `types.ts`; `features/yearbook/ClassYearbook`;
+`features/support/ClassSupport`; `features/class-home/HeadlineStats`;
+`components/shared/PrintButton` (Blok 9-dakı `events/manage/PrintButton`-dan
+bura köçdü — ikinci istifadəçi yarandı, `features/*` bir-birindən import etmir).
+Səhifələr: `/class/[slug]/memories`, `/class/[slug]/yearbook`,
+`/class/[slug]/support` (üçü də `force-dynamic`; `/class` prefiksi
+`APP_ROUTE_PREFIXES`-də olduğu üçün `routes.ts`-ə toxunulmadı).
+
+**Çap görünüşü:** `DashboardShell` → sidebar/header `print:hidden`, `main`
+padding sıfırlanır; `globals.css` → `@media print` (ağ fon, kölgəsiz,
+`a[href]::after` boş — link URL-ləri kağıza düşmür); albomda hər bölmə
+`print:break-before-page`, hər kart `break-inside-avoid`. Paket ƏLAVƏ EDİLMƏDİ.
+
+**Albom quruluşu:** üç sual bölməsi (MOMENT · LESSON · **PLACE — tipdən asılı
+deyil, `guidePlaceId` ilə**) + sitat divarı (CLOSING). ⚠️ Qalan iki növ
+(`UNIVERSITY_STORY`, `THANKS_CLASSMATE`) **STORY** bölməsinə düşür: sual bölməsi
+deyil, amma `showInYearbook` seçmiş istifadəçinin xatirəsi səssizcə itməməlidir.
+`Record<MemoryType, …>` olduğu üçün yeni növ unudulsa `tsc` dayanır.
+
+**PlaceMemories — Blok 11 qeydi:** komponent yazıldı və testlə örtüldü, amma
+HEÇ YERƏ QOŞULMADI — Xankəndi bələdçisi səhifəsi (M3) Blok 11-dədir. **Blok 11-də
+bələdçi məkan kartına `<PlaceMemories placeId={place.id} />` əlavə etmək
+kifayətdir.** Səhifə İCTİMAİ olacağı üçün servis anonim viewer ilə də
+çağırılacaq: `activeVisibleWhere` MƏCBURİDİR, məkan filtri onun ƏVƏZİ deyil,
+ÜSTƏLİYİDİR (ayrıca inteqrasiya + api testi var).
+
+**Yeni v1 endpoint-ləri (18 → 22):**
+`GET /cohorts/{slug}/memories` (tip + məkan filtri, PagerNav metası) ·
+`GET /cohorts/{slug}/yearbook` (hər qeyddə `section`) ·
+`GET /cohorts/{slug}/support` · `GET /guide-places/{id}/memories`
+(**`withViewer`** — bələdçi ictimaidir; naməlum `id` 404 yox, boş siyahı).
+Sxemlər `lib/api/schemas.ts`-ə (`Memory`, `PlaceMemory`, `YearbookEntry`,
+`SupportOfferEntry`), yollar `openapi.ts`-ə; query parametrləri
+`MEMORY_PARAMS`-dan TÖRƏYİR. `openapi.test.ts` və `api-docs.spec.ts`-dəki sabit
+say 18 → 22 yeniləndi.
+
+**Testlər:** vitest **951** (əvvəl 820 → +131: `memory-filters` 27, `yearbook` 18,
+`memories/schemas` 14, `memories/catalog` 8, `headline-stats` 4,
+`memories.db` 25, `api.db` +7, `openapi` +32 avtomatik `it.each`),
+playwright **95** (89 → +6). `tsc --noEmit` · `lint` · `build` təmiz;
+`grep -rn "prisma\." src/app src/features` → yalnız şərhlər. Test dəstindən
+sonra 28 cədvəlin sayları təzə seed ilə **bayt-bayt eynidir** (yoxlanıldı).
+
+**Qalan borc:**
+- Xatirə səthində reaksiya/şərh YOXDUR (qəsdən — bu, söhbət deyil). Lazım olsa
+  lentdəki bağlı Post üzərindən gedir.
+- Albomda üzv kartındaki «ixtisas» cohort-un proqramıdır (bütün üzvlər üçün
+  eynidir); fərdi ixtisas sahəsi sxemdə yoxdur.
+- Yearbook v1 endpoint-i qruplaşdırılmış struktur qaytarmır — düz siyahı +
+  `section` sahəsi (zərf sabit qalsın deyə).
+- Dəstək səthində yazma əməliyyatı yoxdur: redaktə `/me/career`-dəki MÖVCUD
+  bölməyə yönləndirilir (yeni forma yaradılmadı).

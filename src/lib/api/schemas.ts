@@ -39,14 +39,17 @@ import {
   FaqCategorySchema,
   GUIDE_CATEGORY_VALUES,
   GuideCategorySchema,
+  MEMORY_TYPE_VALUES,
   POST_CATEGORY_VALUES,
   POST_KIND_VALUES,
+  SUPPORT_OFFER_TYPE_VALUES,
   SYSTEM_ROLE_VALUES,
   TIMELINE_SOURCE_TYPE_VALUES,
   USER_STAGE_VALUES,
   VISIBILITY_VALUES,
 } from "@/lib/enums";
 import { MIN_SEARCH_LENGTH, PALETTE_LIMIT, SEARCH_PAGE_LIMIT } from "@/lib/search";
+import { YEARBOOK_SECTIONS } from "@/lib/yearbook";
 import {
   isValidAdmissionYear,
   loginSchema,
@@ -511,6 +514,100 @@ export const EventSchema = z
   })
   .passthrough()
   .openapi("Event");
+
+// ---------------------------------------------------------------------------
+// Share Memories · Digital Yearbook · Dəstək təklifləri (Blok 10A)
+// ---------------------------------------------------------------------------
+
+const memoryAuthorSchema = z
+  .object({
+    id: idSchema,
+    firstName: z.string(),
+    lastName: z.string(),
+    avatarUrl: z.string().nullable(),
+  })
+  .passthrough();
+
+export const MemorySchema = z
+  .object({
+    id: idSchema,
+    type: z.enum(MEMORY_TYPE_VALUES),
+    title: z.string(),
+    body: z.string(),
+    dedicatedTo: z.string().nullable(),
+    imageUrl: z.string().nullable(),
+    visibility: visibilitySchema,
+    occurredAt: dateTimeSchema,
+    createdAt: dateTimeSchema,
+    guidePlaceId: z.string().nullable().openapi({
+      description:
+        "«Sevimli yer» körpüsü — `GuidePlace.id`. Xatirə NÖVÜNDƏN ASILI DEYİL: " +
+        "8 növün hər hansı biri məkana bağlana bilər.",
+    }),
+    postId: z.string().nullable().openapi({
+      description:
+        "Lentdə də paylaşılıbsa bağlı `Post.id`. ⚠️ Xronologiyaya düşmə YALNIZ " +
+        "bu post vasitəsilə mümkündür — `TimelineEntry`-də Memory-yə FK yoxdur.",
+    }),
+    showInProfile: z.boolean(),
+    showInFeed: z.boolean(),
+    showInTimeline: z.boolean().openapi({
+      description: "`showInFeed` bağlı olarsa bu bayraq `true` OLA BİLMƏZ.",
+    }),
+    showInYearbook: z.boolean(),
+    author: memoryAuthorSchema,
+    cohort: z
+      .object({ id: idSchema, slug: z.string(), displayName: z.string() })
+      .passthrough(),
+    guidePlace: z
+      .object({ id: idSchema, title: z.string(), category: z.enum(GUIDE_CATEGORY_VALUES) })
+      .passthrough()
+      .nullable(),
+  })
+  .passthrough()
+  .openapi("Memory");
+
+/** Bələdçi səhifəsindəki dar forma (`/guide-places/{id}/memories`). */
+export const PlaceMemorySchema = z
+  .object({
+    id: idSchema,
+    type: z.enum(MEMORY_TYPE_VALUES),
+    title: z.string(),
+    body: z.string(),
+    imageUrl: z.string().nullable(),
+    occurredAt: dateTimeSchema,
+    visibility: visibilitySchema,
+    author: memoryAuthorSchema,
+    cohort: z
+      .object({ id: idSchema, slug: z.string(), displayName: z.string() })
+      .passthrough(),
+  })
+  .passthrough()
+  .openapi("PlaceMemory");
+
+export const YearbookEntrySchema = MemorySchema.extend({
+  section: z.enum(YEARBOOK_SECTIONS).openapi({
+    description:
+      "Albomdaki bölmə. `PLACE` NÖVDƏN ASILI DEYİL — `guidePlaceId` doludursa " +
+      "qeyd həmişə oraya düşür. Bir qeyd YALNIZ BİR bölmədə olur.",
+  }),
+}).openapi("YearbookEntry");
+
+export const SupportOfferEntrySchema = z
+  .object({
+    user: memoryAuthorSchema,
+    type: z.enum(SUPPORT_OFFER_TYPE_VALUES),
+    note: z.string().nullable().openapi({
+      description: "`JOB_SHARING` növündə iş elanı mətnidir.",
+    }),
+    company: z.string().nullable().openapi({
+      description:
+        "Cari iş yeri — YALNIZ `CareerEntry` görünürlükdən keçdikdə. Keçmirsə `null`.",
+    }),
+    position: z.string().nullable(),
+  })
+  .passthrough()
+  .openapi("SupportOfferEntry");
 
 const SearchHitSchema = z
   .object({

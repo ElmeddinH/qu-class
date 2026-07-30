@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import type { CohortHeader } from "@/services/cohort.service";
 
 import { ClassCover } from "./ClassCover";
+import { HeadlineStats, HeadlineStatsSkeleton } from "./HeadlineStats";
 import {
   groupWidgetRows,
   widgetLayout,
@@ -44,6 +45,13 @@ export function ClassHome({ cohort }: { cohort: CohortHeader }) {
     <div className="flex flex-col gap-6">
       {/* spec §16 blok 1-3 — mərhələdən asılı olmayaraq həmişə yuxarıda */}
       <ClassCover cohort={cohort} />
+
+      {/* Rəqəm zolağı (Blok 10A) — öz Suspense sərhədində, çünki beş sorğu
+          çəkir və başlığın qalanı onu gözləməməlidir. Kiçik sinifdə komponent
+          `null` render edir (məxfilik qapısı servisdədir). */}
+      <Suspense fallback={<HeadlineStatsSkeleton />}>
+        <HeadlineStats cohort={cohort} />
+      </Suspense>
 
       {rows.map((row) => (
         <div

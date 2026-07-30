@@ -57,6 +57,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { MEMORY_TYPE_LABELS } from "@/lib/labels";
 import {
   ACHIEVEMENT_CATEGORY_VALUES,
   MEMORY_TYPE_VALUES,
@@ -207,15 +208,22 @@ export const ACHIEVEMENT_CATEGORY_OPTIONS = ACHIEVEMENT_CATEGORY_VALUES;
 // 4. Xatirə növləri — 8 dəyər (spec §11)
 // ---------------------------------------------------------------------------
 
+/**
+ * ⚠️ ETİKETLƏR BURADA YAZILMIR — `lib/labels.ts` → `MEMORY_TYPE_LABELS`.
+ * Blok 10A-da ikinci səth yarandı (`/class/<slug>/memories` + Digital
+ * Yearbook) və `features/*` bir-birindən import etmir; iki cədvəl saxlansaydı
+ * eyni növ iki səhifədə iki adla görünərdi (T13). Burada YALNIZ lentin ikon
+ * seçimi qalır.
+ */
 export const MEMORY_TYPE_META: Record<MemoryType, CatalogEntry> = {
-  SHORT_MEMORY: { label: "Qısa xatirə", icon: "sparkles" },
-  UNIVERSITY_STORY: { label: "Universitet hekayəsi", icon: "scroll" },
-  THANKS_TEACHER: { label: "Müəllimə təşəkkür", icon: "graduation" },
-  THANKS_CLASSMATE: { label: "Sinif yoldaşına təşəkkür", icon: "handshake" },
-  UNFORGETTABLE_LESSON: { label: "Unudulmaz dərs", icon: "book" },
-  MEMORABLE_EVENT: { label: "Yaddaqalan tədbir", icon: "party" },
-  WHAT_UNI_GAVE_ME: { label: "Universitet mənə nə verdi", icon: "star" },
-  MESSAGE_TO_QU: { label: "QU-ya mesaj", icon: "megaphone" },
+  SHORT_MEMORY: { label: MEMORY_TYPE_LABELS.SHORT_MEMORY, icon: "sparkles" },
+  UNIVERSITY_STORY: { label: MEMORY_TYPE_LABELS.UNIVERSITY_STORY, icon: "scroll" },
+  THANKS_TEACHER: { label: MEMORY_TYPE_LABELS.THANKS_TEACHER, icon: "graduation" },
+  THANKS_CLASSMATE: { label: MEMORY_TYPE_LABELS.THANKS_CLASSMATE, icon: "handshake" },
+  UNFORGETTABLE_LESSON: { label: MEMORY_TYPE_LABELS.UNFORGETTABLE_LESSON, icon: "book" },
+  MEMORABLE_EVENT: { label: MEMORY_TYPE_LABELS.MEMORABLE_EVENT, icon: "party" },
+  WHAT_UNI_GAVE_ME: { label: MEMORY_TYPE_LABELS.WHAT_UNI_GAVE_ME, icon: "star" },
+  MESSAGE_TO_QU: { label: MEMORY_TYPE_LABELS.MESSAGE_TO_QU, icon: "megaphone" },
 };
 
 export const MEMORY_TYPE_OPTIONS = MEMORY_TYPE_VALUES;

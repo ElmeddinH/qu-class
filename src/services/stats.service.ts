@@ -25,11 +25,16 @@
 import type { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/db";
+import { AchievementStatus } from "@/lib/enums";
+import { isHeadlineStatsVisible } from "@/lib/headline-stats";
 import {
   coarsenLocation,
+  fieldVisibleWhere,
   statsConsentWhere,
   suppressSmallBuckets,
   visibilityWhereForUserOwned,
+  visibleWithStatus,
+  type ControlledField,
   type Viewer,
 } from "@/lib/visibility";
 
@@ -193,5 +198,108 @@ export async function getWhereAreWeNowStats(
     jobFunctions: toBuckets(byJobFunction, (row) => row.jobFunction),
     degrees: toBuckets(byDegree, (row) => row.degree),
     locations,
+  };
+}
+
+// ===========================================================================
+// Class Page başlıq zolağı (Blok 10A)
+//
+// ⚠️ YENİ FUNKSİYADIR — yuxarıdaki `getWhereAreWeNowStats` və köməkçiləri
+// DƏYİŞDİRİLMƏYİB. Zolaq başqa suala cavab verir: "İndi haradayıq?" məzunların
+// KARYERA aqreqasiyasıdır (razılıq + k-anonimlik), bu isə sinfin ÖZ ölçüsüdür.
+// ===========================================================================
+
+export interface CohortHeadlineStats {
+  memberCount: number;
+  /** Fərqli şəhər sayı — SİYAHI YOX, yalnız say. */
+  cityCount: number;
+  countryCount: number;
+  clubCount: number;
+  /** Yalnız `VERIFIED` + `FEATURED` (aşağıdaki izaha bax). */
+  achievementCount: number;
+}
+
+/**
+ * Sinif başlığındaki rəqəm zolağı: N üzv · X şəhərdən · Y ölkədən · Z klubda ·
+ * W nailiyyət.
+ *
+ * 🔴 DÖRD QAYDA (hər biri ayrıca sızma qapısıdır):
+ *
+ * 1. YALNIZ SAYLAR. Ad, şəhər və ya klub SİYAHISI qaytarılmır — siyahı
+ *    aqreqasiyanı fərdi məlumata çevirir (kim harada?). Siyahı səthi Blok 10B-nin
+ *    («İndi haradayıq?» xəritəsi) işidir və orada `suppressSmallBuckets`
+ *    tətbiq olunur.
+ *
+ * 2. SAYILAN SƏTİRLƏR GÖRÜNÜRLÜK ŞƏRTİNDƏN KEÇİR. Şəhər/ölkə sayı
+ *    `fieldVisibleWhere(viewer, "currentCity" | "currentCountry")` ilə,
+ *    klublar `fieldVisibleWhere(viewer, "clubs")` ilə, nailiyyətlər isə
+ *    `visibleWithStatus` ilə süzülür. Gizlədilmiş sahəyə görə SAYMAQ da
+ *    sızmadır (T17-nin eyni məntiqi: dəyər görünməsə də "var" faktı çıxır).
+ *
+ * 3. KİÇİK SİNİFDƏ ZOLAQ TAMAMİLƏ GİZLƏNİR → `null` qaytarılır.
+ *    Hədd `lib/headline-stats.ts` → `HEADLINE_MIN_MEMBERS` (= `MIN_BUCKET_SIZE`,
+ *    yeni sabit yaradılmayıb). 2 nəfərlik sinifdə "1 ölkədən" cümləsi konkret
+ *    adamın harada olduğunu deyir.
+ *
+ * 4. NAİLİYYƏT SAYI YALNIZ `VERIFIED` + `FEATURED`. `SUBMITTED` sayılsaydı
+ *    moderasiyada olan (hələ təsdiqlənməmiş) nailiyyətin MÖVCUDLUĞU açıqlanardı
+ *    — Blok 8-in moderasiya axını məhz bunu gizlədir.
+ */
+export async function getCohortHeadlineStats(
+  viewer: Viewer,
+  cohortId: string,
+): Promise<CohortHeadlineStats | null> {
+  const memberCount = await prisma.cohortMembership.count({ where: { cohortId } });
+
+  // Qayda 3 — kiçik sinif: heç bir sorğu da getmir.
+  if (!isHeadlineStatsVisible(memberCount)) return null;
+
+  const memberWhere = (field: ControlledField): Prisma.UserWhereInput => ({
+    AND: [
+      { memberships: { some: { cohortId } } },
+      fieldVisibleWhere<Prisma.UserWhereInput>(viewer, field),
+    ],
+  });
+
+  const [cities, countries, clubs, achievementCount] = await Promise.all([
+    prisma.user.groupBy({
+      by: ["currentCity"],
+      where: { AND: [memberWhere("currentCity"), { currentCity: { not: null } }] },
+    }),
+
+    prisma.user.groupBy({
+      by: ["currentCountry"],
+      where: { AND: [memberWhere("currentCountry"), { currentCountry: { not: null } }] },
+    }),
+
+    // Fərqli KLUB sayı — üzvlük sətri yox, klub. `clubs` sahəsi gizlədilmiş
+    // istifadəçinin üzvlüyü sayılmır (qayda 2).
+    prisma.clubMembership.groupBy({
+      by: ["clubId"],
+      where: { user: memberWhere("clubs") },
+    }),
+
+    // Qayda 4 — `SUBMITTED` və `ARCHIVED` sayılmır.
+    prisma.achievement.count({
+      where: {
+        AND: [
+          { cohortId },
+          visibleWithStatus<Prisma.AchievementWhereInput>(
+            viewer,
+            [AchievementStatus.VERIFIED, AchievementStatus.FEATURED],
+            "ownerId",
+          ),
+        ],
+      },
+    }),
+  ]);
+
+  return {
+    memberCount,
+    cityCount: cities.filter((row) => (row.currentCity ?? "").trim() !== "").length,
+    countryCount: countries.filter((row) => (row.currentCountry ?? "").trim() !== "")
+      .length,
+    clubCount: clubs.length,
+    achievementCount,
   };
 }

@@ -32,7 +32,7 @@ export async function SupportOffers({ cohort, headingId }: ClassHomeWidgetProps)
       title="Dəstək təklifləri"
       icon="handshake"
       description="Sinif yoldaşlarının universitetə və bir-birinə təklif etdiyi dəstək."
-      action={{ href: `/class/${cohort.slug}/directory`, label: "Kataloq" }}
+      action={{ href: `/class/${cohort.slug}/support`, label: "Hamısı" }}
     >
       {offers.length === 0 ? (
         cohort.isMember ? (
@@ -40,7 +40,7 @@ export async function SupportOffers({ cohort, headingId }: ClassHomeWidgetProps)
             icon={HandHeart}
             title="Hələ dəstək təklifi yoxdur"
             description="Profilinizdə «dəstəyə açığam» seçimini işarələyib qonaq mühazirəsi, mentorluq və ya təcrübə imkanı təklif edə bilərsiniz."
-            action={{ href: "/me", label: "Profilimi aç" }}
+            action={{ href: "/me/career", label: "Təklif əlavə et" }}
           />
         ) : (
           <EmptyState

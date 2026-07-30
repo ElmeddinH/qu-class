@@ -36,6 +36,7 @@ import type {
   Industry,
   JobFunction,
   LanguageLevel,
+  MemoryType,
   RsvpStatus,
   SupportOfferType,
   TimelineSourceType,
@@ -167,6 +168,26 @@ export const TIMELINE_SOURCE_LABELS: Record<TimelineSourceType, string> = {
   SYSTEM: "Sistem hadisəsi",
 };
 
+/**
+ * `Memory.type` — 8 xatirə növü (spec §11).
+ *
+ * ⚠️ Blok 10A-ya qədər bu etiketlər YALNIZ `features/feed/catalog.ts`-də idi.
+ * İkinci səth (`/class/<slug>/memories` + Digital Yearbook) `features/*`
+ * qovluqları arasında import etməməlidir (istiqamət features → lib), ona görə
+ * etiketlər T13 qaydası ilə buraya köçürüldü: lent kataloqu və xatirə kataloqu
+ * indi EYNİ cədvəldən oxuyur, hər biri yalnız ÖZ ikon/ton seçimini saxlayır.
+ */
+export const MEMORY_TYPE_LABELS: Record<MemoryType, string> = {
+  SHORT_MEMORY: "Qısa xatirə",
+  UNIVERSITY_STORY: "Universitet hekayəsi",
+  THANKS_TEACHER: "Müəllimə təşəkkür",
+  THANKS_CLASSMATE: "Sinif yoldaşına təşəkkür",
+  UNFORGETTABLE_LESSON: "Unudulmaz dərs",
+  MEMORABLE_EVENT: "Yaddaqalan tədbir",
+  WHAT_UNI_GAVE_ME: "Universitet mənə nə verdi",
+  MESSAGE_TO_QU: "QU-ya mesaj",
+};
+
 /** `SupportOffer.type` — məzunun 7 dəstək təklifi (spec §9). */
 export const SUPPORT_OFFER_LABELS: Record<SupportOfferType, string> = {
   GUEST_LECTURE: "Qonaq mühazirəsi",
@@ -282,6 +303,10 @@ export function languageLevelLabel(value: string | null | undefined): string | n
 
 export function supportOfferLabel(value: string): string {
   return SUPPORT_OFFER_LABELS[value as SupportOfferType] ?? "Dəstək";
+}
+
+export function memoryTypeLabel(value: string): string {
+  return MEMORY_TYPE_LABELS[value as MemoryType] ?? "Xatirə";
 }
 
 export function achievementStatusLabel(value: string): string {

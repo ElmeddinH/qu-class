@@ -73,7 +73,9 @@ describe("əməliyyatlar", () => {
   it("bütün v1 endpoint-ləri sənəddədir", () => {
     // Sayı SABİT gözləmə kimi yazılır: yeni endpoint əlavə edən adam sənədə
     // yazmağı unutsa test dayanır.
-    expect(operations.length).toBe(18);
+    // 18 (Blok 9S) + 4 (Blok 10A: memories · yearbook · support ·
+    // guide-places/{id}/memories) = 22.
+    expect(operations.length).toBe(22);
   });
 
   it.each(operations.map((o) => [o.label, o] as const))(

@@ -860,3 +860,136 @@ describe("səhifələmə metası", () => {
     expect(all.meta?.total ?? 0).toBeGreaterThanOrEqual(upcoming.meta?.total ?? 0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 9. Blok 10A endpoint-ləri — xatirələr, albom, dəstək, məkan körpüsü
+//
+// 🔴 EYNİ SUAL, YENİ SƏTH: dörd yeni endpoint yeni sızma nöqtəsidirmi?
+// Xüsusən `/guide-places/{id}/memories` — o, ANONİM sorğuya açıqdır (bələdçi
+// ictimaidir), yəni məxfilik yalnız servisdəki `activeVisibleWhere` ilə
+// saxlanılır.
+// ---------------------------------------------------------------------------
+
+describe("Blok 10A — xatirə səthləri", () => {
+  it("🔴 ANONİM sorğu sinif xatirələrində 401 alır", async () => {
+    currentViewer = ANONYMOUS;
+    const { GET } = await import("@/app/api/v1/cohorts/[slug]/memories/route");
+
+    const response = await call(GET, `/api/v1/cohorts/${ownSlug}/memories`, {
+      slug: ownSlug,
+    });
+
+    expect(response.status).toBe(401);
+    expect(await errorOf(response)).toMatchObject({ code: "UNAUTHENTICATED" });
+  });
+
+  it("🔴 BAŞQA sinfin üzvü üçün 404 (mövcudluq sızmasın)", async () => {
+    currentViewer = alumni;
+    const { GET } = await import("@/app/api/v1/cohorts/[slug]/memories/route");
+
+    const response = await call(GET, `/api/v1/cohorts/${ownSlug}/memories`, {
+      slug: ownSlug,
+    });
+
+    expect(response.status).toBe(404);
+  });
+
+  it("üzv siyahını `meta` ilə alır, filtr URL-dən oxunur", async () => {
+    currentViewer = rep;
+    const { GET } = await import("@/app/api/v1/cohorts/[slug]/memories/route");
+
+    const all = await envelopeOf<Array<{ type: string; guidePlaceId: string | null }>>(
+      await call(GET, `/api/v1/cohorts/${ownSlug}/memories`, { slug: ownSlug }),
+    );
+    expect(all.meta?.total).toBeGreaterThan(0);
+    expect(all.meta).toHaveProperty("pageSize");
+
+    // `?place=1` — UI ilə EYNİ parametr adı (`lib/memory-filters.ts`).
+    const places = await envelopeOf<Array<{ guidePlaceId: string | null }>>(
+      await call(GET, `/api/v1/cohorts/${ownSlug}/memories?place=1`, { slug: ownSlug }),
+    );
+    expect(places.data.every((memory) => memory.guidePlaceId !== null)).toBe(true);
+  });
+
+  it("albom yalnız `showInYearbook` qeydlərini və bölmə adını verir", async () => {
+    currentViewer = rep;
+    const { GET } = await import("@/app/api/v1/cohorts/[slug]/yearbook/route");
+
+    const body = await envelopeOf<Array<{ showInYearbook: boolean; section: string }>>(
+      await call(GET, `/api/v1/cohorts/${ownSlug}/yearbook`, { slug: ownSlug }),
+    );
+
+    expect(body.data.length).toBeGreaterThan(0);
+    expect(body.data.every((entry) => entry.showInYearbook)).toBe(true);
+    expect(
+      body.data.every((entry) =>
+        ["MOMENT", "LESSON", "PLACE", "STORY", "CLOSING"].includes(entry.section),
+      ),
+    ).toBe(true);
+  });
+
+  it("🔴 dəstək cavabında `phone` / `personalEmail` YOXDUR", async () => {
+    // `alumni` öz sinfinin (Maliyyə 2022) üzvüdür — orada təkliflər var.
+    currentViewer = alumni;
+    const alumniCohort = await prisma.cohort.findUniqueOrThrow({
+      where: { id: alumni.cohortIds[0] },
+      select: { slug: true },
+    });
+
+    const { GET } = await import("@/app/api/v1/cohorts/[slug]/support/route");
+    const response = await call(
+      GET,
+      `/api/v1/cohorts/${alumniCohort.slug}/support`,
+      { slug: alumniCohort.slug },
+    );
+
+    const text = await response.text();
+    expect(response.status).toBe(200);
+    expect(text).not.toContain("personalEmail");
+    expect(text).not.toContain("\"phone\"");
+    expect(text).not.toContain("@qu.edu.az");
+
+    const body = JSON.parse(text) as { data: Array<{ type: string }> };
+    expect(body.data.length).toBeGreaterThan(0);
+  });
+
+  it("🔴 məkan endpoint-i ANONİM sorğuda CLASS xatirə SIZDIRMIR", async () => {
+    // --- SANITY: məkana bağlı CLASS xatirə həqiqətən var ---
+    const target = await prisma.memory.findFirstOrThrow({
+      where: { guidePlaceId: { not: null }, visibility: "CLASS", status: "ACTIVE" },
+      select: { id: true, guidePlaceId: true, title: true },
+    });
+
+    currentViewer = ANONYMOUS;
+    const { GET } = await import("@/app/api/v1/guide-places/[id]/memories/route");
+
+    const response = await call(
+      GET,
+      `/api/v1/guide-places/${target.guidePlaceId}/memories`,
+      { id: target.guidePlaceId! },
+    );
+
+    // Endpoint 200 verir (bələdçi ictimaidir), amma məzmun süzülüb.
+    expect(response.status).toBe(200);
+
+    const text = await response.text();
+    expect(text).not.toContain(target.id);
+    expect(text).not.toContain(target.title);
+
+    const body = JSON.parse(text) as { data: Array<{ visibility: string }> };
+    expect(body.data.every((memory) => memory.visibility === "PUBLIC")).toBe(true);
+  });
+
+  it("naməlum məkan `id`-si 404 vermir — boş siyahı qaytarır", async () => {
+    currentViewer = ANONYMOUS;
+    const { GET } = await import("@/app/api/v1/guide-places/[id]/memories/route");
+
+    const response = await call(GET, "/api/v1/guide-places/yoxdur/memories", {
+      id: "yoxdur",
+    });
+
+    expect(response.status).toBe(200);
+    const body = await envelopeOf<unknown[]>(response);
+    expect(body.data).toEqual([]);
+  });
+});

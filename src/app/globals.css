@@ -112,6 +112,30 @@
     @apply not-sr-only fixed left-4 top-4 z-50 rounded-btn bg-ku-green px-4 py-2 text-white;
   }
 
+  /* --- ÇAP GÖRÜNÜŞÜ (Digital Yearbook · tədbir hesabatı) ---
+     Kağızda naviqasiya, kölgə və rəngli fon lazım deyil. Elementlərin
+     gizlədilməsi komponentlərdə `print:hidden` ilə edilir (Tailwind print
+     varianti); burada yalnız QLOBAL qaydalar var:
+       · səhifə fonu ağ (`surface`), mətn tünd — token-lərdən, hardcode YOX
+       · kölgələr söndürülür (KUDS kölgələri ekran üçündür)
+       · link ünvanları çapa DÜŞMÜR: bəzi brauzer/uzantı stilləri `a::after`
+         ilə URL əlavə edir və albom oxunmaz olur */
+  @media print {
+    body {
+      @apply bg-surface text-text-primary;
+    }
+
+    a[href]::after {
+      content: "" !important;
+    }
+
+    .shadow-xs-kuds,
+    .shadow-sm-kuds,
+    .shadow-md-kuds {
+      box-shadow: none !important;
+    }
+  }
+
   /* Hərəkət azaldılması tələbinə hörmət */
   @media (prefers-reduced-motion: reduce) {
     *,

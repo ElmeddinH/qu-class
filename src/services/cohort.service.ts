@@ -20,6 +20,7 @@ import { resolveStage } from "@/lib/stage";
 import { TagType, Visibility, type UserStage } from "@/lib/enums";
 import {
   redactProfile,
+  visibilityWhereForUserOwned,
   type ProfileView,
   type Viewer,
 } from "@/lib/visibility";
@@ -504,5 +505,109 @@ export async function listSupportOffers(
       },
       types: row.supportOffers.map((offer) => offer.type),
     };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// 4b. Dəstək təklifləri SƏTHİ — `/class/[slug]/support` (Blok 10A)
+// ---------------------------------------------------------------------------
+
+/** Səthdəki tək təklif — istifadəçi + növ + qeyd (+ iş yeri, keçirsə). */
+export interface SupportOfferEntry {
+  user: Pick<CohortMemberCard, "id" | "firstName" | "lastName" | "avatarUrl">;
+  /** `SupportOfferType`. */
+  type: string;
+  /** Məzunun öz yazdığı qeyd — `JOB_SHARING`-də iş elanı mətnidir. */
+  note: string | null;
+  /**
+   * Cari iş yeri — YALNIZ `CareerEntry` görünürlükdən keçirsə.
+   * Keçmirsə `null` (sahə obyektdə qalır, dəyəri yoxdur — sızma olmasın).
+   */
+  company: string | null;
+  position: string | null;
+}
+
+/**
+ * `/class/[slug]/support` səhifəsinin siyahısı.
+ *
+ * 🔴 ÜÇÜNCÜ, MÜSTƏQİL RAZILIQ: `User.openToSupport`.
+ * Bunu `visibility` (kim görə bilər) və `includeInStats` (aqreqasiyaya
+ * qoşulmaq) ilə QARIŞDIRMA — üçü ayrı suala cavab verir. `SupportOffer`
+ * sətrində `visibility` sütunu YOXDUR, yəni bu bayraq təklifin YEGANƏ
+ * qapısıdır: söndürülübsə sətir ümumiyyətlə qaytarılmır.
+ *
+ * 🔴 ƏLAQƏ MƏLUMATI QAYTARILMIR. `phone` / `personalEmail` default `PRIVATE`-dır
+ * (`DEFAULT_PRIVATE_FIELDS`) və bu səth onları OXUMUR belə — «Əlaqə» düyməsi
+ * profil linkidir. Seçim sahələrində onların olmaması testlə bərkidilib.
+ *
+ * ⚠️ Şirkət adı `CareerEntry`-dəndir və `visibilityWhereForUserOwned` şərtindən
+ * keçir: karyerasını `PRIVATE` saxlayan məzunun iş yeri burada görünmür, təklifi
+ * isə görünür. İki məlumat ayrı-ayrı qapılardan gəlir.
+ */
+export async function listCohortSupportOffers(
+  viewer: Viewer,
+  cohortId: string,
+): Promise<SupportOfferEntry[]> {
+  if (!canSeeRoster(viewer, cohortId)) return [];
+
+  const rows = await prisma.user.findMany({
+    where: {
+      openToSupport: true,
+      memberships: { some: { cohortId } },
+      supportOffers: { some: {} },
+    },
+    orderBy: [{ firstName: "asc" }, { lastName: "asc" }, { id: "asc" }],
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      avatarUrl: true,
+      supportOffers: { select: { type: true, note: true }, orderBy: { type: "asc" } },
+      careerEntries: {
+        where: {
+          AND: [
+            { isCurrent: true },
+            visibilityWhereForUserOwned<Prisma.CareerEntryWhereInput>(viewer),
+          ],
+        },
+        orderBy: [{ startDate: "desc" }],
+        take: 1,
+        select: { company: true, position: true },
+      },
+      fieldVisibility: { select: { field: true, level: true } },
+      memberships: { select: { cohortId: true } },
+    },
+  });
+
+  return rows.flatMap((row) => {
+    // Avatar idarə olunan sahədir — ad-soyaddan fərqli olaraq gizlədilə bilər.
+    const redacted = redactProfile(
+      {
+        id: row.id,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        cohortIds: row.memberships.map((m) => m.cohortId),
+        avatarUrl: row.avatarUrl,
+      },
+      viewer,
+      row.fieldVisibility,
+    );
+
+    const career = row.careerEntries[0] ?? null;
+
+    const user = {
+      id: row.id,
+      firstName: row.firstName,
+      lastName: row.lastName,
+      avatarUrl: (redacted.avatarUrl as string | null | undefined) ?? null,
+    };
+
+    return row.supportOffers.map((offer) => ({
+      user,
+      type: offer.type,
+      note: offer.note,
+      company: career?.company ?? null,
+      position: career?.position ?? null,
+    }));
   });
 }

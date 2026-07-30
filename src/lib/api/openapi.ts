@@ -40,6 +40,7 @@ import {
   PAGE_PARAM,
 } from "@/lib/directory-filters";
 import { ACHIEVEMENT_PARAMS } from "@/lib/achievement-filters";
+import { MEMORY_PARAMS, MEMORY_PLACE_FLAG } from "@/lib/memory-filters";
 import { TIMELINE_PARAMS } from "@/lib/timeline-filters";
 import {
   EVENT_FORMAT_VALUES,
@@ -53,6 +54,7 @@ import {
   EVENT_SCOPE_VALUES,
   FAQ_CATEGORY_VALUES,
   GUIDE_CATEGORY_VALUES,
+  MEMORY_TYPE_VALUES,
   POST_CATEGORY_VALUES,
   TIMELINE_SOURCE_TYPE_VALUES,
   USER_STAGE_VALUES,
@@ -72,13 +74,17 @@ import {
   HealthSchema,
   LoginBodySchema,
   LogoutBodySchema,
+  MemorySchema,
   NullableSessionSchema,
+  PlaceMemorySchema,
   RegisterBodySchema,
   RegisteredUserSchema,
   SearchResultsSchema,
   SessionSchema,
+  SupportOfferEntrySchema,
   TimelineItemSchema,
   ViewerCohortSchema,
+  YearbookEntrySchema,
   envelope,
   listEnvelope,
   z,
@@ -264,6 +270,23 @@ const TimelineQuery = z.object({
   [TIMELINE_PARAMS.source]: queryField(
     z.enum(TIMELINE_SOURCE_TYPE_VALUES),
     "Mənbə növü. `SYSTEM` — cohort tarixlərindən törəyən milestone-lar.",
+  ),
+  ...pageQueryShape,
+});
+
+/**
+ * Xatirə filtrləri — `lib/memory-filters.ts` → `MEMORY_PARAMS`-dən TÖRƏYİR.
+ * UI-a yeni filtr əlavə edilsə sənəd özü yenilənir (adlar təkrar yazılmır).
+ */
+const MemoryQuery = z.object({
+  [MEMORY_PARAMS.type]: queryField(
+    z.enum(MEMORY_TYPE_VALUES),
+    "Xatirə növü (spec §11 — 8 dəyər).",
+  ),
+  [MEMORY_PARAMS.place]: queryField(
+    z.literal(MEMORY_PLACE_FLAG),
+    `Yalnız məkana bağlı xatirələr. Yeganə qəbul edilən dəyər «${MEMORY_PLACE_FLAG}»; ` +
+      "başqa dəyər filtri SƏSSİZCƏ ləğv edir.",
   ),
   ...pageQueryShape,
 });
@@ -597,6 +620,34 @@ path({
   },
 });
 
+path({
+  method: "get",
+  path: "/api/v1/guide-places/{id}/memories",
+  operationId: "listGuidePlaceMemories",
+  tags: ["Public"],
+  summary: "Məkanla bağlı xatirələr",
+  description:
+    "«Sevimli yer» xatirələri — Share Memories [M9] ilə Xankəndi bələdçisi [M3] " +
+    "arasındaki körpü.\n\n" +
+    "🔴 Endpoint anonim sorğuya AÇIQDIR (bələdçi ictimaidir), amma cavab " +
+    "`activeVisibleWhere` süzgəcindən keçir: anonim ziyarətçi YALNIZ `PUBLIC` " +
+    "xatirələri görür. Məkan filtri məxfilik filtrinin ƏVƏZİ deyil, ÜSTƏLİYİDİR " +
+    "— əks halda `CLASS` xatirə ictimai səhifə üzərindən sızardı.\n\n" +
+    "⚠️ Naməlum `id` 404 VERMİR — boş siyahı qaytarır.",
+  request: {
+    params: z.object({
+      id: pathField(z.string(), "Bələdçi məkanının `id`-si (`GET /guide-places`)."),
+    }),
+  },
+  responses: {
+    200: jsonResponse(
+      "Məkana bağlı, viewer-ə görünən xatirələr.",
+      listEnvelope(PlaceMemorySchema, "PlaceMemoryListResponse"),
+    ),
+    ...commonResponses({ isPublic: true }),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Cohorts
 // ---------------------------------------------------------------------------
@@ -726,6 +777,86 @@ path({
     200: jsonResponse(
       "Nailiyyət səhifəsi.",
       listEnvelope(AchievementSchema, "AchievementListResponse"),
+    ),
+    ...commonResponses(),
+  },
+});
+
+path({
+  method: "get",
+  path: "/api/v1/cohorts/{slug}/memories",
+  operationId: "listCohortMemories",
+  tags: ["Cohorts"],
+  summary: "Sinif xatirələri (növ + məkan filtri)",
+  description:
+    "Share Memories [M9] — spec §11-in 8 növü.\n\n" +
+    "🔴 Xatirənin DÖRD göstərilmə seçimi (`showInProfile` / `showInFeed` / " +
+    "`showInTimeline` / `showInYearbook`) görünürlük SƏVİYYƏSİNDƏN fərqlidir: " +
+    "səviyyə «kim görə bilər», bayraqlar «harada göstərilir» sualına cavab " +
+    "verir. Bu endpoint bayraqlardan ASILI DEYİL — sinfin bütün görünən " +
+    "xatirələrini qaytarır.\n\n" +
+    "⚠️ `showInTimeline` yalnız `showInFeed` açıq olduqda `true` ola bilər: " +
+    "`TimelineEntry`-də Memory-yə FK yoxdur, xatirə xronologiyaya ANCAQ bağlı " +
+    "Post vasitəsilə düşür.",
+  security: SECURED,
+  request: { params: SlugParams, query: MemoryQuery },
+  responses: {
+    200: jsonResponse(
+      "Xatirə səhifəsi. `meta.total` filtrdən keçmiş ümumi sayı bildirir.",
+      listEnvelope(MemorySchema, "MemoryListResponse"),
+    ),
+    ...commonResponses(),
+  },
+});
+
+path({
+  method: "get",
+  path: "/api/v1/cohorts/{slug}/yearbook",
+  operationId: "listCohortYearbook",
+  tags: ["Cohorts"],
+  summary: "Digital Yearbook",
+  description:
+    "Albom üçün seçilmiş xatirələr — İKİ şərt birlikdə: görünürlük " +
+    "(`activeVisibleWhere`) VƏ müəllifin `showInYearbook` seçimi. Biri digərini " +
+    "əvəz etmir: `PRIVATE` xatirə albom üçün işarələnsə də yalnız sahibinə " +
+    "görünür.\n\n" +
+    "Hər qeydin `section` sahəsi var: `MOMENT` (yaddaqalan an) · `LESSON` " +
+    "(unudulmaz dərs) · `PLACE` (sevimli yer) · `STORY` · `CLOSING` (sitat " +
+    "divarı). 🔴 `PLACE` NÖVDƏN ASILI DEYİL — `guidePlaceId` doludursa qeyd " +
+    "həmişə oraya düşür və BİR qeyd yalnız BİR bölmədə olur.",
+  security: SECURED,
+  request: { params: SlugParams },
+  responses: {
+    200: jsonResponse(
+      "Albom qeydləri (xronoloji: köhnədən yeniyə).",
+      listEnvelope(YearbookEntrySchema, "YearbookListResponse"),
+    ),
+    ...commonResponses(),
+  },
+});
+
+path({
+  method: "get",
+  path: "/api/v1/cohorts/{slug}/support",
+  operationId: "listCohortSupportOffers",
+  tags: ["Cohorts"],
+  summary: "Dəstək təklifləri (7 növ)",
+  description:
+    "Spec §9 — məzunların təklif etdiyi dəstək: qonaq mühazirəsi, karyera " +
+    "söhbəti, təcrübə, iş elanı paylaşımı, mentorluq, startap əməkdaşlığı, " +
+    "tədbirdə iştirak.\n\n" +
+    "🔴 QAPI `User.openToSupport`-dur — ÜÇÜNCÜ və MÜSTƏQİL razılıq. " +
+    "`visibility` (kim görə bilər) və `includeInStats` (aqreqasiya razılığı) " +
+    "ilə qarışdırılmamalıdır; `SupportOffer` sətrində `visibility` sütunu " +
+    "YOXDUR.\n\n" +
+    "🔴 Cavabda `phone` / `personalEmail` YOXDUR — onlar default `PRIVATE`-dır. " +
+    "Əlaqə üçün istifadəçi profilinə keçid nəzərdə tutulub.",
+  security: SECURED,
+  request: { params: SlugParams },
+  responses: {
+    200: jsonResponse(
+      "Təkliflər — hər sətir bir istifadəçi + bir növ.",
+      listEnvelope(SupportOfferEntrySchema, "SupportOfferListResponse"),
     ),
     ...commonResponses(),
   },

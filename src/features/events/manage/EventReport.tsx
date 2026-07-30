@@ -20,6 +20,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Printer } from "lucide-react";
 
+import { PrintButton } from "@/components/shared/PrintButton";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { requireUser } from "@/lib/auth";
@@ -34,7 +35,6 @@ import { getEventReport } from "@/services/event.service";
 import { exactDateTime, shortDate, timeOfDay } from "@/utils/date";
 
 import { MarkdownAgenda } from "../MarkdownAgenda";
-import { PrintButton } from "./PrintButton";
 
 export async function EventReport({ eventId }: { eventId: string }) {
   const viewer = await requireUser();

@@ -42,8 +42,11 @@ export function DashboardShell({
     <div className="min-h-screen bg-background">
       <SkipLink />
 
-      {/* --- Sidebar (masaüstü) — KUDS §8: 280px, fon ku-dark --- */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-sidebar flex-col border-r border-border bg-ku-dark md:flex">
+      {/* --- Sidebar (masaüstü) — KUDS §8: 280px, fon ku-dark ---
+          ⚠️ `print:hidden`: çapda (Digital Yearbook, tədbir hesabatı) naviqasiya
+          kağıza düşməməlidir. Qayda burada, karkasda saxlanılır — hər səhifə
+          onu təkrar yazsaydı biri unudulardı. */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-sidebar flex-col border-r border-border bg-ku-dark md:flex print:hidden">
         <div className="flex h-header shrink-0 items-center px-6">
           <Brand tone="light" />
         </div>
@@ -58,7 +61,7 @@ export function DashboardShell({
       </aside>
 
       {/* --- Header — KUDS §8: 72px --- */}
-      <header className="fixed inset-x-0 top-0 z-30 h-header border-b border-border bg-surface md:left-sidebar">
+      <header className="fixed inset-x-0 top-0 z-30 h-header border-b border-border bg-surface md:left-sidebar print:hidden">
         <div className="flex h-full items-center gap-3 px-4 md:px-8">
           <MobileNav sections={sections} label={label} />
 
@@ -86,8 +89,11 @@ export function DashboardShell({
       </header>
 
       {/* --- Məzmun — KUDS §8: content padding 32px --- */}
-      <main id="main" className={cn("pt-header md:pl-sidebar", className)}>
-        <div className="mx-auto w-full max-w-content p-4 sm:p-6 md:p-8">
+      <main
+        id="main"
+        className={cn("pt-header md:pl-sidebar print:pl-0 print:pt-0", className)}
+      >
+        <div className="mx-auto w-full max-w-content p-4 sm:p-6 md:p-8 print:p-0">
           {children}
         </div>
       </main>

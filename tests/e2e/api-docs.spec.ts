@@ -129,7 +129,9 @@ test("openapi.json etibarlı sənəddir və hər əməliyyatda operationId var",
     }
   }
 
-  expect(count).toBe(18);
+  // 18 (Blok 9S) + 4 (Blok 10A: memories · yearbook · support ·
+  // guide-places/{id}/memories) = 22.
+  expect(count).toBe(22);
 
   // Kuka adı sənəddə göstərilir — «Try it out» üçün kritikdir.
   expect(document.components.securitySchemes.cookieAuth?.name).toContain(
