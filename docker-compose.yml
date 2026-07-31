@@ -1,0 +1,65 @@
+# ============================================================================
+# QU CLASS — PostgreSQL (OPSİONAL)
+#
+# 🔴 BU FAYL LAYİHƏNİN İŞLƏMƏSİ ÜÇÜN LAZIM DEYİL.
+#    Default quraşdırma SQLite-dır və Docker TƏLƏB ETMİR:
+#        npm install && npx prisma migrate dev && npm run db:seed && npm run dev
+#    Bura yalnız «SQLite-dan Postgres-ə keçid nə qədər işdir?» sualının
+#    ÖLÇÜLƏBİLƏN cavabıdır (bax `docs/DECISIONS.md` → QD-002).
+#
+# Nə üçün belədir: SQLite-ın seçilməsi «Postgres-i bacarmadıq» deyil, məhz
+# bu keçidin ucuz olduğuna əsaslanan qərardır. Aşağıdaki dörd addım o
+# iddianın yoxlanılan formasıdır.
+# ============================================================================
+#
+# KEÇİD — dörd addım:
+#
+#   1) Bazanı qaldır
+#        docker compose up -d
+#
+#   2) `.env`-də bağlantını dəyiş
+#        DATABASE_URL="postgresql://qu:change-me@localhost:5432/qu_class?schema=public"
+#
+#   3) `prisma/schema.prisma` → `datasource db` blokunda TƏK sətir
+#        provider = "sqlite"   →   provider = "postgresql"
+#
+#   4) Miqrasiyaları yenidən yarat və seed et
+#        rm -rf prisma/migrations   # SQLite DDL-i Postgres-ə uyğun deyil
+#        npx prisma migrate dev --name init
+#        npm run db:seed
+#
+# ⚠️ TƏTBİQ KODUNDA DƏYİŞİKLİK YOXDUR. Bütün enum-lar onsuz da `String`
+#    sütundur və Zod ilə qorunur (`src/lib/enums.ts`), yəni Postgres native
+#    enum-una köçürmə TƏLƏB OLUNMUR. Bu, SQLite məhdudiyyətinin qəsdən
+#    miqrasiya üstünlüyünə çevrilməsidir — bax `docs/DECISIONS.md` → QD-005.
+#
+# ⚠️ `docker compose down -v` VOLUME-U SİLİR. Datanı saxlamaq istəyirsənsə
+#    `-v` bayrağını YAZMA.
+# ============================================================================
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: qu-class-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: qu
+      # 🔴 YALNIZ LOKAL DEMO ÜÇÜNDÜR. İstehsalda bu dəyər fayla yazılmır —
+      # secret manager və ya `POSTGRES_PASSWORD_FILE` işlədilir.
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: qu_class
+    ports:
+      # Yalnız `127.0.0.1`-ə bağlanır — port lokal şəbəkəyə açılmır.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - qu-class-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # `prisma migrate` bazanın HAZIR olmasını gözləyir; konteynerin
+      # qalxması kifayət deyil, Postgres öz başlanğıc miqrasiyasını da bitirməlidir.
+      test: ["CMD-SHELL", "pg_isready -U qu -d qu_class"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  qu-class-pgdata:
