@@ -38,6 +38,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AchievementCategory } from "@/lib/enums";
+import { useDialogFocusRestore } from "@/components/kuds/use-dialog-focus-restore";
 
 import { revalidateFeedAction, updatePostSurfacesAction } from "./actions";
 import { ACHIEVEMENT_CATEGORY_META, ACHIEVEMENT_CATEGORY_OPTIONS } from "./catalog";
@@ -59,6 +60,9 @@ export function PostSurfacesDialog({
   onOpenChange,
   onSaved,
 }: PostSurfacesDialogProps) {
+  // TƏLƏ T44 — modal bağlananda fokus tetikləyiciyə qayıtsın.
+  const restoreFocus = useDialogFocusRestore();
+
   const [isPending, startTransition] = useTransition();
 
   const [onTimeline, setOnTimeline] = useState(post.showOnTimeline);
@@ -100,7 +104,7 @@ export function PostSurfacesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" onCloseAutoFocus={restoreFocus}>
         <DialogHeader>
           <DialogTitle>Görünmə yerləri</DialogTitle>
           <DialogDescription>

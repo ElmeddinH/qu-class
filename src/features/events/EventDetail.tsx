@@ -46,7 +46,7 @@ import type { EventDetail as EventDetailData } from "@/services/event.service";
 import { ATTENDEE_AVATAR_LIMIT } from "@/services/event.service";
 import { exactDateTime, shortDate, timeOfDay } from "@/utils/date";
 
-import { AttendanceChart } from "./AttendanceChart";
+import { AttendanceChart } from "./AttendanceChart.lazy";
 import {
   EVENT_ICONS,
   REUNION_BADGE_CLASS,

@@ -33,7 +33,7 @@ import { getAdminActivitySeries, getAdminDashboardStats } from "@/services/admin
 import { listRecentAudit } from "@/services/audit.service";
 import { exactDateTime } from "@/utils/date";
 
-import { ActivityChart } from "./ActivityChart";
+import { ActivityChart } from "./ActivityChart.lazy";
 import { AdminPageHeader } from "./AdminPageHeader";
 
 /** Növbəyə keçidlər — «indi nə etməliyəm?» sualının cavabı. */

@@ -181,7 +181,7 @@ export async function WelcomePage() {
         title={eventsSection.title}
         description={eventsSection.description}
         aside={
-          <Link href="/events" className="text-small text-ku-green hover:underline">
+          <Link href="/events" className="kuds-prose-link text-small">
             Bütün açıq tədbirlər →
           </Link>
         }
@@ -212,7 +212,7 @@ export async function WelcomePage() {
         title={faq.title}
         description={faq.description}
         aside={
-          <Link href="/faq" className="text-small text-ku-green hover:underline">
+          <Link href="/faq" className="kuds-prose-link text-small">
             Bütün suallar →
           </Link>
         }

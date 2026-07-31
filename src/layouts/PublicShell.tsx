@@ -102,9 +102,11 @@ export function PublicShell({ children }: PublicShellProps) {
                   (universitet, tələbələr, Xankəndi). `/docs` isə inteqrasiya
                   sənədidir: auditoriyası fərqlidir və sütun başlığı altında
                   yeri yoxdur. Alt zolaq belə "meta" linklərin adi yeridir. */}
+              {/* ⚠️ `py-1`: `text-caption` sətri 18px-dir və toxunma hədəfi
+                  24px minimumundan aşağı qalırdı (Blok 12C ölçüsü). */}
               <Link
                 href="/docs"
-                className="text-caption text-text-secondary transition-colors hover:text-ku-green"
+                className="inline-block py-1 text-caption text-text-secondary transition-colors hover:text-ku-green"
               >
                 API sənədləri
               </Link>

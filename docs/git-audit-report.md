@@ -2,16 +2,16 @@
 
 `npm run git:audit` (`scripts/git-audit.mjs`) tərəfindən yaradılır. Şəbəkəsiz, yalnız oxu. Tapılan hər dəyər **maskalanır** (ilk 4 simvol + `****`) — hesabatın özü sızma mənbəyinə çevrilməməlidir.
 
-Son işlədilmə: `2026-07-30T19:30:03.860Z`
+Son işlədilmə: `2026-07-30T21:28:37.309Z`
 
 ## Xülasə
 
 | Ölçü | Dəyər |
 | --- | --- |
-| Gəzilən commit | 29 (HEAD-dən kökə, `depth: Infinity`) |
-| Tarixçədəki unikal yol | 551 |
-| Tarixçədəki unikal blob | 704 |
-| İndeksdə izlənən fayl | 548 |
+| Gəzilən commit | 32 (HEAD-dən kökə, `depth: Infinity`) |
+| Tarixçədəki unikal yol | 570 |
+| Tarixçədəki unikal blob | 791 |
+| İndeksdə izlənən fayl | 567 |
 | 🔴 Bloklayan tapıntı | 0 |
 | ⚠️ Xəbərdarlıq | 0 |
 
@@ -34,7 +34,7 @@ GitHub həddləri: **50 MB** xəbərdarlıq · **100 MB** hard blok.
 | 7 | 86.3 KB | `STATE.md` |
 | 8 | 81.2 KB | `prisma/seed-data/content.ts` |
 | 9 | 77.2 KB | `prisma/seed-data/content.ts` |
-| 10 | 67.8 KB | `prisma/seed.ts` |
+| 10 | 68.0 KB | `prisma/seed.ts` |
 
 ## `.gitignore` uyğunluğu
 
@@ -49,8 +49,8 @@ Tərsinə təsdiq (bunlar İZLƏNMƏLİDİR):
 
 | Rol | Ad | E-poçt | Commit sayı |
 | --- | --- | --- | --- |
-| author | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 29 |
-| committer | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 29 |
+| author | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 32 |
+| committer | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 32 |
 
 ⚠️ **T33** — GitHub commit-i töhfə qrafikinə yalnız e-poçt hesaba bağlı olduqda yazır. Uyğunsuzluq push-DAN ƏVVƏL düzəldilməlidir: sonrakı düzəliş bütün commit SHA-larını dəyişir.
 

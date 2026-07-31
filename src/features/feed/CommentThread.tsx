@@ -38,6 +38,11 @@ function initialsOf(firstName: string, lastName: string): string {
 export function CommentThread({ postId, initialCount }: CommentThreadProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  // 🔴 «Xəta» «boşluq»dan AYRILMALIDIR (Blok 12C · D bəndi).
+  // Əvvəl uğursuz yükləmə yalnız toast göstərirdi, ekranda isə «Hələ şərh
+  // yoxdur» qalırdı — yəni SƏHV MƏLUMAT: şərhlər var, sadəcə gəlmədi. Toast
+  // saniyələr sonra itir, yanlış cümlə isə ekranda qalır.
+  const [hasError, setHasError] = useState(false);
   const [comments, setComments] = useState<FeedComment[] | null>(null);
   const [body, setBody] = useState("");
   const [replyTo, setReplyTo] = useState<FeedComment | null>(null);
@@ -47,10 +52,12 @@ export function CommentThread({ postId, initialCount }: CommentThreadProps) {
 
   async function load() {
     setIsLoading(true);
+    setHasError(false);
     const result = await listCommentsAction(postId);
     setIsLoading(false);
 
     if (!result.ok || !result.value) {
+      setHasError(true);
       toast.error(result.message ?? "Şərhlər yüklənmədi.");
       return;
     }
@@ -188,7 +195,22 @@ export function CommentThread({ postId, initialCount }: CommentThreadProps) {
             </div>
           ) : null}
 
-          {!isLoading && roots.length === 0 ? (
+          {!isLoading && hasError ? (
+            <div
+              role="alert"
+              className="flex flex-col items-start gap-2 rounded-card border border-border bg-surface p-4"
+            >
+              <p className="text-small text-text-primary">Şərhlər yüklənmədi.</p>
+              <p className="text-caption text-text-secondary">
+                Bağlantını yoxlayıb yenidən cəhd edin — mövcud şərhlər silinməyib.
+              </p>
+              <Button type="button" variant="outline" size="sm" onClick={() => void load()}>
+                Yenidən cəhd et
+              </Button>
+            </div>
+          ) : null}
+
+          {!isLoading && !hasError && roots.length === 0 ? (
             <p className="text-small text-text-secondary">
               Hələ şərh yoxdur. İlk fikri sən yaz.
             </p>

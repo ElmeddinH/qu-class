@@ -32,6 +32,8 @@ import {
   YAxis,
 } from "recharts";
 
+import { bucketChartHeight } from "./bucket-chart-layout";
+
 export interface BucketDatum {
   /** Xam açar — React key üçün (etiketlər eyniləşə bilər). */
   key: string;
@@ -45,12 +47,10 @@ interface BucketBarChartProps {
   dimensionLabel: string;
 }
 
-/** Sətir başına hündürlük — çox xanada qrafik sıxılmasın. */
-const ROW_HEIGHT = 44;
-const MIN_HEIGHT = 176;
-
 export function BucketBarChart({ data, dimensionLabel }: BucketBarChartProps) {
-  const height = Math.max(MIN_HEIGHT, data.length * ROW_HEIGHT);
+  // ⚠️ Hesab `bucket-chart-layout.ts`-dədir: skeleton eyni hündürlüyü Recharts-ı
+  // yükləmədən bilməlidir (bax həmin faylın başlığı).
+  const height = bucketChartHeight(data.length);
 
   return (
     <div style={{ height }} className="w-full">

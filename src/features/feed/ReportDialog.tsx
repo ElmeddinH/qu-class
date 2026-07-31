@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { REPORT_REASON_VALUES, ReportReason, type ReportReason as ReportReasonType } from "@/lib/enums";
+import { useDialogFocusRestore } from "@/components/kuds/use-dialog-focus-restore";
 
 import { reportPostAction } from "./actions";
 
@@ -50,6 +51,9 @@ interface ReportDialogProps {
 }
 
 export function ReportDialog({ postId, open, onOpenChange }: ReportDialogProps) {
+  // TƏLƏ T44 — modal bağlananda fokus tetikləyiciyə qayıtsın.
+  const restoreFocus = useDialogFocusRestore();
+
   const [isPending, startTransition] = useTransition();
   const [reason, setReason] = useState<string>(ReportReason.INAPPROPRIATE);
   const [details, setDetails] = useState("");
@@ -71,7 +75,7 @@ export function ReportDialog({ postId, open, onOpenChange }: ReportDialogProps) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md" onCloseAutoFocus={restoreFocus}>
         <DialogHeader>
           <DialogTitle>Paylaşımı şikayət et</DialogTitle>
           <DialogDescription>

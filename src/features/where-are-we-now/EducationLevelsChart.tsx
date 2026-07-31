@@ -19,7 +19,7 @@ import { GraduationCap } from "lucide-react";
 import { cellTotal, undisclosedTotal, type StatsBucket, type StatsCell } from "@/lib/career-stats";
 import { degreeLabel } from "@/lib/labels";
 
-import { BucketBarChart } from "./BucketBarChart";
+import { BucketBarChart } from "./BucketBarChart.lazy";
 import { ChartFrame } from "./ChartFrame";
 import { StatsTable } from "./StatsTable";
 import { MAP_TAB_META } from "./catalog";

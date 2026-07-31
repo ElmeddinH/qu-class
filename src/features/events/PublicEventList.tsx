@@ -25,6 +25,7 @@ import {
   publicEventsHref,
   type PublicEventFilterState,
 } from "@/lib/public-event-filters";
+import { FILTER_CHIP_BASE, filterChipTone } from "@/components/shared/filter-chip";
 import { cn } from "@/lib/utils";
 import type { EventItem } from "@/services/event.service";
 
@@ -127,10 +128,9 @@ function TimeChip({
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "flex items-center gap-2 rounded-badge px-3 py-1 text-small transition-colors",
-        active
-          ? "bg-ku-green font-medium text-white"
-          : "bg-muted text-text-secondary hover:bg-ku-soft hover:text-ku-dark",
+        "flex items-center gap-2",
+        FILTER_CHIP_BASE,
+        filterChipTone(active),
       )}
     >
       <Icon className="h-4 w-4" aria-hidden />

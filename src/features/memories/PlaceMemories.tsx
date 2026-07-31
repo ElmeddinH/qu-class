@@ -137,7 +137,7 @@ export async function PlaceMemories({
         // düşür (middleware) və bu, doğru davranışdır.
         <Link
           href={`/class/${memories[0].cohort.slug}/memories?${MEMORY_PARAMS.place}=${MEMORY_PLACE_FLAG}`}
-          className="text-small text-ku-green hover:underline"
+          className="kuds-prose-link text-small"
         >
           Məkanla bağlı bütün xatirələr
         </Link>

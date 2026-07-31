@@ -56,6 +56,7 @@ import { INDUSTRY_VALUES } from "@/lib/enums";
 import { INDUSTRY_LABELS } from "@/lib/labels";
 import { Visibility } from "@/lib/enums";
 import type { OwnCareerEntry } from "@/services/career.service";
+import { useDialogFocusRestore } from "@/components/kuds/use-dialog-focus-restore";
 
 import { careerEntrySchema, type CareerEntryFormInput } from "../schemas";
 import { saveCareerEntryAction } from "./actions";
@@ -101,6 +102,9 @@ export function CareerEntryDialog({
   entry,
   onSaved,
 }: CareerEntryDialogProps) {
+  // TƏLƏ T44 — modal bağlananda fokus tetikləyiciyə qayıtsın.
+  const restoreFocus = useDialogFocusRestore();
+
   const [pending, startTransition] = useTransition();
 
   const form = useForm<CareerEntryFormInput>({
@@ -136,7 +140,7 @@ export function CareerEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" onCloseAutoFocus={restoreFocus}>
         <DialogHeader>
           <DialogTitle>{entry ? "Karyera qeydini redaktə et" : "Karyera qeydi əlavə et"}</DialogTitle>
           <DialogDescription>

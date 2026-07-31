@@ -41,7 +41,7 @@ import { CitiesChart } from "./CitiesChart";
 import { CompaniesChart } from "./CompaniesChart";
 import { CountriesChart } from "./CountriesChart";
 import { EducationLevelsChart } from "./EducationLevelsChart";
-import { IndustriesChart } from "./IndustriesChart";
+import { IndustriesChart } from "./IndustriesChart.lazy";
 import { JobFunctionsChart } from "./JobFunctionsChart";
 import { MapSkeleton } from "@/components/shared/MapSkeleton";
 import { MapPanel } from "./MapPanel";

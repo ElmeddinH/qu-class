@@ -58,3 +58,12 @@ next-env.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Audit artefaktları — TÖRƏMƏDİR (Blok 12C).
+# `npm run audit:lighthouse` → 17 MB HTML+JSON, `npm run audit:responsive` →
+# 34 MB ekran görüntüsü. Hər ikisi bir əmrlə yenidən yaradılır, ona görə
+# repoda yalnız XÜLASƏ markdown-ları saxlanılır:
+#   docs/lighthouse/README.md · docs/responsive/report.md · docs/quality-report-12c.md
+/docs/lighthouse/**/*.html
+/docs/lighthouse/**/*.json
+/docs/responsive/*.png

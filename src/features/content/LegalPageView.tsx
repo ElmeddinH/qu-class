@@ -19,6 +19,7 @@ import { ScrollText } from "lucide-react";
 
 import { Markdown } from "@/components/shared/Markdown";
 import { LEGAL_PAGES, legalHref, type LegalSlug } from "@/lib/content-routes";
+import { FILTER_CHIP_BASE, filterChipTone } from "@/components/shared/filter-chip";
 import { cn } from "@/lib/utils";
 import { getContentPage } from "@/services/content.service";
 import { shortDate } from "@/utils/date";
@@ -48,10 +49,8 @@ export async function LegalPageView({ slug }: { slug: LegalSlug }) {
               href={legalHref(entry.slug)}
               aria-current={entry.slug === slug ? "page" : undefined}
               className={cn(
-                "rounded-badge px-3 py-1 text-small transition-colors",
-                entry.slug === slug
-                  ? "bg-ku-green font-medium text-white"
-                  : "bg-muted text-text-secondary hover:bg-ku-soft hover:text-ku-dark",
+                FILTER_CHIP_BASE,
+                filterChipTone(entry.slug === slug),
               )}
             >
               {entry.label}
@@ -77,7 +76,7 @@ export async function LegalPageView({ slug }: { slug: LegalSlug }) {
 
       <p className="text-small text-text-secondary">
         Əlçatanlıqla bağlı maneə görmüsünüzsə{" "}
-        <Link href="/accessibility" className="text-ku-green hover:underline">
+        <Link href="/accessibility" className="kuds-prose-link">
           əlçatanlıq bəyanatı
         </Link>{" "}
         səhifəsindən bildirin.

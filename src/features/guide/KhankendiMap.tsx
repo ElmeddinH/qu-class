@@ -81,7 +81,19 @@ export function KhankendiMap({ places, withoutCoordinates }: KhankendiMapProps) 
           width={800}
           height={420}
           className="h-auto w-full"
-          role="img"
+          // 🔴 `role="img"` DEYİL, `role="group"` (Blok 12C · axe
+          // `nested-interactive`, serious). ARIA-da `img` rolu «uşaqları
+          // təqdimatdır» qrupundadır: onun içindəki hər şey əlçatanlıq
+          // ağacından SİLİNİR. Marker dairələri isə `role="button"` +
+          // `tabIndex={0}` daşıyır — yəni klaviatura ilə fokuslanan, amma
+          // ekran oxuyucuya GÖRÜNMƏYƏN nəzarət elementləri yaranırdı
+          // (fokus «boşluğa» düşür). `group` interaktiv övladlara icazə verir
+          // və etiket saxlanılır.
+          //
+          // ⚠️ Alternativ — markerlərdən `tabIndex`-i çıxarmaq — rədd edildi:
+          // xəritəyə klaviatura ilə çatmaq faylın öz müqaviləsidir (yuxarıdakı
+          // qeyd) və mətn siyahısı onu ƏVƏZ ETMİR, TAMAMLAYIR.
+          role="group"
           aria-label="Xankəndi bələdçisindəki məkanların xəritəsi. Eyni məlumat aşağıdaki siyahıdadır."
         >
           <Geographies geography={TOPOLOGY}>

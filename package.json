@@ -23,7 +23,10 @@
     "git:commit": "node scripts/git.mjs commit",
     "git:log": "node scripts/git.mjs log",
     "git:audit": "node scripts/git-audit.mjs",
-    "git:push": "node scripts/git-push.mjs"
+    "git:push": "node scripts/git-push.mjs",
+    "audit:lighthouse": "tsx scripts/lighthouse-audit.ts",
+    "audit:queries": "tsx scripts/query-profile.ts",
+    "audit:responsive": "tsx scripts/responsive-shots.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -73,6 +76,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.62.0",
     "@testing-library/react": "^16.3.2",

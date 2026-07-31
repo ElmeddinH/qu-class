@@ -55,7 +55,11 @@ export function MemberIdentity({
   const fullName = `${firstName} ${lastName}`;
 
   return (
-    <div className="flex items-start gap-3">
+    // ⚠️ XARİCİ qutuda da `min-w-0` (Blok 12C). Daxildəki `min-w-0` tək
+    // başına kifayət etmir: bu div özü kart/grid xanasının flex-övladıdır və
+    // `min-width: auto` ilə öz min-content ölçüsündən (kəsilməmiş ad + subtitle)
+    // aşağı sıxıla bilmir — 375px-də kart viewport-dan taşırdı.
+    <div className="flex min-w-0 items-start gap-3">
       <Avatar className={cn("shrink-0", size === "lg" ? "h-12 w-12" : "h-10 w-10")}>
         {avatarUrl ? <AvatarImage src={avatarUrl} alt="" /> : null}
         <AvatarFallback className="bg-ku-soft text-caption text-ku-dark">

@@ -156,7 +156,7 @@ export function GuidePlaceDetail({ place, related }: GuidePlaceDetailProps) {
 
             <Link
               href={guideHref({ category: null })}
-              className="text-small text-ku-green hover:underline"
+              className="kuds-prose-link text-small"
             >
               ← Bütün bələdçi
             </Link>

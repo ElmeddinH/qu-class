@@ -21,6 +21,7 @@ import {
   type NotificationStatusFilter,
 } from "@/lib/notification-filters";
 import { notificationTypeLabel } from "@/lib/labels";
+import { FILTER_CHIP_BASE, filterChipTone } from "@/components/shared/filter-chip";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABELS: Record<NotificationStatusFilter, string> = {
@@ -85,7 +86,7 @@ export function NotificationFilters({ filters, types, total }: NotificationFilte
         {hasActiveNotificationFilters(filters) ? (
           <Link
             href={notificationsHref()}
-            className="text-small text-ku-green hover:underline"
+            className="kuds-prose-link text-small"
           >
             Filtri sıfırla
           </Link>
@@ -101,10 +102,8 @@ function Chip({ href, label, active }: { href: string; label: string; active: bo
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "rounded-badge px-3 py-1 text-small transition-colors",
-        active
-          ? "bg-ku-green font-medium text-white"
-          : "bg-muted text-text-secondary hover:bg-ku-soft hover:text-ku-dark",
+        FILTER_CHIP_BASE,
+        filterChipTone(active),
       )}
     >
       {label}

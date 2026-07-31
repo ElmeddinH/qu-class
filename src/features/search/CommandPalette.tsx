@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/command";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { MIN_SEARCH_LENGTH, searchResultCount } from "@/lib/search";
+import { useDialogFocusRestore } from "@/components/kuds/use-dialog-focus-restore";
 
 import { SEARCH_GROUPS, SEARCH_ICONS } from "./catalog";
 import { useSearchQuery } from "./useSearchQuery";
@@ -45,6 +46,9 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ placeholder = "Axtar..." }: CommandPaletteProps) {
+  // TƏLƏ T44 — modal bağlananda fokus tetikləyiciyə qayıtsın.
+  const restoreFocus = useDialogFocusRestore();
+
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
@@ -89,7 +93,7 @@ export function CommandPalette({ placeholder = "Axtar..." }: CommandPaletteProps
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent className="overflow-hidden p-0 sm:max-w-2xl" onCloseAutoFocus={restoreFocus}>
           <DialogTitle className="sr-only">Qlobal axtarış</DialogTitle>
 
           <Command shouldFilter={false} className="rounded-modal">

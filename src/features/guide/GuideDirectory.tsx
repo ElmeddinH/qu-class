@@ -33,6 +33,7 @@ import {
   type GuideFilterState,
 } from "@/lib/guide-filters";
 import { guideCategoryLabel } from "@/lib/labels";
+import { FILTER_CHIP_BASE, filterChipTone } from "@/components/shared/filter-chip";
 import { cn } from "@/lib/utils";
 import type { GuidePlaceItem } from "@/services/content.service";
 
@@ -172,7 +173,7 @@ export function GuideDirectory({ places, filters }: GuideDirectoryProps) {
       <p className="text-small text-text-secondary">
         Bələdçi redaksiya məzmunudur. Sinif yoldaşlarının məkanlarla bağlı
         xatirələrini hər məkanın öz səhifəsində oxuya bilərsən —{" "}
-        <Link href="/register" className="text-ku-green hover:underline">
+        <Link href="/register" className="kuds-prose-link">
           qeydiyyatdan keçib
         </Link>{" "}
         öz xatirəni də əlavə et.
@@ -195,10 +196,8 @@ function CategoryChip({
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "rounded-badge px-3 py-1 text-small transition-colors",
-        active
-          ? "bg-ku-green font-medium text-white"
-          : "bg-muted text-text-secondary hover:bg-ku-soft hover:text-ku-dark",
+        FILTER_CHIP_BASE,
+        filterChipTone(active),
       )}
     >
       {label}

@@ -51,7 +51,9 @@ export function DirectoryCard({ member }: { member: DirectoryEntry }) {
   const hiddenInterestCount = interests.length - visibleInterests.length;
 
   return (
-    <li className="flex h-full flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-sm-kuds">
+    // ⚠️ `min-w-0`: kart `ul.grid`-in xanasıdır və `min-width: auto` onu
+    // uzun fakültə/ixtisas adının min-content enindən aşağı sıxılmağa qoymurdu.
+    <li className="flex h-full min-w-0 flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-sm-kuds">
       <MemberIdentity
         id={member.id}
         firstName={member.firstName}
@@ -65,19 +67,26 @@ export function DirectoryCard({ member }: { member: DirectoryEntry }) {
       />
 
       <dl className="flex flex-col gap-2 text-caption text-text-secondary">
+        {/* 🔴 `dt`/`dd` `dl > div`-in BİRBAŞA övladı olmalıdır (WCAG 1.3.1 —
+            axe `dlitem` + `definition-list`). Əvvəl burada İKİ `div` qatı vardı
+            (`dl > div > div > dt`) və HTML qruplaşdırma qaydası pozulurdu: bir
+            `div` qatına icazə var, ikisinə yox. Sütun düzülüşü indi `dd`-nin
+            İÇİNDƏ (`span`) qurulur — görünüş eynidir, semantika düzəlib. */}
         {cohort ? (
           <div className="flex items-start gap-2">
-            <GraduationCap className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <div className="flex min-w-0 flex-col">
-              <dt className="sr-only">Fakültə və ixtisas</dt>
-              <dd className="truncate">
-                {[cohort.facultyName, cohort.programName].filter(Boolean).join(" · ") ||
-                  cohort.displayName}
-              </dd>
-              <dd>
-                {cohort.admissionYear}–{cohort.graduationYear}
-              </dd>
-            </div>
+            <dt className="sr-only">Fakültə və ixtisas</dt>
+            <dd className="flex min-w-0 items-start gap-2">
+              <GraduationCap className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate">
+                  {[cohort.facultyName, cohort.programName].filter(Boolean).join(" · ") ||
+                    cohort.displayName}
+                </span>
+                <span>
+                  {cohort.admissionYear}–{cohort.graduationYear}
+                </span>
+              </span>
+            </dd>
           </div>
         ) : null}
 

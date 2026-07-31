@@ -153,7 +153,7 @@ export function AccessibilityScreen({ isAuthenticated }: AccessibilityScreenProp
               məsul şəxsinə yazın — əlaqə məlumatı{" "}
               <Link
                 href={legalHref("equal-opportunity")}
-                className="text-ku-green hover:underline"
+                className="kuds-prose-link"
               >
                 bərabər imkanlar bəyanatındadır
               </Link>

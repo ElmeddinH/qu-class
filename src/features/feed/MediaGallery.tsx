@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import type { FeedMedia } from "@/services/post.service";
+import { useDialogFocusRestore } from "@/components/kuds/use-dialog-focus-restore";
 
 interface MediaGalleryProps {
   media: FeedMedia[];
@@ -30,6 +31,9 @@ interface MediaGalleryProps {
 }
 
 export function MediaGallery({ media, label }: MediaGalleryProps) {
+  // TƏLƏ T44 — modal bağlananda fokus tetikləyiciyə qayıtsın.
+  const restoreFocus = useDialogFocusRestore();
+
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   if (media.length === 0) return null;
@@ -78,7 +82,7 @@ export function MediaGallery({ media, label }: MediaGalleryProps) {
       </ul>
 
       <Dialog open={active !== null} onOpenChange={(open) => !open && setOpenIndex(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-3xl" onCloseAutoFocus={restoreFocus}>
           <DialogTitle className="text-h4">{label}</DialogTitle>
           <DialogDescription>
             {openIndex !== null ? `${openIndex + 1} / ${media.length}` : ""}

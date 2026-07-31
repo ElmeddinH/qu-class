@@ -43,22 +43,39 @@ export async function NotificationBadge() {
       : `Bildirişlər — ${unread} oxunmamış`;
 
   return (
-    <Button variant="ghost" size="icon" aria-label={label} asChild className="relative">
-      <Link href={NOTIFICATIONS_PATH}>
-        <Bell className="h-6 w-6" aria-hidden />
+    <>
+      {/* 🔴 CANLI BÖLGƏ (KUDS §21, WCAG 4.1.3 — Blok 12C).
+          Rozet SERVER komponentidir və `revalidatePath("/", "layout")` onu
+          SƏHİFƏ DƏYİŞMƏDƏN yenidən render edir: ekran oxuyucu üçün rəqəm
+          səssizcə dəyişir. `aria-live` bölgəsi dəyişikliyi elan edir.
 
-        {unread > 0 ? (
-          <span
-            // ⚠️ `aria-hidden`: say onsuz da düymənin `aria-label`-ındadır,
-            // yoxsa ekran oxuyucusu rəqəmi iki dəfə oxuyar.
-            aria-hidden
-            data-testid="notification-badge"
-            className="absolute -right-0.5 -top-0.5 flex min-w-5 items-center justify-center rounded-badge bg-danger-strong px-1 text-caption font-medium leading-5 text-white"
-          >
-            {unread > MAX_DISPLAY ? `${MAX_DISPLAY}+` : unread}
-          </span>
-        ) : null}
-      </Link>
-    </Button>
+          ⚠️ Bölgə HƏMİŞƏ DOM-dadır (say 0 olanda mətn boşdur): `aria-live`
+          yalnız MÖVCUD bölgənin məzmunu dəyişəndə işləyir — sonradan əlavə
+          olunan bölgə elan olunmur.
+
+          ⚠️ Düymənin ÖZÜNƏ `aria-live` qoyulmur: onda hər render-də bütün
+          etiket («Bildirişlər — 3 oxunmamış») təkrar oxunardı. */}
+      <span className="sr-only" aria-live="polite" data-testid="notification-live">
+        {unread > 0 ? `${unread} oxunmamış bildiriş` : ""}
+      </span>
+
+      <Button variant="ghost" size="icon" aria-label={label} asChild className="relative">
+        <Link href={NOTIFICATIONS_PATH}>
+          <Bell className="h-6 w-6" aria-hidden />
+
+          {unread > 0 ? (
+            <span
+              // ⚠️ `aria-hidden`: say onsuz da düymənin `aria-label`-ındadır,
+              // yoxsa ekran oxuyucusu rəqəmi iki dəfə oxuyar.
+              aria-hidden
+              data-testid="notification-badge"
+              className="absolute -right-0.5 -top-0.5 flex min-w-5 items-center justify-center rounded-badge bg-danger-strong px-1 text-caption font-medium leading-5 text-white"
+            >
+              {unread > MAX_DISPLAY ? `${MAX_DISPLAY}+` : unread}
+            </span>
+          ) : null}
+        </Link>
+      </Button>
+    </>
   );
 }

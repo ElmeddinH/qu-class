@@ -51,6 +51,7 @@ import { DEGREE_VALUES, Degree, Visibility } from "@/lib/enums";
 import { MAX_ENTRY_YEAR, MIN_ENTRY_YEAR } from "@/lib/form-fields";
 import { DEGREE_LABELS } from "@/lib/labels";
 import type { OwnEducationEntry } from "@/services/career.service";
+import { useDialogFocusRestore } from "@/components/kuds/use-dialog-focus-restore";
 
 import { educationEntrySchema, type EducationEntryFormInput } from "../schemas";
 import { saveEducationEntryAction } from "./actions";
@@ -84,6 +85,9 @@ export function EducationEntryDialog({
   entry,
   onSaved,
 }: EducationEntryDialogProps) {
+  // TƏLƏ T44 — modal bağlananda fokus tetikləyiciyə qayıtsın.
+  const restoreFocus = useDialogFocusRestore();
+
   const [pending, startTransition] = useTransition();
 
   const form = useForm<EducationEntryFormInput>({
@@ -117,7 +121,7 @@ export function EducationEntryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl" onCloseAutoFocus={restoreFocus}>
         <DialogHeader>
           <DialogTitle>{entry ? "Təhsil qeydini redaktə et" : "Təhsil qeydi əlavə et"}</DialogTitle>
           <DialogDescription>

@@ -31,10 +31,15 @@ export function MobileNav({ sections, label }: MobileNavProps) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
+        {/* 🔴 `shrink-0` (Blok 12C · 375px ölçüsü). Düymə `size="icon"` ilə
+            36×36-dır, amma header-in flex sətrində `flex-shrink: 1` defaultu
+            ilə YANINDAKI elementlərə yer verib **16 px enə** sıxılırdı — yəni
+            hamburger ikonu kəsilir və toxunma hədəfi WCAG 2.2 AA-nın 24px
+            minimumunun altına düşürdü. Ölçü `docs/responsive/report.md`-dədir. */}
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden"
+          className="shrink-0 md:hidden"
           aria-label="Naviqasiyanı aç"
         >
           <Menu className="h-6 w-6" aria-hidden />

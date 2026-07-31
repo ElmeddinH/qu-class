@@ -45,6 +45,18 @@ export function TimelineEntryItem({ item, cohortSlug }: TimelineEntryItemProps) 
   const Icon = item.isSystemMilestone ? Flag : FEED_ICONS[meta.icon];
   const href = sourceHref(item, cohortSlug);
 
+  /**
+   * 🔴 KUDS kontrast qaydası (CLAUDE.md): `ku-cream` fonunda YALNIZ
+   * `text-text-primary`. Milestone kartının fonu `ku-cream/40`-dır (ağın
+   * üzərində ≈ #F9FAE5) və orada `text-text-secondary` (#64748B) **4.49:1**
+   * verir — WCAG AA-nın 4.5:1 həddindən bir qırıntı AŞAĞI. axe bunu
+   * `color-contrast` (serious) kimi bildirir. Adi kartda (ağ fon) eyni rəng
+   * 4.76:1-dir və qalır — ona görə ton ŞƏRTLİDİR, qlobal deyil.
+   */
+  const mutedTone = item.isSystemMilestone
+    ? "text-text-primary"
+    : "text-text-secondary";
+
   return (
     <li className="relative pl-12">
       {/* Xəttin üzərindəki nöqtə — milestone daha iri və accent rəngdədir. */}
@@ -64,7 +76,7 @@ export function TimelineEntryItem({ item, cohortSlug }: TimelineEntryItemProps) 
           item.isSystemMilestone ? "bg-ku-cream/40" : "bg-surface",
         )}
       >
-        <div className="flex flex-wrap items-center gap-2 text-caption text-text-secondary">
+        <div className={cn("flex flex-wrap items-center gap-2 text-caption", mutedTone)}>
           <time dateTime={item.occurredAt.toISOString()}>{shortDate(item.occurredAt)}</time>
           <span aria-hidden>·</span>
           <span>{item.academicYear}</span>
@@ -73,7 +85,7 @@ export function TimelineEntryItem({ item, cohortSlug }: TimelineEntryItemProps) 
         <h3 className="text-h4 font-medium text-text-primary">{item.title}</h3>
 
         {item.summary ? (
-          <p className="line-clamp-3 text-small text-text-secondary">{item.summary}</p>
+          <p className={cn("line-clamp-3 text-small", mutedTone)}>{item.summary}</p>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2">

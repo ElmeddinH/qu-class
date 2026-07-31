@@ -47,7 +47,13 @@ export function PageHeader({
                 {index > 0 ? (
                   <ChevronRight className="h-3 w-3 shrink-0" aria-hidden />
                 ) : null}
-                <Link href={crumb.href} className="transition-colors hover:text-ku-green">
+                <Link
+                  // ⚠️ `py-1` — mətn hündürlüyü 18px-dir və toxunma hədəfi
+                  // WCAG 2.2 AA-nın 24px minimumuna çatmır. Şaquli boşluq
+                  // düzülüşü pozmur (sətir `items-center` ilə mərkəzlənib).
+                  href={crumb.href}
+                  className="inline-block py-1 transition-colors hover:text-ku-green"
+                >
                   {crumb.label}
                 </Link>
               </li>

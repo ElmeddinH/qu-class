@@ -226,6 +226,21 @@
     @apply text-h3 text-text-primary;
   }
 
+  /* --- KUDS §21 / WCAG 1.4.1 — MƏTN BLOKU İÇİNDƏ duran link ---
+     🔴 `hover:underline` KİFAYƏT DEYİL. Mətn bloku içindəki link ətrafındakı
+     mətndən YALNIZ rənglə seçilirsə (ku-green #44766C ↔ text-secondary
+     #64748B = 1.09:1) rəng korluğu olan və ya monoxrom ekranda oxuyan
+     istifadəçi linki ÜMUMİYYƏTLƏ görmür; kursoru olmayan istifadəçi (klaviatura,
+     toxunma ekranı) `hover` vəziyyətinə heç vaxt çatmır. axe bunu
+     `link-in-text-block` (serious) kimi bildirir — Blok 12C-nin ölçüsü.
+
+     Ona görə xətt HƏMİŞƏ var. Bu sinif YALNIZ cümlə içindəki linklərə aiddir;
+     müstəqil duran linklər (kart başlığı, «Bax» keçidi) mətn bloku içində
+     olmadığı üçün qaydanın əhatəsinə düşmür və toxunulmur. */
+  .kuds-prose-link {
+    @apply text-ku-green underline underline-offset-4;
+  }
+
   /* --- Status nişanları — kontrast-təhlükəsiz kombinasiyalar --- */
   .kuds-badge-success {
     @apply rounded-badge bg-success/15 px-3 py-1 text-caption text-success-strong;

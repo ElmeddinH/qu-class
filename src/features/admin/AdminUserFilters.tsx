@@ -45,7 +45,12 @@ function SelectField({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2">
+    // 🔴 `min-w-0` + `w-full` (Blok 12C · 375px üfüqi sürüşməsi).
+    // Native `<select>`-in İÇ MİNİMUM ENİ ən uzun opsiyanın enidir
+    // («Biznesin idarə edilməsi — Class of 2030 (20)» ≈ 368px). Grid xanası
+    // default `min-width: auto` daşıyır, yəni bu minimumdan AŞAĞI SIXILA
+    // BİLMİR və 375px ekranda bütün səhifə yana sürüşür.
+    <div className="flex min-w-0 flex-col gap-2">
       <Label htmlFor={id} className="text-caption text-text-secondary">
         {label}
       </Label>
@@ -53,7 +58,7 @@ function SelectField({
         id={id}
         name={name}
         defaultValue={value}
-        className="h-10 rounded-input border border-border bg-surface px-3 text-small text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ku-green"
+        className="h-10 w-full min-w-0 rounded-input border border-border bg-surface px-3 text-small text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ku-green"
       >
         {children}
       </select>
@@ -76,7 +81,7 @@ export function AdminUserFilters({ filters, cohorts }: AdminUserFiltersProps) {
       />
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <div className="flex flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2">
           <Label
             htmlFor="admin-user-search"
             className="text-caption text-text-secondary"

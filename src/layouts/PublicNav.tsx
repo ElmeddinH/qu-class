@@ -61,10 +61,12 @@ export function PublicMobileMenu() {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
+        {/* 🔴 `shrink-0` — bax `layouts/MobileNav.tsx`-dəki eyni qeyd:
+            flex sətrində düymə sıxılıb toxunma hədəfi minimumundan aşağı düşür. */}
         <Button
           variant="ghost"
           size="icon"
-          className="md:hidden"
+          className="shrink-0 md:hidden"
           aria-label="Menyunu aç"
         >
           <Menu className="h-6 w-6" aria-hidden />

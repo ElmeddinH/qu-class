@@ -54,7 +54,7 @@ export default async function RegisterPage() {
 
           <p className="text-small text-text-secondary">
             Artıq hesabınız var?{" "}
-            <Link href="/login" className="font-medium text-ku-green hover:underline">
+            <Link href="/login" className="kuds-prose-link font-medium">
               Daxil olun
             </Link>
           </p>

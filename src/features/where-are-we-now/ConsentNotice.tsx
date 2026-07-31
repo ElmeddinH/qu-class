@@ -74,7 +74,11 @@ export function ConsentNotice({ stats }: { stats: WhereAreWeNow }) {
         </span>
       </p>
 
-      <p className="text-caption text-text-secondary">
+      {/* ⚠️ `text-text-primary` — `ku-blue/40` fonunda `text-text-secondary`
+          4.5:1 həddini keçmir (axe `color-contrast`, serious). CLAUDE.md-nin
+          qaydası onsuz da budur: ku-blue/ku-soft/ku-cream üzərində yalnız
+          `text-text-primary`. Ölçü `text-caption` olaraq qalır. */}
+      <p className="text-caption text-text-primary">
         {MIN_BUCKET_SIZE} nəfərdən az olan qruplar məxfilik üçün «Açıqlanmayan» sətrinə
         birləşdirilib — belə qrup konkret şəxsi göstərmiş olardı.
         {suppressedCount > 0 ? (

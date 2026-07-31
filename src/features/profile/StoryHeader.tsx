@@ -11,6 +11,7 @@
 // keşindən YOX — CLAUDE.md və PLAN.md §4.6.
 // ============================================================================
 
+import Image from "next/image";
 import { MapPin } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -21,6 +22,16 @@ import type { ProfileResult } from "@/services/user.service";
 
 interface StoryHeaderProps {
   result: ProfileResult;
+}
+
+/**
+ * Ünvan `/api/upload`-un qaytardığı YERLİ yoldurmu?
+ *
+ * ⚠️ `//host/…` (protokolsuz xarici ünvan) da `/` ilə başlayır — ona görə
+ * yoxlama tam prefiksdir, sadəcə birinci simvol deyil.
+ */
+function isLocalUpload(url: string): boolean {
+  return url.startsWith("/uploads/");
 }
 
 export function StoryHeader({ result }: StoryHeaderProps) {
@@ -35,16 +46,36 @@ export function StoryHeader({ result }: StoryHeaderProps) {
       {/* Banner — şəkil yoxdursa KUDS qradiyenti (boş ekran buraxılmır). */}
       <div
         className={cn(
-          "h-32 w-full bg-ku-soft sm:h-40",
+          "relative h-32 w-full bg-ku-soft sm:h-40",
           !coverUrl && "bg-gradient-to-r from-ku-dark via-ku-green to-ku-soft",
         )}
       >
-        {/* Banner ünvanı ixtiyari xarici hostdan gələ bilər; `next/image` üçün
-            hər hostu `remotePatterns`-ə yazmaq lazım gələrdi (next.config.ts),
-            naməlum host isə çalışma zamanı xəta verərdi. */}
+        {/* 🔴 İKİ YOL, ÇÜNKİ MƏNBƏ İKİ CÜRDÜR (Blok 12C).
+            `coverUrl` sxemdə sərbəst mətndir (`schemas.ts` → `imageField`):
+            ya `/api/upload`-un qaytardığı YERLİ yol (`/uploads/…`), ya da
+            istifadəçinin yapışdırdığı XARİCİ ünvan.
+
+            · Yerli yol → `next/image`: `sizes` ilə responsiv, AVIF/WebP-yə
+              çevrilir və `priority` LCP-ni sürətləndirir (banner ekranın ən
+              üstündədir). Tapşırığın «public/uploads da daxil» tələbi budur.
+            · Xarici ünvan → adi `<img>`: `next/image` hostu
+              `next.config.ts` → `images.remotePatterns`-də tələb edir və
+              naməlum host ÇALIŞMA ZAMANI 400 verərdi. Hər hostu ağ siyahıya
+              yazmaq isə optimizatoru açıq proksiyə çevirər. */}
         {coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={coverUrl} alt="" className="h-full w-full object-cover" />
+          isLocalUpload(coverUrl) ? (
+            <Image
+              src={coverUrl}
+              alt=""
+              fill
+              sizes="(min-width: 1024px) 900px, 100vw"
+              className="object-cover"
+              priority
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={coverUrl} alt="" className="h-full w-full object-cover" />
+          )
         ) : null}
       </div>
 

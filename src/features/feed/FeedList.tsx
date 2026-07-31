@@ -151,7 +151,12 @@ export function FeedList({ cohortId, cohortSlug, category, initialPage }: FeedLi
   if (posts.length === 0) {
     return (
       <FeedSection>
-        <Card>
+        {/* ⚠️ `data-testid="empty-state"` — lentin boş vəziyyəti ORTAQ
+            `EmptyState` komponentini işlətmir (illüstrasiya daha böyükdür və
+            CTA mətni kateqoriyaya görə dəyişir), amma MAŞIN ÜÇÜN eyni açarı
+            daşımalıdır: `tests/e2e/empty-states.spec.ts` bütün siyahıları
+            HƏMİN bir selektorla gəzir. */}
+        <Card data-testid="empty-state">
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <span
               className="flex h-16 w-16 items-center justify-center rounded-avatar bg-ku-soft"

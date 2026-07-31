@@ -76,7 +76,12 @@ export function AzerbaijanMap({ pins }: { pins: MapPin[] }) {
           width={WIDTH}
           height={HEIGHT}
           className="h-auto w-full"
-          role="img"
+          // 🔴 `role="group"` — `role="img"` DEYİL (Blok 12C · axe
+          // `nested-interactive`). `img` rolunun uşaqları TƏQDİMATDIR: içindəki
+          // `MapPins` markerləri (`role="button"` + `tabIndex={0}`) əlçatanlıq
+          // ağacından düşür və klaviatura fokusu ekran oxuyucu üçün görünməz
+          // elementə keçir. `group` interaktiv övladlara icazə verir.
+          role="group"
           aria-label="Məzunların Azərbaycan şəhərləri üzrə paylanması. Eyni məlumat aşağıdaki cədvəldədir."
         >
           <ZoomableGroup

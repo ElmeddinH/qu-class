@@ -35,6 +35,7 @@ import {
 } from "@/lib/faq-filters";
 import { FAQ_CATEGORY_VALUES } from "@/lib/enums";
 import { faqCategoryLabel } from "@/lib/labels";
+import { FILTER_CHIP_BASE, filterChipTone } from "@/components/shared/filter-chip";
 import { cn } from "@/lib/utils";
 import { listFaqs } from "@/services/content.service";
 
@@ -137,11 +138,11 @@ export async function FaqScreen({ filters }: FaqScreenProps) {
 
       <p className="text-small text-text-secondary">
         Cavabını tapmadın?{" "}
-        <Link href="/newcomers" className="text-ku-green hover:underline">
+        <Link href="/newcomers" className="kuds-prose-link">
           Yeni tələbələr üçün bələdçiyə
         </Link>{" "}
         bax və ya{" "}
-        <Link href="/services" className="text-ku-green hover:underline">
+        <Link href="/services" className="kuds-prose-link">
           tələbə xidmətləri
         </Link>{" "}
         səhifəsindən əlaqə saxla.
@@ -164,10 +165,8 @@ function CategoryChip({
       href={href}
       aria-current={active ? "true" : undefined}
       className={cn(
-        "rounded-badge px-3 py-1 text-small transition-colors",
-        active
-          ? "bg-ku-green font-medium text-white"
-          : "bg-muted text-text-secondary hover:bg-ku-soft hover:text-ku-dark",
+        FILTER_CHIP_BASE,
+        filterChipTone(active),
       )}
     >
       {label}

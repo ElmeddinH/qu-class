@@ -1578,3 +1578,94 @@ Push **qəsdən işlədilməyib**: PAT istifadəçidədir və token bu terminald
 interaktiv oxuna bilməz. `npm run git:push` hazırdır və işə düşməzdən əvvəl
 auditi AYRI PROSES kimi çağırır — yəni tapıntı varsa şəbəkəyə çıxmadan dayanır
 (sıra: AUDİT → PUSH, tərsinə heç vaxt).
+
+---
+
+## Blok 12C — bitdi (əlçatanlıq · performans · responsive · vəziyyətlər)
+
+Yeni funksiya YOXDUR — bu blok **ölçdü, tapdı, düzəltdi və sübut etdi**.
+Tam hesabat: `docs/quality-report-12c.md`.
+
+```
+npx tsc --noEmit  ✓    npm run lint  ✓    npm run build  ✓
+vitest      1510 passed   (1495 → +15)
+playwright   212 passed   (148  → +64)
+```
+
+### Nə ölçüldü, nə tapıldı
+
+| Ölçü | Əvvəl | Sonra |
+|---|---:|---:|
+| axe `serious` (12 səhifə × 2 vəziyyət) | **141 node** | **0** |
+| Lighthouse desktop, 5 səhifə (ən aşağı) | 100 | 100 |
+| Lighthouse mobil, 5 səhifə (ən aşağı) | 86 | 87 |
+| Üfüqi sürüşmə (5 breakpoint × 10 səhifə) | 2 səhifə | **0** |
+| Toxunma hədəfi < 24px (WCAG 2.2) | 7 element sinfi | **0** |
+
+Beş axe qaydası düzəldildi: `dlitem` + `definition-list` (72+24 node —
+`DirectoryCard`-da `dl > div > div > dt`), `color-contrast` (27 — `bg-muted`
+üzərində `text-text-secondary` 3.86:1, `ku-cream/40` üzərində 4.49:1),
+`link-in-text-block` (16 — cümlə içindəki link yalnız rənglə seçilirdi),
+`nested-interactive` (2 — xəritə `role="img"` idi, fokuslanan markerlərlə).
+
+### Yeni fayllar
+
+| Fayl | Nə edir |
+|---|---|
+| `tests/e2e/a11y.spec.ts` | axe-core · 12 səhifə × 2 vəziyyət (24 test) |
+| `tests/e2e/a11y-keyboard.spec.ts` | klaviatura, fokus tələsi, canlı bölgə, reduced-motion (14 test) |
+| `tests/e2e/empty-states.spec.ts` | boş vəziyyət gəzintisi + 404 sərhədləri (12 test) |
+| `src/lib/kuds-contrast.test.ts` | KUDS kontrast qaydalarının mənbə skanı + öz-yoxlama |
+| `src/features/feed/FeedList.test.tsx` | lentin boş/xəta ayaqları (komponent testi) |
+| `scripts/lighthouse-audit.ts` | `npm run audit:lighthouse` — auth kukisi ilə 5 səhifə |
+| `scripts/responsive-shots.ts` | `npm run audit:responsive` — 5 bp × 10 səhifə + ölçmə |
+| `scripts/query-profile.ts` | `npm run audit:queries` — N+1 profili |
+| `src/components/kuds/use-dialog-focus-restore.ts` | **T44** düzəlişi |
+| `src/components/shared/{RouteError,RouteNotFound,PageSkeleton,ChartSkeleton,filter-chip}` | ortaq vəziyyət/ton komponentləri |
+| `src/app/(public|app|admin)/{error,not-found}.tsx` + `(admin)/loading.tsx` | route qrupu sərhədləri |
+| `src/features/**/*.lazy.tsx` (4 ədəd) | Recharts → `next/dynamic(ssr:false)` |
+
+### 🔴 T44 — Radix `Dialog` fokusu yalnız `DialogTrigger` olanda qaytarır
+
+`DialogContent` `onCloseAutoFocus`-da `event.preventDefault()` çağırıb fokusu
+`context.triggerRef`-ə verir. Layihədəki 7 modaldan 6-sı idarə olunandır
+(`open`/`onOpenChange`), yəni `triggerRef` **null**-dur → brauzerin öz bərpası
+ləğv olunur, fokus isə heç kimə getmir və `<body>`-yə düşür. Esc-dən sonra
+növbəti Tab səhifənin əvvəlindən başlayırdı (WCAG 2.4.3).
+`useDialogFocusRestore()` `focusin` ilə modaldan KƏNARDA fokuslanan son elementi
+saxlayır və ona qaytarır. «`open` dəyişəndə `activeElement`-i oxu» yanaşması
+İŞLƏMİR: Radix fokusu uşaq effektində köçürür, valideyn effekti isə sonra işləyir.
+
+### 🔴 `loading.tsx` yalnız `(admin)` qrupundadır — ölçülmüş qərar
+
+`loading.tsx` seqmenti AXINLA render edir → HTTP statusu məzmundan ƏVVƏL
+göndərilir → sonrakı `notFound()` statusu dəyişə bilmir.
+
+```
+(app)/loading.tsx VAR  → GET /class/<yoxdur> = 200  🔴
+(app)/loading.tsx YOX  → GET /class/<yoxdur> = 404  ✓
+```
+
+`(app)` + `(public)`-də **25 səhifə** `notFound()` çağırır və üç mövcud e2e
+testi 404 statusunu ölçür; «yoxdur»/«icazə yoxdur» ayırd edilməməsi də statusa
+söykənir. `(admin)`-də heç bir səhifə `notFound()` çağırmır → orada təhlükəsizdir.
+
+### Digər ölçülmüş qərarlar
+
+- **ISR ictimai səhifələrdə TƏTBİQ EDİLMƏDİ**: `ConsentGate` → `cookies()`
+  bütün `(public)` route-larını dinamik edir (sübut: `/docs` DB-yə toxunmur,
+  yenə `ƒ`). PPR experimental, stack kilidlidir. Ölçü itki göstərmir
+  (`server-response-time` 20–40 ms, desktop 100).
+- **`/home` mobil 87**: yönləndirmə 600 ms alır; hədəf səhifə birbaşa ölçüləndə
+  (`/class/[slug]`) **91**.
+- **Bundle**: `/class/[slug]/map` 279 → **159 kB**, `/events/[id]` 275 → **162 kB**.
+- **N+1 YOXDUR**: feed/directory/timeline — `take` 6 → 24 dəyişəndə sorğu sayı
+  sabit qalır (11/11/4).
+- **Törəmə artefaktlar gitignore-dadır**: `docs/lighthouse/**/*.{html,json}`
+  (17 MB) və `docs/responsive/*.png` (34 MB). Xülasə markdown-ları qalır.
+
+### Ölçmə tələsi (yol boyu tapıldı)
+
+`next start` REBUILD-DƏN SONRA yenidən qaldırılmalıdır. Köhnə server köhnə
+HTML-i verir, brauzer artıq mövcud olmayan chunk hash-lərini istəyir → 400 →
+Lighthouse «Best Practices 96» göstərir. Kodun deyil, ölçmənin nasazlığıdır.

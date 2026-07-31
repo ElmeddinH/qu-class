@@ -64,8 +64,12 @@ import {
   type ConsentValue,
 } from "@/lib/consent";
 import { legalHref } from "@/lib/content-routes";
+import { useDialogFocusRestore } from "@/components/kuds/use-dialog-focus-restore";
 
 export function CookieBanner() {
+  // TƏLƏ T44 — modal bağlananda fokus tetikləyiciyə qayıtsın.
+  const restoreFocus = useDialogFocusRestore();
+
   const [dismissed, setDismissed] = useState(false);
   const [height, setHeight] = useState(0);
   const [preferencesOpen, setPreferencesOpen] = useState(false);
@@ -124,7 +128,7 @@ export function CookieBanner() {
                 saxlanılır və heç bir identifikator daşımır.{" "}
                 <Link
                   href={legalHref("privacy")}
-                  className="text-ku-green underline-offset-4 hover:underline"
+                  className="kuds-prose-link"
                 >
                   Məxfilik bildirişi
                 </Link>
@@ -149,7 +153,7 @@ export function CookieBanner() {
       </div>
 
       <Dialog open={preferencesOpen} onOpenChange={setPreferencesOpen}>
-        <DialogContent data-testid="cookie-preferences" className="max-w-lg">
+        <DialogContent data-testid="cookie-preferences" className="max-w-lg" onCloseAutoFocus={restoreFocus}>
           <DialogHeader>
             <DialogTitle>Kuki seçimləri</DialogTitle>
             <DialogDescription>
@@ -209,7 +213,7 @@ export function CookieBanner() {
             Ətraflı:{" "}
             <Link
               href={legalHref("privacy")}
-              className="text-ku-green underline-offset-4 hover:underline"
+              className="kuds-prose-link"
             >
               Məxfilik bildirişi
             </Link>

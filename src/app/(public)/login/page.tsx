@@ -79,7 +79,7 @@ export default async function LoginPage({
 
           <p className="text-small text-text-secondary">
             Hesabınız yoxdur?{" "}
-            <Link href="/register" className="font-medium text-ku-green hover:underline">
+            <Link href="/register" className="kuds-prose-link font-medium">
               Qeydiyyatdan keçin
             </Link>
           </p>

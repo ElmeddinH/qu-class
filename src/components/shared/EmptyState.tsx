@@ -35,6 +35,11 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div
+      // ⚠️ `data-testid` (Blok 12C · D bəndi) — boş vəziyyətin MAŞINLA
+      // yoxlanmasının yeganə etibarlı yoludur. Mətnə görə axtarmaq olmur:
+      // hər siyahının öz başlığı var və mətn dəyişəndə yoxlama səssizcə
+      // sınardı. `tests/e2e/empty-states.spec.ts` bu açara baxır.
+      data-testid="empty-state"
       className={cn(
         "flex flex-col items-center gap-3 rounded-card border border-dashed border-border px-6 py-8 text-center",
         className,
