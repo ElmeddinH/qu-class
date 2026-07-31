@@ -67,3 +67,8 @@ next-env.d.ts
 /docs/lighthouse/**/*.html
 /docs/lighthouse/**/*.json
 /docs/responsive/*.png
+
+# ⚠️ `docs/screenshots/*.png` QƏSDƏN İGNORE EDİLMİR (Blok 13B).
+# Bunlar audit artefaktı deyil, README QALEREYASIDIR: GitHub-da səhifə onlarsız
+# boş çərçivələrlə açılır. Ölçü fərqi də qərarı asanlaşdırır — 17 fayl ≈ 2.5 MB,
+# `docs/responsive/` isə 50 fayl ≈ 34 MB. `npm run shots` ilə yenidən yaradılır.

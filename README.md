@@ -46,20 +46,70 @@ Lighthouse desktop **100/100/100/100** (5 səhifə) · WCAG 2.2 AA qapısı bağ
 
 ## Ekran görüntüləri
 
-<!-- 📌 13B: hər yer üçün docs/media/*.png (1440×900, KUDS tokenləri ilə).
-     Ölçülmüş responsive görüntülər onsuz da var: `npm run audit:responsive`
-     → docs/responsive/<səhifə>__<en>.png (5 breakpoint × 10 səhifə). -->
+17 səth, KUDS §9 «Desktop» referansında (**1440×900**). Hamısı
+[`scripts/screenshots.ts`](scripts/screenshots.ts) ilə **avtomatik** çəkilir —
+əl ilə redaktə olunmur:
 
-| Ekran | Yol | Fayl |
-|---|---|---|
-| Açılış səhifəsi | `/` | *[ 13B ]* `docs/media/01-landing.png` |
-| Sinif ana səhifəsi | `/class/[slug]` | *[ 13B ]* `docs/media/02-class-home.png` |
-| Sinif lenti | `/class/[slug]/feed` | *[ 13B ]* `docs/media/03-feed.png` |
-| Məxfilik idarəetməsi | `/me/privacy` | *[ 13B ]* `docs/media/04-privacy.png` |
-| «İndi haradayıq?» | `/class/[slug]/map` | *[ 13B ]* `docs/media/05-map.png` |
-| Rəqəmsal illik | `/class/[slug]/yearbook` | *[ 13B ]* `docs/media/06-yearbook.png` |
-| İdarə paneli | `/admin` | *[ 13B ]* `docs/media/07-admin.png` |
-| Swagger UI | `/docs` | *[ 13B ]* `docs/media/08-swagger.png` |
+```bash
+npx prisma db seed        # bazanı sıfırla
+npm run build
+npm run shots:serve       # ayrı terminalda — saatı sabitlənmiş server
+npm run shots
+```
+
+Skript determinizmi dörd qapı ilə təmin edir: **seed bazası** (sabit PRNG +
+sabit `NOW`), **sabit an** (server `scripts/freeze-clock.cjs`, brauzer
+`clock.setFixedTime` — nisbi tarixlər sürüşmür), **animasiya söndürülməsi**
+(`prefers-reduced-motion: reduce` + `animations: "disabled"`) və **kuki
+razılığının əvvəlcədən verilməsi** (banner məzmunu örtməsin).
+
+🔒 Skript həm də **şəxsi məlumat qapısıdır**: hər icrada bazanı və 17 ekranın
+görünən mətnini yoxlayır — istehlakçı poçt domeni, seedə aid olmayan e-poçt
+domeni, şablona uymayan telefon və ya repo sahibinin öz kimliyi tapılsa
+sıfırdan fərqli kodla çıxır. Cari nəticə: **tapıntı yoxdur** ✅. Seed adları
+uydurma ad hovuzlarından qurulur, e-poçtlar `@qu.edu.az` / `@mail.az`,
+telefonlar `+994 5x xxx xx xx` şablonundadır.
+
+### Açıq səth
+
+| Açılış səhifəsi [M1] | Xankəndi bələdçisi [M3] |
+|---|---|
+| [![Açılış](docs/screenshots/01-welcome.png)](docs/screenshots/01-welcome.png) | [![Xankəndi](docs/screenshots/03-khankendi.png)](docs/screenshots/03-khankendi.png) |
+| **FAQ [M2]** | **Giriş** |
+| [![FAQ](docs/screenshots/02-faq.png)](docs/screenshots/02-faq.png) | [![Giriş](docs/screenshots/04-login.png)](docs/screenshots/04-login.png) |
+
+### Sinif səthi
+
+| Sinif lenti [M5] | Sinif kataloqu [M6] |
+|---|---|
+| [![Lent](docs/screenshots/05-feed.png)](docs/screenshots/05-feed.png) | [![Kataloq](docs/screenshots/06-directory.png)](docs/screenshots/06-directory.png) |
+| **Mənim sinif hekayəm [M7]** | **Xronologiya [M8]** |
+| [![Hekayə](docs/screenshots/07-class-story.png)](docs/screenshots/07-class-story.png) | [![Xronologiya](docs/screenshots/08-timeline.png)](docs/screenshots/08-timeline.png) |
+| **Nailiyyətlər [M10]** | **Xatirələr [M9]** |
+| [![Nailiyyətlər](docs/screenshots/09-achievements.png)](docs/screenshots/09-achievements.png) | [![Xatirələr](docs/screenshots/10-memories.png)](docs/screenshots/10-memories.png) |
+| **Tədbirlər [M12]** | **🔒 İndi haradayıq? [M11]** |
+| [![Tədbirlər](docs/screenshots/11-events.png)](docs/screenshots/11-events.png) | [![Xəritə](docs/screenshots/12-map.png)](docs/screenshots/12-map.png) |
+
+### Şəxsi, idarə və dizayn səthi
+
+| Bildiriş mərkəzi [M15] | 🔒 Məxfilik idarəetməsi [M14] |
+|---|---|
+| [![Bildirişlər](docs/screenshots/13-notifications.png)](docs/screenshots/13-notifications.png) | [![Məxfilik](docs/screenshots/14-privacy.png)](docs/screenshots/14-privacy.png) |
+| **İdarə paneli [M17]** | **Şikayət moderasiyası [M17]** |
+| [![Admin](docs/screenshots/15-admin-dashboard.png)](docs/screenshots/15-admin-dashboard.png) | [![Moderasiya](docs/screenshots/16-admin-moderation.png)](docs/screenshots/16-admin-moderation.png) |
+| **KUDS stil bələdçisi** | |
+| [![KUDS](docs/screenshots/17-kuds.png)](docs/screenshots/17-kuds.png) | |
+
+Tam siyahı və çəkiliş parametrləri: [`docs/screenshots/README.md`](docs/screenshots/README.md).
+
+⚠️ **Xəritə və xatirələr ayrı hesabla çəkilib** və bu, məxfilik modelinin
+nəticəsidir: `UNIVERSITY_ADMIN` başqa sinfin `CLASS` məzmununu **oxumur**,
+aqreqasiya isə ayrıca `includeInStats` razılığı tələb edir. Ona görə bu iki
+ekran `alumni@qu.edu.az` (sinfi `maliyye-2022`) hesabı ilə — yəni **həmin
+sinfin üzvü kimi** — çəkilib.
+
+Beş breakpoint üzrə **ölçülmüş** responsive görüntülər ayrıdır:
+`npm run audit:responsive` → [`docs/responsive/`](docs/responsive/report.md).
 
 ---
 
@@ -605,6 +655,9 @@ bağlanmalı siyahı).
 
 | Fayl | Nə var |
 |---|---|
+| [`docs/GW-COMPARISON.md`](docs/GW-COMPARISON.md) | **GW müqayisəsi** — 17 modul × 4 ölçü, 14 əlavənin kodda təsdiqlənmiş vəziyyəti, 6 qəsdli imtinanın səbəbi. Müdafiə materialı |
+| [`CHANGELOG.md`](CHANGELOG.md) | Blok-blok tarixçə — 35 commit mənalı qruplarda |
+| [`docs/screenshots/`](docs/screenshots/README.md) | 17 ekran görüntüsü + çəkiliş parametrləri və şəxsi məlumat yoxlamasının nəticəsi |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Sistem konteksti, ER diaqramı, məxfilik qərar axını, fan-out sequence, auth Edge/Node bölgüsü, qat qaydaları — **7 Mermaid diaqramı** |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | 17 qərar: Kontekst · Qərar · Alternativlər · Nəticə |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Təhdid modeli — nəyi qoruyuruq, **nəyi yox**; seed duzu, audit jurnalı, `.env` qaydaları |
@@ -623,7 +676,8 @@ bağlanmalı siyahı).
 |---|---|
 | **Müəllif** | Elmeddin Heydarov — Holberton School final layihəsi |
 | **Dizayn standartı** | KUDS v1.0 — Qarabağ Universiteti |
-| **Commit tarixçəsi** | 33 commit, blok-blok iş axını (`npm run git:log`) |
+| **Commit tarixçəsi** | 35 commit, blok-blok iş axını (`npm run git:log`) — [`CHANGELOG.md`](CHANGELOG.md) |
+| **Buraxılış** | `v1.0.0` (annotasiyalı teq) |
 
 ⚠️ Layihə mühitində **`git` binarı yoxdur** — commit-lər `isomorphic-git` ilə
 yazılır (`scripts/git.mjs`). Nəticə standart `.git` qovluğudur, `git log` /

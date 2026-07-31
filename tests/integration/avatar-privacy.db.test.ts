@@ -168,13 +168,35 @@ describe("🔒 T40 — lent və şərhlər", () => {
   });
 
   it("şərh müəllifinin gizlədilmiş avatarı QAYTARILMIR", async () => {
+    // 🔴 ŞƏRH SEÇİMİ MƏXFİLİKDƏN KEÇMƏLİDİR — yoxsa test öz-özünü sındırır.
+    //
+    // Əvvəl burada sadəcə `take: 1` var idi. Seed determinist olduğu üçün o,
+    // HƏMİŞƏ `cmt-009`-u seçirdi — və həmin şərhin paylaşımı (`pst-288`)
+    // BAŞQASININ `PRIVATE` paylaşımıdır. `listComments(viewerSameClass, …)`
+    // ondan sıfır sətir qaytarır, çünki məxfilik mühərriki DÜZGÜN işləyir:
+    // `PRIVATE` yalnız sahibinə görünür. Yəni `expect(mine.length > 0)`
+    // uğursuzluğu məhsul qüsuru deyil, testin YANLIŞ QURULMASI idi.
+    //
+    // İndi şərh yalnız BAXAN TƏRƏFİN GÖRDÜYÜ paylaşımlardan seçilir. Testin
+    // mövzusu dəyişmir — mövzu avatar redaksiyasıdır, paylaşım görünürlüyü
+    // deyil (onun öz testləri `visibility.test.ts`-dədir).
     const comments = await prisma.comment.findMany({
-      where: { authorId: member.userId, status: "ACTIVE" },
+      where: {
+        authorId: member.userId,
+        status: "ACTIVE",
+        post: {
+          status: "ACTIVE",
+          cohortId: { in: viewerSameClass.cohortIds },
+          // `PRIVATE` qəsdən kənardadır: baxan tərəf onu görmür.
+          visibility: { in: [Visibility.PUBLIC, Visibility.UNIVERSITY, Visibility.CLASS] },
+        },
+      },
       select: { postId: true },
+      orderBy: { id: "asc" },
       take: 1,
     });
 
-    if (comments.length === 0) return; // seed-də şərhi yoxdursa yoxlanacaq bir şey yoxdur
+    if (comments.length === 0) return; // seed-də uyğun şərh yoxdursa yoxlanacaq bir şey yoxdur
 
     const rows = await listComments(viewerSameClass, comments[0].postId);
     const mine = rows.filter((row) => row.author.id === member.userId);

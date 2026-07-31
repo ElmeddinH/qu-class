@@ -18,6 +18,8 @@ import { PrismaClient } from "@prisma/client";
 
 import { LANDING_SECTIONS, PUBLIC_NAV } from "../../src/layouts/nav";
 
+import { classOnlyPostText } from "./class-only-text";
+
 const prisma = new PrismaClient();
 
 test.afterAll(async () => {
@@ -124,38 +126,15 @@ test("başlıq iyerarxiyası pozulmur: h1-dən sonra h3 yoxdur", async ({ page }
 // ---------------------------------------------------------------------------
 
 /**
- * 🔴 YALNIZ CLASS PAYLAŞIMLARINDA olan mətn parçası.
+ * 🔴 YALNIZ CLASS PAYLAŞIMLARINDA olan mətn.
  *
- * ⚠️ SADƏCƏ «bir CLASS postun ilk 40 simvolu» KİFAYƏT ETMİR və bu, Blok 11A-da
- * ölçüldü: seed gövdələri sabit hovuzdan (`POST_BODIES[category]`) dövrə ilə
- * seçilir, yəni EYNİ mətn həm CLASS, həm də PUBLIC paylaşımda ola bilər.
- * Açılış səhifəsinə «Son xəbərlər» bloku gələnə qədər bu, gözə dəymirdi —
- * indi PUBLIC gövdələr səhifədə görünür və köhnə forma YALANDAN qırılır.
+ * Seçim məntiqi ORTAQ modula köçürüldü — eyni invariantı `public.spec.ts` də
+ * yoxlayır və needle qaydası iki yerdə saxlanılsa biri köhnəlir.
  *
- * Düzgün needle: anonim ziyarətçinin GÖRDÜYÜ heç bir paylaşımda OLMAYAN mətn.
+ * Blok 13B-də tapılan qüsur və düzəlişin izahı: `./class-only-text.ts`.
  */
 async function classOnlyBodyFragment(): Promise<string> {
-  const [classPosts, visiblePosts] = await Promise.all([
-    prisma.post.findMany({
-      where: { visibility: "CLASS", status: "ACTIVE", body: { not: null } },
-      orderBy: [{ createdAt: "desc" }],
-      select: { body: true },
-    }),
-    prisma.post.findMany({
-      where: { visibility: "PUBLIC", status: "ACTIVE", body: { not: null } },
-      select: { body: true },
-    }),
-  ]);
-
-  const publicBodies = visiblePosts.map((post) => post.body as string);
-
-  for (const post of classPosts) {
-    const fragment = (post.body as string).slice(0, 40);
-    if (fragment.length <= 20) continue;
-    if (!publicBodies.some((body) => body.includes(fragment))) return fragment;
-  }
-
-  throw new Error("seed-də yalnız CLASS-a məxsus paylaşım mətni tapılmadı");
+  return classOnlyPostText(prisma);
 }
 
 test("🔴 anonim brauzerdə seed-dəki CLASS paylaşımın mətni səhifədə YOXDUR", async ({

@@ -18,6 +18,8 @@ import { PrismaClient } from "@prisma/client";
 
 import { resolveStage } from "@/lib/stage";
 
+import { settleHeadings } from "./settle";
+
 const prisma = new PrismaClient();
 
 const SEED_PASSWORD = "Test1234!";
@@ -83,8 +85,20 @@ async function login(page: Page, email: string) {
   await page.waitForURL(/\/class\/|\/home/);
 }
 
-/** Səhifədəki widget başlıqlarını GÖRÜNMƏ SIRASI ilə qaytarır. */
+/**
+ * Səhifədəki widget başlıqlarını GÖRÜNMƏ SIRASI ilə qaytarır.
+ *
+ * 🔴 SUSPENSE AXINI GÖZLƏNİLİR — yoxsa test FLAKE olur (Blok 13B-də tutuldu).
+ * Class Page widget-ləri Suspense sərhədləri arxasında STREAM olunur: naviqasiya
+ * bitəndə `main` artıq mövcuddur, amma `h2`-lərin bir hissəsi hələ gəlməyib.
+ * `allInnerTexts()` həmin anda oxunsa siyahı NATAMAM gəlir və test «blok
+ * yoxdur» deyib qırılır. Ən ağır cohort (`maliyye-2022`) ən çox sınır.
+ *
+ * Gözləmə qaydası ortaq moduldadır: `./settle.ts`.
+ */
 async function widgetHeadings(page: Page): Promise<string[]> {
+  await settleHeadings(page);
+
   return page.locator("main h2").allInnerTexts();
 }
 

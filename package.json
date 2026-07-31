@@ -26,7 +26,9 @@
     "git:push": "node scripts/git-push.mjs",
     "audit:lighthouse": "tsx scripts/lighthouse-audit.ts",
     "audit:queries": "tsx scripts/query-profile.ts",
-    "audit:responsive": "tsx scripts/responsive-shots.ts"
+    "audit:responsive": "tsx scripts/responsive-shots.ts",
+    "shots:serve": "NODE_OPTIONS=\"--require ./scripts/freeze-clock.cjs\" next start -p 3100",
+    "shots": "tsx scripts/screenshots.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

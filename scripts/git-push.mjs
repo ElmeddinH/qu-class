@@ -19,6 +19,19 @@
 // İstifadə (token bash tarixçəsinə düşmür — `read -rs`):
 //   read -rsp "PAT: " GITHUB_TOKEN && export GITHUB_TOKEN \
 //     GITHUB_REPO=owner/qu-class && npm run git:push; unset GITHUB_TOKEN
+//
+// 🔴 TEQLƏR AVTOMATİK GETMİR — `--tags` REJİMİ (Blok 13B).
+// `git.push({ ref: "main" })` YALNIZ `refs/heads/main`-i göndərir. CLI `git
+// push`-un `--follow-tags` davranışı isomorphic-git-də YOXDUR: annotasiyalı teq
+// ayrıca obyektdir və ayrıca `git.push({ ref: "refs/tags/v1.0.0" })` çağırışı
+// tələb edir. Bunsuz teq lokal qalır, GitHub-da «Releases» boş görünür və
+// təhvil paketində buraxılış nöqtəsi olmur.
+//
+//   npm run git:push -- --tags        # branch + BÜTÜN teqlər
+//   npm run git:push -- --tag v1.0.0  # branch + YALNIZ bu teq
+//
+// ⚠️ Sıra pozulmur: əvvəl branch, SONRA teq. Əks halda teq uzaqda MÖVCUD
+// OLMAYAN commit-ə işarə edər və GitHub onu rədd edər.
 // ============================================================================
 
 import { spawnSync } from "node:child_process";
@@ -67,8 +80,84 @@ function runAuditGate() {
   console.log("────────────────────────────────────────────────────────────\n");
 }
 
+/**
+ * `--tags` / `--tag <ad>` bayraqlarını oxuyur.
+ *
+ * ⚠️ npm skripti vasitəsilə çağırılanda bayraqlar `--`-dan sonra gəlir
+ * (`npm run git:push -- --tags`); npm onları olduğu kimi ötürür, yəni əlavə
+ * ayrıştırma lazım deyil.
+ */
+function parseTagFlags(argv) {
+  const wanted = [];
+  let all = false;
+
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === "--tags") all = true;
+    else if (argv[i] === "--tag") {
+      const name = argv[i + 1];
+      if (!name || name.startsWith("-")) {
+        throw new Error("`--tag` bayrağından sonra teq adı gözlənilir (məs. --tag v1.0.0).");
+      }
+      wanted.push(name);
+      i += 1;
+    }
+  }
+
+  return { all, wanted };
+}
+
+/**
+ * Teqləri AYRICA push edir və hər birini uzaqdan OXUYUB təsdiqləyir.
+ *
+ * ⚠️ Annotasiyalı teq `refs/tags/<ad>` altında TAG OBYEKTİNƏ işarə edir,
+ * commit-ə yox — ona görə uzaq `oid` lokal `git.resolveRef()` nəticəsi ilə
+ * müqayisə olunur, `main`-in commit SHA-sı ilə YOX. Yüngül (lightweight) teqdə
+ * isə ikisi üst-üstə düşür; kod hər iki halda düzgün işləyir.
+ */
+async function pushTags(http, auth, url, names, token) {
+  if (names.length === 0) return;
+
+  console.log("");
+  console.log(`── Teqlər (${names.length}) ─────────────────────────────────────────`);
+
+  for (const name of names) {
+    const ref = `refs/tags/${name}`;
+    const localOid = await git.resolveRef({ ...repo, ref });
+
+    const result = await git.push({
+      ...repo,
+      http,
+      remote: "origin",
+      ref,
+      remoteRef: ref,
+      // 🔴 `force` teqlərdə DƏ false-dur. Uzaqdakı teqin üzərinə yazmaq
+      // buraxılışın mənasını dəyişər — «v1.0.0» artıq başqa koda işarə edər.
+      force: false,
+      ...auth,
+      onMessage: (message) => process.stdout.write(`  ${redact(message, token)}`),
+    });
+
+    if (result?.ok === false || result?.error) {
+      throw new Error(`${ref} rədd edildi: ${redact(result.error ?? "naməlum səbəb", token)}`);
+    }
+
+    const serverRefs = await git.listServerRefs({ http, url, prefix: "refs/tags/", ...auth });
+    const remote = serverRefs.find((entry) => entry.ref === ref);
+
+    if (!remote) throw new Error(`TƏSDİQ UĞURSUZ — uzaqda ${ref} tapılmadı.`);
+    if (remote.oid !== localOid) {
+      throw new Error(
+        `TƏSDİQ UĞURSUZ — uzaq ${ref} ${remote.oid.slice(0, 7)}, lokal ${localOid.slice(0, 7)}.`,
+      );
+    }
+
+    console.log(`  ✓ ${name}  ${localOid.slice(0, 7)}  (uzaqdan təsdiqləndi)`);
+  }
+}
+
 async function main() {
   // ── 1) Giriş dəyərləri ─────────────────────────────────────────────────────
+  const tagFlags = parseTagFlags(process.argv.slice(2));
   const token = process.env.GITHUB_TOKEN;
   if (!token) {
     console.error(
@@ -181,6 +270,19 @@ async function main() {
     );
   }
 
+  // ── 7) Teqlər — branch UĞURLA getdikdən SONRA ──────────────────────────────
+  // Sıra vacibdir: teq uzaqda mövcud olmayan commit-ə işarə edə bilməz.
+  const localTags = await git.listTags({ ...repo });
+  const tagNames = tagFlags.all ? localTags : tagFlags.wanted;
+
+  for (const name of tagFlags.wanted) {
+    if (!localTags.includes(name)) {
+      throw new Error(`Lokal teq tapılmadı: ${name}. Mövcudlar: ${localTags.join(", ") || "(yoxdur)"}`);
+    }
+  }
+
+  await pushTags(http, auth, url, tagNames, token);
+
   console.log("");
   console.log("┌─ PUSH TAMAMLANDI ──────────────────────────────────────────");
   console.log(`│ repo        https://github.com/${repoSlug}`);
@@ -188,6 +290,9 @@ async function main() {
   console.log(`│ commit      ${commits.length}`);
   console.log(`│ uzaq HEAD   ${remoteMain.oid}`);
   console.log(`│ təsdiq      uzaq main == lokal main ✓ (listServerRefs)`);
+  console.log(
+    `│ teq         ${tagNames.length > 0 ? `${tagNames.join(", ")} ✓` : "göndərilmədi (--tags / --tag verilməyib)"}`,
+  );
   console.log("└────────────────────────────────────────────────────────────");
 }
 

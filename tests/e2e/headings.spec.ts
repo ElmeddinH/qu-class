@@ -23,6 +23,8 @@ import { PrismaClient } from "@prisma/client";
 
 import { PUBLIC_PAGE_PATHS } from "../../src/lib/routes";
 
+import { settleHeadings } from "./settle";
+
 const prisma = new PrismaClient();
 
 const SEED_PASSWORD = "Test1234!";
@@ -130,6 +132,13 @@ function findLevelJump(headings: HeadingInfo[]): string | null {
  * Ona görə "ilk başlıq h1-dir" şərti `<main>` daxilində ölçülür.
  */
 async function assertHierarchy(page: Page, path: string) {
+  // 🔴 SUSPENSE AXINI GÖZLƏNİLİR — Blok 13B-də tutulan FLAKE.
+  // `page.goto()` `load` hadisəsində qayıdır, amma stream olunan widget-lərin
+  // başlıqları hələ gəlməmiş ola bilir; həmin anda `readHeadings` BOŞ massiv
+  // qaytarır və test «heç bir başlıq tapılmadı» deyib qırılır. İzah və niyə
+  // «skeleton sayı = 0» şərtinin işləmədiyi: `./settle.ts`.
+  await settleHeadings(page);
+
   const headings = await readHeadings(page, "document");
 
   expect(headings.length, `${path}: heç bir başlıq tapılmadı`).toBeGreaterThan(0);
@@ -176,6 +185,19 @@ test("ictimai səhifələrdə başlıq iyerarxiyası pozulmur", async ({ browser
     ];
 
     for (const path of paths) {
+      // 🔴 `/docs` KƏNARDADIR — `public.spec.ts`-dəki eyni istisna ilə üzbəüz.
+      //
+      // Səhifə Swagger UI-dir: bizim `<h1>API sənədləri</h1>`-dən sonra
+      // kitabxana hidrasiya zamanı ÖZ `<h1>`-ini (`QU CLASS API 0.1.0 OAS 3.0`)
+      // əlavə edir, yəni sənəddə iki birinci səviyyə başlıq olur. İyerarxiya
+      // `swagger-ui-dist`-in daxili şablonundadır — `src/components/ui/` kimi
+      // bizim nəzarətimizdə deyil.
+      //
+      // ⚠️ Blok 13B-yə qədər bu sətir SƏSSİZCƏ keçirdi, çünki yoxlama Swagger
+      // hidrasiyasından ƏVVƏL oxuyurdu. `settleHeadings()` gözləməni düzəldəndə
+      // vəziyyət göründü — yəni test əvvəl «yaşıl» deyil, ERKƏN idi.
+      if (path === "/docs") continue;
+
       await page.goto(path);
       await assertHierarchy(page, path);
     }

@@ -27,6 +27,8 @@ import { PUBLIC_PAGE_PATHS } from "../../src/lib/routes";
 import { FOOTER_NAV, PUBLIC_NAV } from "../../src/layouts/nav";
 import { LEGAL_PAGES } from "../../src/lib/content-routes";
 
+import { classOnlyPostText } from "./class-only-text";
+
 const prisma = new PrismaClient();
 
 const SEED_PASSWORD = "Test1234!";
@@ -197,27 +199,11 @@ test("🔴 anonim ictimai səhifələrdə seed-dəki CLASS paylaşımın mətni 
   // (`POST_BODIES[category]`) dövrə ilə seçilir, yəni eyni mətn həm CLASS, həm
   // PUBLIC paylaşımda ola bilər. «Bir CLASS postun ilk cümləsi» götürülsəydi
   // test PUBLIC nüsxəni görüb YALANDAN qırılardı — sızma olmadığı halda.
-  const [classPosts, publicPosts] = await Promise.all([
-    prisma.post.findMany({
-      where: { visibility: "CLASS", status: "ACTIVE", body: { not: null } },
-      select: { body: true },
-    }),
-    prisma.post.findMany({
-      where: { visibility: "PUBLIC", status: "ACTIVE", body: { not: null } },
-      select: { body: true },
-    }),
-  ]);
-
-  const publicBodies = publicPosts.map((post) => post.body as string);
-
-  const needle = classPosts
-    .map((post) => (post.body as string).split(/[.!?\n]/)[0].trim().slice(0, 60))
-    .find(
-      (candidate) =>
-        candidate.length > 20 && !publicBodies.some((body) => body.includes(candidate)),
-    );
-
-  expect(needle, "yalnız CLASS-a məxsus mətn tapılmadı").toBeTruthy();
+  //
+  // ⚠️ Blok 13B: BAŞ fraqment bu şərti təzə seed-də HEÇ VAXT ödəmir (gövdələr
+  // eyni cümlə ilə başlayır) — seçim ortaq modula köçürüldü və TAM gövdə
+  // üzərindən aparılır. İzah: `./class-only-text.ts`.
+  const needle = await classOnlyPostText(prisma);
 
   const { page, close } = await anonymousPage(browser);
 
@@ -225,7 +211,7 @@ test("🔴 anonim ictimai səhifələrdə seed-dəki CLASS paylaşımın mətni 
     for (const path of ["/", "/events", "/khankendi", `/khankendi/${placeId}`]) {
       await page.goto(path);
       const content = await page.content();
-      expect(content.includes(needle!), `${path} səhifəsində CLASS post mətni var`).toBe(
+      expect(content.includes(needle), `${path} səhifəsində CLASS post mətni var`).toBe(
         false,
       );
     }

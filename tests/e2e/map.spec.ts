@@ -435,7 +435,16 @@ test("razılıq bildirişi və «sənin məlumatın…» sətri görünür", asy
   await expect(participation).toHaveText(/iştirak (edir|etmir)/);
 
   // Gizlədilmiş qrupların səbəbi AÇIQ yazılır (səssizcə atılmır).
-  await expect(page.getByText(/nəfərdən az olan qruplar məxfilik üçün/)).toBeVisible();
+  //
+  // ⚠️ Blok 13B — STRICT MODE POZUNTUSU. Qısa `/nəfərdən az olan qruplar
+  // məxfilik üçün/` şablonu İKİ elementə düşür: izah abzasına VƏ diaqram
+  // əfsanəsindəki «Açıqlanmayan · N — 3 nəfərdən…» sətrinə. Əfsanə sətri
+  // yalnız gizlədilmiş səbət MÖVCUD olanda render olunur, yəni test bazadakı
+  // paylanmadan asılı olaraq bəzən keçib bəzən qırılırdı. Şablon izah
+  // cümləsinin SONUNA qədər uzadılır — əfsanə sətrində o davam yoxdur.
+  await expect(
+    page.getByText(/nəfərdən az olan qruplar məxfilik üçün «Açıqlanmayan» sətrinə/),
+  ).toBeVisible();
 
   // Razılığı dəyişmək üçün birbaşa yol var.
   await expect(page.getByRole("link", { name: /Karyera məlumatım/ })).toHaveAttribute(
