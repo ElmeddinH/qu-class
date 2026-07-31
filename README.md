@@ -39,8 +39,11 @@ Lighthouse desktop **100/100/100/100** (5 səhifə) · WCAG 2.2 AA qapısı bağ
 > **[ Demo GIF buraya əlavə olunacaq ]**
 > `docs/media/demo.gif` — Blok 13B
 
+🎬 **Canlı demo ssenarisi** (8 dəqiqə, dəqiqə-dəqiqə): [`docs/DEMO.md`](docs/DEMO.md)
+
 **Sənədlər:** [Arxitektura](docs/ARCHITECTURE.md) · [Qərarlar jurnalı](docs/DECISIONS.md) ·
-[Təhlükəsizlik](docs/SECURITY.md) · [İcra planı](PLAN.md) · [İş qaydaları](CLAUDE.md)
+[Təhlükəsizlik](docs/SECURITY.md) · [Müdafiə S&C](docs/DEFENSE-QA.md) ·
+[Rəqəmlər](docs/METRICS.md) · [İcra planı](PLAN.md) · [İş qaydaları](CLAUDE.md)
 
 ---
 
@@ -655,6 +658,9 @@ bağlanmalı siyahı).
 
 | Fayl | Nə var |
 |---|---|
+| [`docs/DEMO.md`](docs/DEMO.md) | **8 dəqiqəlik canlı demo ssenarisi** — dəqiqə-dəqiqə addımlar, danışıq mətni, «əvvəlcədən hazırla» siyahısı və «nəyi göstərmə» qadağan siyahısı |
+| [`docs/DEFENSE-QA.md`](docs/DEFENSE-QA.md) | **Müdafiə sual-cavabı** — 25 ehtimal olunan sual, kod istinadı ilə qısa cavablar; zəif nöqtələr dürüst yazılıb |
+| [`docs/METRICS.md`](docs/METRICS.md) | **Layihənin real rəqəmləri** — fayl, sətir, model, endpoint, test, commit; hər rəqəmin yanında ölçmə əmri |
 | [`docs/GW-COMPARISON.md`](docs/GW-COMPARISON.md) | **GW müqayisəsi** — 17 modul × 4 ölçü, 14 əlavənin kodda təsdiqlənmiş vəziyyəti, 6 qəsdli imtinanın səbəbi. Müdafiə materialı |
 | [`CHANGELOG.md`](CHANGELOG.md) | Blok-blok tarixçə — 35 commit mənalı qruplarda |
 | [`docs/screenshots/`](docs/screenshots/README.md) | 17 ekran görüntüsü + çəkiliş parametrləri və şəxsi məlumat yoxlamasının nəticəsi |
