@@ -12,6 +12,9 @@
 // Hər ikisi səssiz səhvdir — ona görə forma testlə bərkidilir.
 // ============================================================================
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { SESSION_COOKIE_NAME } from "@/auth.config";
@@ -437,5 +440,17 @@ describe("nümunələr (example)", () => {
 
     const parsed = RegisterBodySchema.shape.admissionYear.safeParse(example);
     expect(parsed.success, `nümunə «${String(example)}» doğrulamadan keçmir`).toBe(true);
+  });
+});
+
+describe("docs/openapi.json drift qoruyucusu", () => {
+  it("🔴 repodakı statik snapshot buildOpenApiDocument() ilə eynidir", () => {
+    const snapshotPath = join(process.cwd(), "docs", "openapi.json");
+    const snapshot = readFileSync(snapshotPath, "utf-8");
+
+    expect(
+      snapshot,
+      "`docs/openapi.json` kodla üst-üstə düşmür — `npm run docs:openapi` işlədib yenidən commit et.",
+    ).toBe(`${JSON.stringify(document, null, 2)}\n`);
   });
 });

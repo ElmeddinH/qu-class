@@ -472,6 +472,18 @@ Aktivlər `predev` / `prebuild` hook-ları ilə `public/swagger/`-ə köçürül
 ([`src/lib/api/openapi.ts`](src/lib/api/openapi.ts)), yəni əl ilə yazılmış YAML
 köhnələ bilmir.
 
+**Sənədi görməyin üç yolu:**
+
+| Nə lazımdır | Hansı yol | Nə tələb edir |
+|---|---|---|
+| Layihəni qaldırmadan, təkcə repo | [`docs/openapi.json`](docs/openapi.json) | Heç nə — fayl repoda hazır, mətn redaktoru kifayətdir |
+| Vizual, validasiya edilmiş baxış | [editor.swagger.io](https://editor.swagger.io) → File ▸ Import file → `docs/openapi.json` | Brauzer, internet (editor.swagger.io özü) |
+| İnteraktiv, «Try it out» ilə canlı sorğu | `/docs` | Layihə işləməlidir (`npm run dev`) |
+
+⚠️ `docs/openapi.json` **statik snapshot-dır**, mənbə deyil — `npm run docs:openapi`
+ilə `buildOpenApiDocument()`-dan yenidən generasiya olunur. Kod dəyişib fayl
+yenilənməzsə `src/lib/api/openapi.test.ts`-dəki drift testi qırmızıya düşür.
+
 **34 route · 33 sənədləşmiş əməliyyat:**
 
 | Sahə | Say | Nümunə |

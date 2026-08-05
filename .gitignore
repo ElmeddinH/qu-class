@@ -72,3 +72,10 @@ next-env.d.ts
 # Bunlar audit artefaktı deyil, README QALEREYASIDIR: GitHub-da səhifə onlarsız
 # boş çərçivələrlə açılır. Ölçü fərqi də qərarı asanlaşdırır — 17 fayl ≈ 2.5 MB,
 # `docs/responsive/` isə 50 fayl ≈ 34 MB. `npm run shots` ilə yenidən yaradılır.
+
+# ⚠️ `docs/openapi.json` QƏSDƏN İGNORE EDİLMİR (Sprint 2).
+# Digər `docs/` artefaktlarından FƏRQLİ olaraq bunun bütün məqsədi layihəni
+# QALDIRMADAN görünməkdir — Swagger UI (`/docs`) və `/api/v1/openapi.json`
+# yalnız server işləyəndə mövcuddur, yoxlayıcı isə repoya baxıb sənədi
+# görməlidir. `npm run docs:openapi` ilə yenidən generasiya olunur (Zod
+# sxemlərindən törəyir); drift-i `src/lib/api/openapi.test.ts` tutur.
