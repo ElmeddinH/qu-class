@@ -1,6 +1,22 @@
 // ============================================================================
 // src/lib/api/rate-limit.ts
-// Login cəhdlərinin sadə sayğacı — `POST /api/v1/auth/login` üçün.
+// Sabit pəncərəli (fixed window) sayğaclar — `/api/v1` üçün.
+//
+// İKİ İSTİFADƏÇİ VAR və onların SAYMA QAYDASI FƏRQLİDİR:
+//
+//   1. LOGIN (`checkLoginRate` · `recordFailedLogin`) — YALNIZ UĞURSUZ cəhd
+//      sayılır, uğurlu giriş sayğacı sıfırlayır. Hədəf: parol təxmini.
+//
+//   2. YAZMA (`consumeWriteRate`, Blok 14B) — HƏR sorğu sayılır, uğurlu da.
+//      Hədəf spam-dır: 500 uğurlu paylaşım da eyni dərəcədə zərərlidir və
+//      "uğursuzluğu" olmayan əməliyyatda uğursuzluq saymağın mənası yoxdur.
+//      Ona görə yoxlama və artırma TƏK çağırışdadır (`consume`), login-dəki
+//      iki addımlı (`check` + `record`) nümunə TƏKRARLANMIR.
+//
+// 🔴 LİMİTSİZ YAZMA ENDPOINT-İ SPAM QAPISIDIR. `POST` / `PATCH` / `DELETE`
+// hər biri transaksiya, bildiriş yayımı və (silmədə) audit sətri deməkdir —
+// yəni bir sorğu onlarla sətir yaradır. Bu, "gözəl olardı" deyil, sənədləşmiş
+// təhlükəsizlik tələbidir; aşan sorğu 429 + `Retry-After` alır.
 //
 // 🔴 MƏHDUDİYYƏT AÇIQ YAZILIR: sayğac MODUL SƏVİYYƏSİNDƏ `Map`-dir, yəni
 // YALNIZ BİR Node prosesi üçün işləyir. İki instans (horizontal scale,
@@ -21,6 +37,8 @@
 // düzgün şifrə ilə 5 dəfə daxil olan istifadəçi bloklanardı.
 // ============================================================================
 
+import { fail } from "./respond";
+
 /** Pəncərə: 10 dəqiqə. */
 export const LOGIN_WINDOW_MS = 10 * 60 * 1000;
 
@@ -33,7 +51,37 @@ interface Bucket {
   resetAt: number;
 }
 
+/**
+ * Sayğac anbarları AYRIDIR, tək `Map` + prefiks DEYİL.
+ *
+ * ⚠️ `loginAttemptKey` `«e-poçt|IP»` qaytarır və bu forma testlərdə bərkidilib.
+ * Yazma açarı isə `«userId|əhatə»`-dir — eyni `Map`-də saxlasaydıq
+ * `ali@qu.edu.az|10.0.0.1` ilə hipotetik bir `userId|scope` açarı toqquşa
+ * bilərdi. İki anbar həm də hər sayğacın ayrıca sıfırlanmasına imkan verir
+ * (testlərdə biri digərini pozmur).
+ */
 const buckets = new Map<string, Bucket>();
+const writeBuckets = new Map<string, Bucket>();
+
+/**
+ * Sabit pəncərə məntiqinin ORTAQ nüvəsi — hər iki sayğac bunu işlədir.
+ * Bitmiş xana silinir ki, `Map` sonsuz böyüməsin.
+ */
+function readBucket(
+  store: Map<string, Bucket>,
+  key: string,
+  now: number,
+): Bucket | null {
+  const bucket = store.get(key);
+  if (!bucket) return null;
+
+  if (bucket.resetAt <= now) {
+    store.delete(key);
+    return null;
+  }
+
+  return bucket;
+}
 
 /**
  * Sayğac açarı. E-poçt normallaşdırılmış GƏLMƏLİDİR (`normalizeEmail`),
@@ -72,13 +120,8 @@ export interface RateLimitVerdict {
  * Uğursuz cəhddən sonra `recordFailedLogin()` çağırılır.
  */
 export function checkLoginRate(key: string, now: number = Date.now()): RateLimitVerdict {
-  const bucket = buckets.get(key);
-
   // Pəncərə bitibsə xana silinir — Map sonsuz böyüməsin.
-  if (bucket && bucket.resetAt <= now) {
-    buckets.delete(key);
-    return { allowed: true, retryAfterSeconds: 0, remaining: LOGIN_MAX_ATTEMPTS };
-  }
+  const bucket = readBucket(buckets, key, now);
 
   if (!bucket) {
     return { allowed: true, retryAfterSeconds: 0, remaining: LOGIN_MAX_ATTEMPTS };
@@ -108,9 +151,9 @@ export function checkLoginRate(key: string, now: number = Date.now()): RateLimit
  * şifrəni sonradan yazan istifadəçi də gözləməli olardı.
  */
 export function recordFailedLogin(key: string, now: number = Date.now()): void {
-  const bucket = buckets.get(key);
+  const bucket = readBucket(buckets, key, now);
 
-  if (!bucket || bucket.resetAt <= now) {
+  if (!bucket) {
     buckets.set(key, { count: 1, resetAt: now + LOGIN_WINDOW_MS });
     return;
   }
@@ -126,4 +169,105 @@ export function clearLoginAttempts(key: string): void {
 /** Yalnız TEST üçün: qlobal vəziyyəti sıfırlayır. */
 export function resetLoginRateLimiter(): void {
   buckets.clear();
+}
+
+// ---------------------------------------------------------------------------
+// YAZMA sayğacı (Blok 14B) — POST / PATCH / DELETE
+// ---------------------------------------------------------------------------
+
+/** Yazma pəncərəsi: 1 dəqiqə. */
+export const WRITE_WINDOW_MS = 60 * 1000;
+
+/**
+ * Bir pəncərədə icazə verilən yazma sayı.
+ *
+ * ⚠️ Rəqəm REAL istifadəyə görə seçilib, "təhlükəsiz görünsün" deyə yox:
+ * kompozitorda ardıcıl bir neçə paylaşım etmək və səthləri düzəltmək normaldır
+ * (yaz → bayrağı aç → fikrini dəyiş → sil). 20 sorğu/dəqiqə insanı narahat
+ * etmir, skriptli spam-ı isə dərhal kəsir.
+ */
+export const WRITE_MAX_REQUESTS = 20;
+
+/**
+ * Yazma sayğacının açarı.
+ *
+ * 🔴 Açar `userId`-dir, IP DEYİL — login-dən fərqli olaraq bu endpoint-lər
+ * QORUNANDIR (`withUser`), yəni kimliyi onsuz da bilirik. IP işlətsəydik
+ * universitet şəbəkəsində (NAT) bir tələbənin aktivliyi bütün kampusu
+ * bloklayardı; `userId` isə saxtalaşdırıla bilməz (JWT imzalıdır),
+ * `x-forwarded-for` isə bilər.
+ *
+ * `scope` ayrı büdcə yaradır: 14C-də memories / events öz açarını verəcək və
+ * paylaşım limiti onların limitini yeməyəcək.
+ */
+export function writeRateKey(userId: string, scope: string): string {
+  return `${userId}|${scope}`;
+}
+
+/**
+ * Yazma cəhdini SAYIR və nəticəni qaytarır.
+ *
+ * ⚠️ Login-dəki `check` + `record` ayrılığı BURADA YOXDUR və bu, qəsdəndir:
+ * yazmada "uğursuz cəhd" anlayışı yoxdur — hər qəbul edilmiş sorğu resurs
+ * xərcləyir. Tək çağırış həm də iki addım arasında qalan yarışı (eyni anda
+ * gələn iki sorğunun ikisi də `check`-dən keçməsi) aradan qaldırır.
+ *
+ * ⚠️ Hədd AŞILANDA da sayğac artmır: əks halda blok müddəti hər cəhddə
+ * uzanardı (sürüşən pəncərə davranışı) və istifadəçi heç vaxt çıxa bilməzdi.
+ */
+export function consumeWriteRate(
+  key: string,
+  now: number = Date.now(),
+): RateLimitVerdict {
+  const bucket = readBucket(writeBuckets, key, now);
+
+  if (!bucket) {
+    writeBuckets.set(key, { count: 1, resetAt: now + WRITE_WINDOW_MS });
+    return {
+      allowed: true,
+      retryAfterSeconds: 0,
+      remaining: WRITE_MAX_REQUESTS - 1,
+    };
+  }
+
+  if (bucket.count >= WRITE_MAX_REQUESTS) {
+    return {
+      allowed: false,
+      retryAfterSeconds: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)),
+      remaining: 0,
+    };
+  }
+
+  bucket.count += 1;
+  return {
+    allowed: true,
+    retryAfterSeconds: 0,
+    remaining: WRITE_MAX_REQUESTS - bucket.count,
+  };
+}
+
+/**
+ * Route qapısı: hədd aşılıbsa hazır 429 cavabı, yoxsa `null`.
+ *
+ * `Retry-After` MƏCBURİDİR — onsuz müştəri nə vaxt təkrarlayacağını bilmir və
+ * praktikada dərhal yenidən vurur (RFC 9110 §10.2.3).
+ *
+ * ```ts
+ * const limited = enforceWriteRate(viewer.userId, "posts");
+ * if (limited) return limited;
+ * ```
+ */
+export function enforceWriteRate(userId: string, scope: string): Response | null {
+  const verdict = consumeWriteRate(writeRateKey(userId, scope));
+  if (verdict.allowed) return null;
+
+  return fail("TOO_MANY_REQUESTS", {
+    message: "Çox sayda yazma sorğusu göndərdiniz. Bir azdan yenidən cəhd edin.",
+    headers: { "retry-after": String(verdict.retryAfterSeconds) },
+  });
+}
+
+/** Yalnız TEST üçün: yazma sayğacını sıfırlayır. */
+export function resetWriteRateLimiter(): void {
+  writeBuckets.clear();
 }

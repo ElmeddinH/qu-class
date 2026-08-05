@@ -83,6 +83,12 @@ import {
   CohortHeaderSchema,
   ContentPageDetailSchema,
   ContentPageSchema,
+  CreateEventBodySchema,
+  CreateMemoryBodySchema,
+  CreatePostBodySchema,
+  CreatedEventSchema,
+  CreatedMemorySchema,
+  CreatedPostSchema,
   DirectoryEntrySchema,
   EventSchema,
   FacultyCatalogSchema,
@@ -103,6 +109,9 @@ import {
   SessionSchema,
   SupportOfferEntrySchema,
   TimelineItemSchema,
+  UpdateEventBodySchema,
+  UpdateMemoryBodySchema,
+  UpdatePostBodySchema,
   ViewerCohortSchema,
   WhereAreWeNowSchema,
   YearbookEntrySchema,
@@ -129,7 +138,30 @@ export const API_TAGS = [
       "Sinif (class page) məzmunu. Hər cavab `visibilityWhere(viewer)` " +
       "süzgəcindən keçir — icazəsiz sinif üçün 404 qaytarılır, 403 YOX.",
   },
-  { name: "Events", description: "Tədbirlər və Reunion." },
+  {
+    name: "Posts",
+    description:
+      "Paylaşımın TAM həyat dövrü: yaradılma, tək oxu, səthlərin yenilənməsi, " +
+      "silinmə. 🔴 Lentin SİYAHISI qəsdən `Cohorts` taqındadır — o, sinif " +
+      "səthidir və `{slug}` ilə əhatələnir; burada isə paylaşımın ÖZÜ resursdur " +
+      "(`/posts/{id}`) və inteqrasiya yazan adam CRUD-un dörd addımını bir " +
+      "bölmədə görür.",
+  },
+  {
+    name: "Memories",
+    description:
+      "Xatirənin TAM həyat dövrü: yaradılma, tək oxu, qismən yenilənmə, " +
+      "silinmə [M9]. 🔴 Sinfin xatirə SİYAHISI qəsdən `Cohorts` taqındadır — o, " +
+      "sinif səthidir və `{slug}` ilə əhatələnir; burada isə xatirənin ÖZÜ " +
+      "resursdur (`/memories/{id}`) və `Posts` taqı ilə eyni məntiq işləyir.",
+  },
+  {
+    name: "Events",
+    description:
+      "Tədbirlər və Reunion. Yazma əməliyyatları (`POST` / `PATCH` / `DELETE`) " +
+      "🔴 İKİ QAPIDAN keçir: görünürlük (görməyənə 404) və İDARƏETMƏ rolu " +
+      "(`EVENT_MANAGER_ROLES` — görüb idarə etməyənə 403).",
+  },
   {
     name: "Notifications",
     description:
@@ -191,8 +223,11 @@ const FORBIDDEN_403 = errorResponse(
 );
 
 const RATE_LIMIT_429 = errorResponse(
-  "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) " +
-    "bildirir.",
+  "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) " +
+    "bildirir.\n\n" +
+    "⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır " +
+    "(10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır " +
+    "(1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
 );
 
 const UNSUPPORTED_415 = errorResponse(
@@ -247,6 +282,22 @@ const SlugParams = z.object({
 
 const EventIdParams = z.object({
   id: pathField(z.string(), "Tədbirin `id`-si."),
+});
+
+const MemoryIdParams = z.object({
+  id: pathField(
+    z.string(),
+    "Xatirənin `id`-si — sinif siyahısından və ya yaratma cavabındakı " +
+      "`Location` başlığından götürülür.",
+  ),
+});
+
+const PostIdParams = z.object({
+  id: pathField(
+    z.string(),
+    "Paylaşımın `id`-si — lent cavabından və ya yaratma cavabındakı " +
+      "`Location` başlığından götürülür.",
+  ),
 });
 
 /** Səhifə nömrəsi — dörd siyahı endpoint-inin hamısında eyni. */
@@ -991,6 +1042,360 @@ path({
   responses: {
     200: jsonResponse("Tədbir.", envelope(EventSchema, "EventResponse")),
     ...commonResponses({ isPublic: true }),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Posts — CRUD (Blok 14B)
+//
+// 🔴 NİYƏ REST YAZMA ƏMƏLİYYATLARI VAR, HALBUKİ UI SERVER ACTION İŞLƏDİR:
+// hər iki səth EYNİ servis funksiyalarını (`createPost` · `updatePostSurfaces`
+// · `deletePost`) çağırır. Məntiq dublikat DEYİL — fərq yalnız NƏQLİYYATDADIR:
+// forma üçün Server Action (progressive enhancement, `revalidatePath`),
+// xarici inteqrasiya üçün isə sənədləşmiş HTTP müqaviləsi.
+//
+// ⚠️ Bütün yazma əməliyyatları sayğacdan keçir (429 sənədlidir) və `POST`/
+// `PATCH` üçün `Content-Type: application/json` MƏCBURİDİR (415). `DELETE`-də
+// 415 YOXDUR — gövdəsi yoxdur və brauzer `<form>`-u `DELETE` göndərə bilmir,
+// yəni məzmun tipi qorumaya heç nə əlavə etmir.
+// ---------------------------------------------------------------------------
+
+path({
+  method: "post",
+  path: "/api/v1/cohorts/{slug}/posts",
+  operationId: "createCohortPost",
+  tags: ["Posts"],
+  summary: "Sinifdə yeni paylaşım açır",
+  description:
+    "Paylaşım YOLDAKI sinfə yazılır — gövdədə `cohortId` YOXDUR. Üzv " +
+    "olmadığın sinif üçün cavab **404**-dür (403 YOX): sinfin mövcudluğu da " +
+    "məlumatdır.\n\n" +
+    "Səthlərə yayılma TƏK TRANSAKSİYADADIR: `showOnTimeline` → " +
+    "`TimelineEntry`, `showInAchievements` → `Achievement` (status " +
+    "`SUBMITTED`), sinif yoldaşlarına `Notification`. `PRIVATE` paylaşımda " +
+    "bildiriş göndərilmir — məzmunu görməyənə «yeni paylaşım var» demək özü " +
+    "sızmadır.\n\n" +
+    "⚠️ `media[].url` yalnız `/uploads/…` ola bilər (`POST /api/upload` " +
+    "cavabı). Xarici ünvan SƏSSİZCƏ atılır, xəta verilmir — lent kartı başqa " +
+    "saytdan şəkil çəkməməlidir.\n\n" +
+    "⚠️ `occurredAt` SƏTİRDİR (`2026-09-02T09:00`), `Date` deyil — eyni sxem " +
+    "brauzer formasında da işlənir və `z.coerce` sahə tiplərini dağıdardı.\n\n" +
+    "201 cavabında `Location` başlığı yaradılan resursun ünvanını verir.",
+  security: SECURED,
+  request: {
+    params: SlugParams,
+    body: { required: true, content: { [JSON_MEDIA]: { schema: CreatePostBodySchema } } },
+  },
+  responses: {
+    201: jsonResponse(
+      "Paylaşım yaradıldı. `Location` başlığı `/api/v1/posts/{id}`-dir.",
+      envelope(CreatedPostSchema, "CreatedPostResponse"),
+    ),
+    ...commonResponses(),
+    415: UNSUPPORTED_415,
+  },
+});
+
+path({
+  method: "get",
+  path: "/api/v1/posts/{id}",
+  operationId: "getPost",
+  tags: ["Posts"],
+  summary: "Tək paylaşım",
+  description:
+    "🔴 Görünməyən paylaşım üçün **404** — 403 YOX. Başqa sinfin `CLASS` " +
+    "paylaşımı üçün 403 qaytarsaydıq, «bu `id`-də nəsə var» faktı sızardı.\n\n" +
+    "⚠️ Anonim sorğu da qəbul olunur: `PUBLIC` paylaşım giriş etməmiş " +
+    "ziyarətçiyə açıqdır. Filtr DB səviyyəsindədir (`activeVisibleWhere`), " +
+    "cavab JS-də süzülmür.",
+  request: { params: PostIdParams },
+  responses: {
+    200: jsonResponse("Paylaşım.", envelope(FeedPostSchema, "FeedPostResponse")),
+    ...commonResponses({ isPublic: true }),
+  },
+});
+
+path({
+  method: "patch",
+  path: "/api/v1/posts/{id}",
+  operationId: "updatePostSurfaces",
+  tags: ["Posts"],
+  summary: "Paylaşımın səthlərini dəyişir",
+  description:
+    "QİSMƏN yeniləmə: göndərilməyən bayraq DƏYİŞMİR. Ona görə `PUT` deyil, " +
+    "`PATCH` — əməliyyat paylaşımın yalnız bir alt çoxluğuna (harada " +
+    "göründüyünə) toxunur, mətnə və mediaya YOX.\n\n" +
+    "🔴 Səthləri YALNIZ MÜƏLLİF idarə edir. Sinif yoldaşı (moderator da) " +
+    "**403** alır — bu, redaktədir, moderasiya əməliyyatı deyil. Paylaşımı " +
+    "GÖRMƏYƏN isə 403 yox, **404** alır: mövcudluq faktı sızmır.\n\n" +
+    "⚠️ `showInAchievements` ilk dəfə açılırsa `achievement` obyekti " +
+    "MƏCBURİDİR (`Achievement.title` / `.category` / `.awardedAt` sxemdə " +
+    "nullable deyil) — çatışmasa 422. Bayraq bağlananda nailiyyət SİLİNMİR, " +
+    "`ARCHIVED` olur: təsdiq tarixçəsi qalmalıdır.\n\n" +
+    "Cavab YENİLƏNMİŞ paylaşımdır — ikinci `GET` lazım deyil.",
+  security: SECURED,
+  request: {
+    params: PostIdParams,
+    body: { required: true, content: { [JSON_MEDIA]: { schema: UpdatePostBodySchema } } },
+  },
+  responses: {
+    200: jsonResponse(
+      "Yenilənmiş paylaşım.",
+      envelope(FeedPostSchema, "UpdatedPostResponse"),
+    ),
+    ...commonResponses(),
+    415: UNSUPPORTED_415,
+  },
+});
+
+path({
+  method: "delete",
+  path: "/api/v1/posts/{id}",
+  operationId: "deletePost",
+  tags: ["Posts"],
+  summary: "Paylaşımı silir",
+  description:
+    "İcazə: MÜƏLLİF və ya həmin sinfin moderatoru. Moderasiya yolu ilə " +
+    "silinirsə `AuditLog` sətri MƏCBURİDİR və eyni transaksiyada yazılır.\n\n" +
+    "⚠️ Silmə SOFT-dur (`status = DELETED`), yəni `onDelete: Cascade` İŞƏ " +
+    "DÜŞMÜR: xronologiya qeydi həmin transaksiyada AÇIQ şəkildə silinir, " +
+    "nailiyyət isə `ARCHIVED` olur. Müştəri üçün nəticə eynidir — resurs " +
+    "artıq qaytarılmır.\n\n" +
+    "⚠️ İdempotent DEYİL: ikinci `DELETE` **404** verir.\n\n" +
+    "⚠️ Gövdə yoxdur, ona görə `Content-Type` da tələb olunmur (415 yoxdur). " +
+    "Brauzer `<form>`-u `DELETE` göndərə bilmir — cross-site risk onsuz da " +
+    "mövcud deyil.",
+  security: SECURED,
+  request: { params: PostIdParams },
+  responses: {
+    204: { description: "Silindi. Gövdə YOXDUR (204 cavabın gövdəsi ola bilməz)." },
+    ...commonResponses(),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Memories — CRUD (Blok 14C)
+//
+// 🔴 ŞABLON 14B-DƏNDİR, YENİ QƏRAR YOXDUR: yaratma sinif yolundadır
+// (`/cohorts/{slug}/memories`), qalan üç əməliyyat resursun öz ünvanındadır
+// (`/memories/{id}`). Hər yazma əməliyyatı sayğacdan keçir (429) və `POST` /
+// `PATCH` üçün `Content-Type: application/json` MƏCBURİDİR (415); `DELETE`-də
+// 415 yoxdur — gövdəsi yoxdur.
+// ---------------------------------------------------------------------------
+
+path({
+  method: "post",
+  path: "/api/v1/cohorts/{slug}/memories",
+  operationId: "createCohortMemory",
+  tags: ["Memories"],
+  summary: "Sinifdə yeni xatirə yazır",
+  description:
+    "Xatirə YOLDAKI sinfə yazılır — gövdədə `cohortId` YOXDUR. Üzv olmadığın " +
+    "sinif üçün cavab **404**-dür (403 YOX): sinfin mövcudluğu da məlumatdır.\n\n" +
+    "🔴 `showInTimeline` YALNIZ `showInFeed` açıq olduqda `true` ola bilər — " +
+    "əks halda **422** (`TIMELINE_REQUIRES_FEED`). Səbəb sxemdədir: " +
+    "`TimelineEntry`-də Memory-yə FK YOXDUR, yəni xatirə xronologiyaya ANCAQ " +
+    "bağlı Post vasitəsilə düşür. Qayda İKİ QAT tətbiq olunur (Zod + servis) və " +
+    "heç biri route-da təkrarlanmır.\n\n" +
+    "Səthlərə yayılma TƏK TRANSAKSİYADADIR: `showInFeed` → `Post` " +
+    "(kind: MEMORY, eyni görünürlük), `showInTimeline` → `TimelineEntry`.\n\n" +
+    "⚠️ `imageUrl` yalnız `/uploads/…` ola bilər (`POST /api/upload` cavabı); " +
+    "xarici ünvan SƏSSİZCƏ atılır — kart başqa saytdan şəkil çəkməməlidir.\n\n" +
+    "⚠️ `occurredAt` SƏTİRDİR (`2026-11-05T20:00`), `Date` deyil — eyni sxem " +
+    "brauzer formasında da işlənir.",
+  security: SECURED,
+  request: {
+    params: SlugParams,
+    body: { required: true, content: { [JSON_MEDIA]: { schema: CreateMemoryBodySchema } } },
+  },
+  responses: {
+    201: jsonResponse(
+      "Xatirə yaradıldı. `Location` başlığı `/api/v1/memories/{id}`-dir.",
+      envelope(CreatedMemorySchema, "CreatedMemoryResponse"),
+    ),
+    ...commonResponses(),
+    415: UNSUPPORTED_415,
+  },
+});
+
+path({
+  method: "get",
+  path: "/api/v1/memories/{id}",
+  operationId: "getMemory",
+  tags: ["Memories"],
+  summary: "Tək xatirə",
+  description:
+    "🔴 Görünməyən xatirə üçün **404** — 403 YOX. Başqa sinfin `CLASS` " +
+    "xatirəsi üçün 403 qaytarsaydıq «bu `id`-də nəsə var» faktı sızardı.\n\n" +
+    "⚠️ Anonim sorğu da qəbul olunur: `PUBLIC` xatirə Xankəndi bələdçisi " +
+    "səhifəsində onsuz da ictimaidir. Filtr DB səviyyəsindədir " +
+    "(`activeVisibleWhere` + `status ≠ DELETED`).",
+  request: { params: MemoryIdParams },
+  responses: {
+    200: jsonResponse("Xatirə.", envelope(MemorySchema, "MemoryResponse")),
+    ...commonResponses({ isPublic: true }),
+  },
+});
+
+path({
+  method: "patch",
+  path: "/api/v1/memories/{id}",
+  operationId: "updateMemory",
+  tags: ["Memories"],
+  summary: "Xatirəni qismən yeniləyir",
+  description:
+    "QİSMƏN yeniləmə: göndərilməyən sahə DƏYİŞMİR. Ona görə `PUT` deyil, " +
+    "`PATCH` — müştəri bütöv xatirəni göndərməyə məcbur deyil, cari dəyərlər " +
+    "serverdə birləşdirilir.\n\n" +
+    "🔴 Redaktə YALNIZ MÜƏLLİFİNDİR. Sinif yoldaşı (moderator da) **403** alır " +
+    "— moderator məzmunu SİLƏ bilər, amma başqasının xatirəsini yazmaq redaktə " +
+    "deyil, saxtakarlıq olardı. Xatirəni GÖRMƏYƏN isə 403 yox, **404** alır.\n\n" +
+    "🔴 `showInTimeline` BİRLƏŞMİŞ nəticədə `showInFeed` olmadan qalırsa " +
+    "**422** (`TIMELINE_REQUIRES_FEED`) — yoxlama servisdədir, çünki qayda " +
+    "göndərilən gövdəyə DEYİL, son vəziyyətə aiddir.\n\n" +
+    "⚠️ Səth bayraqları dəyişəndə törəmə sətirlər yenidən qurulur: `showInFeed` " +
+    "söndürülsə bağlı Post SOFT-DELETE olunur və xronologiya qeydi silinir " +
+    "(soft delete-də cascade İŞLƏMİR).\n\n" +
+    "Cavab YENİLƏNMİŞ xatirədir — ikinci `GET` lazım deyil.",
+  security: SECURED,
+  request: {
+    params: MemoryIdParams,
+    body: { required: true, content: { [JSON_MEDIA]: { schema: UpdateMemoryBodySchema } } },
+  },
+  responses: {
+    200: jsonResponse(
+      "Yenilənmiş xatirə.",
+      envelope(MemorySchema, "UpdatedMemoryResponse"),
+    ),
+    ...commonResponses(),
+    415: UNSUPPORTED_415,
+  },
+});
+
+path({
+  method: "delete",
+  path: "/api/v1/memories/{id}",
+  operationId: "deleteMemory",
+  tags: ["Memories"],
+  summary: "Xatirəni silir",
+  description:
+    "İcazə: MÜƏLLİF və ya həmin sinfin moderatoru. Moderasiya yolu ilə " +
+    "silinirsə `AuditLog` sətri MƏCBURİDİR və eyni transaksiyada yazılır " +
+    "(sahibin öz silməsi moderasiya deyil — sətir yazılmır).\n\n" +
+    "⚠️ Silmə SOFT-dur (`status = DELETED`), yəni `onDelete: Cascade` İŞƏ " +
+    "DÜŞMÜR: bağlı Post da soft-delete olunur və xronologiya qeydi həmin " +
+    "transaksiyada AÇIQ şəkildə silinir.\n\n" +
+    "⚠️ İdempotent DEYİL: ikinci `DELETE` **404** verir.\n\n" +
+    "⚠️ Gövdə yoxdur, ona görə `Content-Type` da tələb olunmur (415 yoxdur).",
+  security: SECURED,
+  request: { params: MemoryIdParams },
+  responses: {
+    204: { description: "Silindi. Gövdə YOXDUR (204 cavabın gövdəsi ola bilməz)." },
+    ...commonResponses(),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Events — yazma (Blok 14C)
+//
+// 🔴 TƏDBİRDƏ İKİ İCAZƏ MODELİ VAR (bax `services/event.service.ts` başlığı):
+// GÖRÜNÜRLÜK (kim görür) və İDARƏETMƏ (kim dəyişə bilər). Yazma endpoint-ləri
+// hər ikisindən keçir və status kodları məhz bu ayrılığı əks etdirir:
+//   · tədbiri GÖRMƏYƏN         → 404 (mövcudluq sızmır)
+//   · görən, amma rolsuz üzv   → 403 (mövcudluq onsuz da məlumdur)
+// ---------------------------------------------------------------------------
+
+path({
+  method: "post",
+  path: "/api/v1/cohorts/{slug}/events",
+  operationId: "createCohortEvent",
+  tags: ["Events"],
+  summary: "Sinifdə yeni tədbir elan edir",
+  description:
+    "Tədbir YOLDAKI sinfə yazılır — gövdədə `cohortId` YOXDUR.\n\n" +
+    "🔴 ÜZVLÜK KİFAYƏT DEYİL: yaratma `EVENT_MANAGER_ROLES` " +
+    "(`CLASS_REPRESENTATIVE` / `EVENT_COORDINATOR`) rolunu tələb edir və rol " +
+    "hər sorğuda DB-dən oxunur. Rolsuz üzv **403** alır (sinfi görür, yəni " +
+    "mövcudluq sızmır), üzv OLMAYAN isə **404**.\n\n" +
+    "🔴 `scope = FACULTY` olduqda `facultyId` MƏCBURİDİR — çatışmasa **422** " +
+    "(`FACULTY_REQUIRED`). `endsAt` başlama vaxtından əvvəldirsə **422** " +
+    "(`INVALID_DATES`).\n\n" +
+    "Yaratma TƏK TRANSAKSİYADADIR: `Event` + sinif üzvlərinə `INVITED` RSVP " +
+    "sətirləri + `EVENT_INVITE` bildirişləri + `AuditLog`. ⚠️ `PRIVATE` " +
+    "tədbirdə dəvət və bildiriş BURAXILIR — tədbiri görməyənə «sizi dəvət " +
+    "etdik» demək özü sızmadır.\n\n" +
+    "⚠️ Tarixlər və tutum SƏTİRDİR (`2027-05-20T18:00`, `\"60\"`) — eyni sxem " +
+    "brauzer formasında işlənir və `z.coerce` sahə tiplərini dağıdardı.",
+  security: SECURED,
+  request: {
+    params: SlugParams,
+    body: { required: true, content: { [JSON_MEDIA]: { schema: CreateEventBodySchema } } },
+  },
+  responses: {
+    201: jsonResponse(
+      "Tədbir elan olundu. `Location` başlığı `/api/v1/events/{id}`-dir.",
+      envelope(CreatedEventSchema, "CreatedEventResponse"),
+    ),
+    ...commonResponses(),
+    415: UNSUPPORTED_415,
+  },
+});
+
+path({
+  method: "patch",
+  path: "/api/v1/events/{id}",
+  operationId: "updateEvent",
+  tags: ["Events"],
+  summary: "Tədbiri qismən yeniləyir",
+  description:
+    "QİSMƏN yeniləmə: göndərilməyən sahə DƏYİŞMİR — cari dəyərlər serverdə " +
+    "birləşdirilir.\n\n" +
+    "🔴 İcazə: tədbiri YARADAN, sinfin `EVENT_MANAGER_ROLES` rolu və ya " +
+    "universitet admini. Tədbiri görən, amma idarə etməyən üzv **403** alır; " +
+    "GÖRMƏYƏN **404**.\n\n" +
+    "🔴 `cohortId` DƏYİŞDİRİLƏ BİLMƏZ və gövdədə də yoxdur: sinif dəyişsəydi " +
+    "mövcud dəvətlər və RSVP sətirləri başqa sinfə «köçərdi».\n\n" +
+    "⚠️ Tədbir xronologiyaya əlavə olunubsa (`addedToTimeline`) törəmə qeyd " +
+    "EYNİ TRANSAKSİYADA yenilənir. Bu, məxfilik addımıdır: xronologiyanın " +
+    "görünürlüyü mənbədən kopyalanır, yəni tədbiri `PUBLIC`-dən `CLASS`-a " +
+    "daraltmaq köhnə qeydə toxunmasaydı daraltma SƏSSİZCƏ İŞLƏMƏZDİ.\n\n" +
+    "⚠️ Yeniləmə dəvətləri TƏKRAR GÖNDƏRMİR — bir yazı səhvini düzəltmək " +
+    "sinfə 28 bildiriş demək olmamalıdır.\n\n" +
+    "Cavab YENİLƏNMİŞ tədbirdir.",
+  security: SECURED,
+  request: {
+    params: EventIdParams,
+    body: { required: true, content: { [JSON_MEDIA]: { schema: UpdateEventBodySchema } } },
+  },
+  responses: {
+    200: jsonResponse("Yenilənmiş tədbir.", envelope(EventSchema, "UpdatedEventResponse")),
+    ...commonResponses(),
+    415: UNSUPPORTED_415,
+  },
+});
+
+path({
+  method: "delete",
+  path: "/api/v1/events/{id}",
+  operationId: "deleteEvent",
+  tags: ["Events"],
+  summary: "Tədbiri silir (ləğv edir)",
+  description:
+    "İcazə `PATCH` ilə eynidir (yaradan / koordinator / admin).\n\n" +
+    "🔴 SİLMƏ `status = CANCELLED` YAZIR, sətir SİLİNMİR. Səbəb sxemdədir: " +
+    "`Event.status` `DRAFT | PUBLISHED | CANCELLED | COMPLETED` tanıyır, " +
+    "`DELETED` YOXDUR. Hard delete RSVP tarixçəsini və check-in qeydlərini " +
+    "cascade ilə aparardı — iştirak faktı isə hesabatın mənbəyidir. Müştəri " +
+    "üçün nəticə eynidir: tədbir ictimai siyahıdan çıxır.\n\n" +
+    "⚠️ Soft delete-də cascade İŞLƏMİR, ona görə `TimelineEntry` eyni " +
+    "transaksiyada AÇIQ şəkildə silinir və `addedToTimeline` bayrağı düşür.\n\n" +
+    "⚠️ İdempotent DEYİL: ikinci `DELETE` **404** verir.\n\n" +
+    "⚠️ Gövdə yoxdur, ona görə `Content-Type` da tələb olunmur (415 yoxdur).",
+  security: SECURED,
+  request: { params: EventIdParams },
+  responses: {
+    204: { description: "Ləğv edildi. Gövdə YOXDUR." },
+    ...commonResponses(),
   },
 });
 

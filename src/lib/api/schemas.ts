@@ -64,6 +64,18 @@ import {
   passwordSchema,
   universityEmailSchema,
 } from "@/features/auth/schemas";
+// ⚠️ Lent YAZMA sxemləri BURADA YENİDƏN QURULMUR — kompozitor forması ilə eyni
+// mənbədən gəlir (bax aşağıda `CreatePostBodySchema`).
+import {
+  createPostFields,
+  postContentRules,
+  updatePostSurfacesSchema,
+} from "@/features/feed/schemas";
+// ⚠️ Xatirə və tədbir YAZMA sxemləri də EYNİ qayda ilə forma sxemlərindən
+// törəyir (Blok 14C) — `.omit()` / `.partial()` işləsin deyə effektsiz
+// obyektlər ixrac olunub.
+import { memoryFields, memorySurfaceRules } from "@/features/memories/schemas";
+import { createEventFields, eventContentRules } from "@/features/events/schemas";
 import { API_ERROR_CODES } from "./errors";
 
 export { z };
@@ -879,6 +891,198 @@ export const PostsQuerySchema = z.object({
   cursor: z.string().optional(),
   take: takeSchema(CURSOR_MAX_TAKE, CURSOR_DEFAULT_TAKE),
 });
+
+// ---------------------------------------------------------------------------
+// Paylaşım YAZMA gövdələri (Blok 14B)
+//
+// 🔴 SXEMLƏR TƏKRAR YAZILMIR. Doğrulama qaydalarının VAHİD mənbəyi
+// `src/features/feed/schemas.ts`-dir — kompozitor forması (React Hook Form) və
+// `/api/v1` EYNİ obyektdən törəyir. Ayrı yazsaydıq, məsələn `MAX_BODY_LENGTH`
+// yalnız bir tərəfdə dəyişər və eyni gövdə brauzerdə keçib REST-də düşərdi.
+//
+// ⚠️ TƏLƏ T3 BURADA DA KEÇƏRLİDİR: bu sxemlərdə `z.coerce` YOXDUR. `occurredAt`
+// SƏTİR olaraq doğrulanır (`isParsableDate`), `Date`-ə çevirmə serverdədir
+// (`features/feed/post-input.ts`). Coerce əlavə etsək sxemin GİRİŞ tipi
+// `unknown`-a düşər və eyni sxemi işlədən `useForm<…>` sahə tipləri dağılar.
+// ---------------------------------------------------------------------------
+
+/**
+ * `POST /api/v1/cohorts/{slug}/posts` gövdəsi.
+ *
+ * 🔴 `cohortId` GÖVDƏDƏ YOXDUR — sinif YOLDAN gəlir və `resolveCohortScope`
+ * ilə həll olunur. Gövdədə ikinci bir sinif dəyəri qəbul etsəydik iki mənbə
+ * yaranardı: "hansı sinif?" sualının cavabı `{slug}`-la ziddiyyət təşkil edə
+ * bilərdi və hər çağırış nöqtəsi hansına güvənəcəyini özü seçərdi.
+ *
+ * ⚠️ Çarpaz qaydalar (`postContentRules`) `.omit()`-dən SONRA yenidən tətbiq
+ * olunur: `ZodEffects`-in `.omit()` metodu yoxdur, ona görə əvvəl EFFEKTSİZ
+ * obyekt kəsilir, sonra EYNİ qayda funksiyası üzərinə qoyulur.
+ */
+export const CreatePostBodySchema = createPostFields
+  .omit({ cohortId: true })
+  .superRefine(postContentRules)
+  .openapi("CreatePostBody", {
+    // Swagger «Try it out» boş forma ilə açılmasın — nümunə ƏN SADƏ keçərli
+    // paylaşımdır (mətn, sinif səviyyəsi, səthlərə yayılma yoxdur).
+    example: {
+      category: "GENERAL",
+      kind: "TEXT",
+      visibility: "CLASS",
+      body: "Bu gün laboratoriyada ilk prototipi işə saldıq.",
+      occurredAt: "2026-09-02T09:00",
+      linkUrl: "",
+      linkTitle: "",
+      linkImage: "",
+      referencedEventId: "",
+      showOnTimeline: false,
+      showInAchievements: false,
+      media: [],
+      achievement: { title: "", organization: "", awardedAt: "", proofUrl: "" },
+      memory: { title: "", body: "", dedicatedTo: "" },
+    },
+  });
+
+/**
+ * `PATCH /api/v1/posts/{id}` gövdəsi — QİSMƏN yeniləmə.
+ *
+ * 🔴 NİYƏ PATCH, PUT YOX: əməliyyat postun YALNIZ BİR alt çoxluğunu (hansı
+ * səthlərdə göründüyünü) dəyişir. `PUT` bütöv resursun əvəzlənməsi deməkdir və
+ * müştəri mətni, medianı, görünürlüyü də göndərməli olardı — halbuki servis
+ * onları BU əməliyyatda dəyişmir (`updatePostSurfaces`).
+ *
+ * ⚠️ Hər sahə `.optional()`-dır: göndərilməyən bayraq DƏYİŞMİR. Route cari
+ * dəyəri `getPost`-dan oxuyub birləşdirir — `false` default qoysaydıq, tək
+ * bayraq göndərən müştəri o birini SƏSSİZCƏ söndürərdi.
+ */
+export const UpdatePostBodySchema = updatePostSurfacesSchema
+  .omit({ postId: true })
+  .partial()
+  .openapi("UpdatePostBody", {
+    example: { showOnTimeline: true },
+  });
+
+/** `/api/v1/posts/{id}` yol parametri. */
+export const PostIdParamsSchema = z.object({
+  id: z.string().min(1),
+});
+
+/**
+ * 201 cavabının gövdəsi.
+ *
+ * ⚠️ Yalnız `postId` qaytarılır, bütöv paylaşım YOX: `createPost` transaksiyanın
+ * sonunda yalnız `id` bilir və postu yenidən oxumaq üçün ƏLAVƏ sorğu lazım
+ * olardı. Müştəri `Location` başlığındakı ünvanı izləyib tam obyekti ala bilir.
+ */
+export const CreatedPostSchema = z
+  .object({ postId: idSchema })
+  .openapi("CreatedPost");
+
+// ---------------------------------------------------------------------------
+// Xatirə və tədbir YAZMA gövdələri (Blok 14C)
+//
+// 🔴 SXEMLƏR TƏKRAR YAZILMIR — 14B-nin qaydası eynilə davam edir: qaydaların
+// VAHİD mənbəyi `features/memories/schemas.ts` və `features/events/schemas.ts`-
+// dir (forma da, API da eyni obyektdən törəyir).
+//
+// 🔴 `cohortId` YARATMA GÖVDƏLƏRİNDƏ YOXDUR: sinif YOLDAN gəlir
+// (`/cohorts/{slug}/…`) və `resolveCohortScope` ilə həll olunur. İkinci mənbə
+// olsaydı `{slug}` ilə gövdənin ziddiyyəti hər çağırış nöqtəsində fərqli həll
+// olunardı.
+//
+// ⚠️ `PATCH` gövdələri `.partial()`-dır: göndərilməyən sahə DƏYİŞMİR. Route
+// cari dəyəri servisdən oxuyub birləşdirir (`memory-input.ts` / `event-input.ts`),
+// çünki hər iki servis funksiyası TAM sahə dəstini alır. Default qoysaydıq tək
+// sahə göndərən müştəri qalanını SƏSSİZCƏ sıfırlardı.
+// ---------------------------------------------------------------------------
+
+/** `POST /api/v1/cohorts/{slug}/memories` gövdəsi. */
+export const CreateMemoryBodySchema = memoryFields
+  .superRefine(memorySurfaceRules)
+  .openapi("CreateMemoryBody", {
+    example: {
+      type: "MEMORABLE_EVENT",
+      title: "İlk hakaton gecəmiz",
+      body:
+        "Bütün gecəni laboratoriyada keçirdik və səhər açılanda prototip " +
+        "nəhayət işlədi.",
+      dedicatedTo: "",
+      imageUrl: "",
+      occurredAt: "2026-11-05T20:00",
+      guidePlaceId: "",
+      visibility: "CLASS",
+      showInProfile: true,
+      showInFeed: false,
+      showInTimeline: false,
+      showInYearbook: true,
+    },
+  });
+
+/**
+ * `PATCH /api/v1/memories/{id}` gövdəsi — QİSMƏN yeniləmə.
+ *
+ * ⚠️ `TIMELINE_REQUIRES_FEED` qaydası BURADA tətbiq OLUNMUR və bu, qəsdəndir:
+ * qayda BİRLƏŞMİŞ nəticəyə aiddir (göndərilən `showInTimeline` + MÖVCUD
+ * `showInFeed`), yəni yalnız gövdəyə baxan sxem yanlış qərar verərdi. Yoxlama
+ * servisdədir (`updateMemory`-nin ilk sətri) və route onun `reason`-unu 422-yə
+ * çevirir.
+ */
+export const UpdateMemoryBodySchema = memoryFields
+  .partial()
+  .openapi("UpdateMemoryBody", {
+    example: { showInYearbook: true },
+  });
+
+/** 201 cavabı — bütöv xatirə YOX, yalnız `id` (`CreatedPost` ilə eyni səbəb). */
+export const CreatedMemorySchema = z
+  .object({ memoryId: idSchema })
+  .openapi("CreatedMemory");
+
+/** `POST /api/v1/cohorts/{slug}/events` gövdəsi. */
+export const CreateEventBodySchema = createEventFields
+  .omit({ cohortId: true })
+  .superRefine(eventContentRules)
+  .openapi("CreateEventBody", {
+    example: {
+      title: "Buraxılış görüşü",
+      description: "Sinfin illik görüşü.",
+      startsAt: "2027-05-20T18:00",
+      endsAt: "2027-05-20T21:00",
+      location: "Universitet konfrans zalı",
+      onlineUrl: "",
+      isOnline: false,
+      capacity: "60",
+      registrationDeadline: "2027-05-18T23:59",
+      agenda: "",
+      contactId: "",
+      visibility: "CLASS",
+      scope: "CLASS",
+      category: "SOCIAL",
+      facultyId: "",
+      clubId: "",
+      coverUrl: "",
+    },
+  });
+
+/**
+ * `PATCH /api/v1/events/{id}` gövdəsi — QİSMƏN yeniləmə.
+ *
+ * ⚠️ Çarpaz qaydalar (`eventContentRules`) burada tətbiq olunmur: onlar TAM
+ * obyektə baxır (məs. «onlayn tədbirin keçidi olmalıdır»), qismən gövdədə isə
+ * müqayisə ediləcək ikinci sahə OLMAYA BİLƏR. Birləşdirilmiş nəticəni servis
+ * yoxlayır — `FACULTY_REQUIRED` və `INVALID_DATES` `updateEvent`-dədir və
+ * cavaba 422 kimi düşür.
+ */
+export const UpdateEventBodySchema = createEventFields
+  .omit({ cohortId: true })
+  .partial()
+  .openapi("UpdateEventBody", {
+    example: { location: "Yeni məkan: A korpusu, 204" },
+  });
+
+/** 201 cavabı — yalnız `id`; tam obyekt `Location` ünvanından oxunur. */
+export const CreatedEventSchema = z
+  .object({ eventId: idSchema })
+  .openapi("CreatedEvent");
 
 /**
  * `GET /notifications` — filtr + səhifələmə.

@@ -71,7 +71,17 @@ function isCapacityString(value: string): boolean {
 // createEvent — spec §14-ün 10 sahəsi + bizim 3 əlavəmiz
 // ---------------------------------------------------------------------------
 
-export const createEventSchema = z
+/**
+ * Tədbirin SAHƏLƏRİ — çarpaz qaydalar (`eventContentRules`) HƏLƏ tətbiq
+ * olunmadan.
+ *
+ * 🔴 NİYƏ AYRICA İXRAC OLUNUR (Blok 14C, `features/feed/schemas.ts` →
+ * `createPostFields` ilə EYNİ SƏBƏB): `/api/v1` gövdə sxemləri eyni sahələri
+ * işlədir, amma `cohortId` ONDA YOXDUR (sinif YOLDAN gəlir) və `PATCH` gövdəsi
+ * `.partial()`-dır. `ZodEffects`-in `.omit()` / `.partial()` metodu YOXDUR,
+ * ona görə effektsiz OBYEKT ayrıca lazımdır.
+ */
+export const createEventFields = z
   .object({
     /**
      * ⚠️ Müştərinin göstərdiyi sinif TƏK BAŞINA ETİBARLI DEYİL: servis
@@ -127,74 +137,87 @@ export const createEventSchema = z
     clubId: z.string().trim(),
 
     coverUrl: optionalUrl(),
-  })
-  .superRefine((value, ctx) => {
-    // --- Bitmə tarixi başlamadan sonra olmalıdır ---
-    if (value.endsAt !== "" && isParsableDate(value.startsAt) && isParsableDate(value.endsAt)) {
-      if (new Date(value.endsAt).getTime() <= new Date(value.startsAt).getTime()) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["endsAt"],
-          message: "Bitmə vaxtı başlama vaxtından sonra olmalıdır.",
-        });
-      }
-    }
-
-    // --- Qeydiyyat son tarixi tədbirdən əvvəl olmalıdır ---
-    if (
-      value.registrationDeadline !== "" &&
-      isParsableDate(value.startsAt) &&
-      isParsableDate(value.registrationDeadline)
-    ) {
-      if (
-        new Date(value.registrationDeadline).getTime() > new Date(value.startsAt).getTime()
-      ) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["registrationDeadline"],
-          message: "Qeydiyyat son tarixi tədbirin başlamasından sonra ola bilməz.",
-        });
-      }
-    }
-
-    // --- Onlayn tədbirin keçidi olmalıdır ---
-    if (value.isOnline && value.onlineUrl === "") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["onlineUrl"],
-        message: "Onlayn tədbir üçün keçid ünvanı tələb olunur.",
-      });
-    }
-
-    // --- Üzbəüz tədbirin məkanı olmalıdır ---
-    if (!value.isOnline && value.location === "") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["location"],
-        message: "Üzbəüz tədbir üçün məkan yazılmalıdır.",
-      });
-    }
-
-    // --- scope = FACULTY → fakültə məcburidir ---
-    // ⚠️ Bu, sxemdəki `facultyId String?` ilə ziddiyyət deyil: sütun nullable-dır,
-    // çünki digər dörd səviyyədə fakültə YOXDUR. Məcburilik yalnız bu şaxədədir.
-    if (value.scope === EventScope.FACULTY && value.facultyId === "") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["facultyId"],
-        message: "Fakültə səviyyəli tədbir üçün fakültə seçilməlidir.",
-      });
-    }
-
-    // --- scope = CLUB → klub məcburidir ---
-    if (value.scope === EventScope.CLUB && value.clubId === "") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["clubId"],
-        message: "Klub səviyyəli tədbir üçün klub seçilməlidir.",
-      });
-    }
   });
+
+/**
+ * Doğrulanmış tədbir sahələri — `cohortId` DAXİL DEYİL.
+ *
+ * ⚠️ Tip `cohortId`-siz qurulub: çarpaz qaydalar onu OXUMUR, ona görə həm
+ * forma girişi (cohortId VAR), həm də API gövdəsi (cohortId YOX) eyni
+ * funksiyaya verilə bilir (`postContentRules` ilə eyni nümunə).
+ */
+export type EventFieldsInput = Omit<z.infer<typeof createEventFields>, "cohortId">;
+
+/** Tədbirin ÇARPAZ sahə qaydaları — forma da, API da EYNİ funksiyanı işlədir. */
+export const eventContentRules = (value: EventFieldsInput, ctx: z.RefinementCtx) => {
+  // --- Bitmə tarixi başlamadan sonra olmalıdır ---
+  if (value.endsAt !== "" && isParsableDate(value.startsAt) && isParsableDate(value.endsAt)) {
+    if (new Date(value.endsAt).getTime() <= new Date(value.startsAt).getTime()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["endsAt"],
+        message: "Bitmə vaxtı başlama vaxtından sonra olmalıdır.",
+      });
+    }
+  }
+
+  // --- Qeydiyyat son tarixi tədbirdən əvvəl olmalıdır ---
+  if (
+    value.registrationDeadline !== "" &&
+    isParsableDate(value.startsAt) &&
+    isParsableDate(value.registrationDeadline)
+  ) {
+    if (
+      new Date(value.registrationDeadline).getTime() > new Date(value.startsAt).getTime()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["registrationDeadline"],
+        message: "Qeydiyyat son tarixi tədbirin başlamasından sonra ola bilməz.",
+      });
+    }
+  }
+
+  // --- Onlayn tədbirin keçidi olmalıdır ---
+  if (value.isOnline && value.onlineUrl === "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["onlineUrl"],
+      message: "Onlayn tədbir üçün keçid ünvanı tələb olunur.",
+    });
+  }
+
+  // --- Üzbəüz tədbirin məkanı olmalıdır ---
+  if (!value.isOnline && value.location === "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["location"],
+      message: "Üzbəüz tədbir üçün məkan yazılmalıdır.",
+    });
+  }
+
+  // --- scope = FACULTY → fakültə məcburidir ---
+  // ⚠️ Bu, sxemdəki `facultyId String?` ilə ziddiyyət deyil: sütun nullable-dır,
+  // çünki digər dörd səviyyədə fakültə YOXDUR. Məcburilik yalnız bu şaxədədir.
+  if (value.scope === EventScope.FACULTY && value.facultyId === "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["facultyId"],
+      message: "Fakültə səviyyəli tədbir üçün fakültə seçilməlidir.",
+    });
+  }
+
+  // --- scope = CLUB → klub məcburidir ---
+  if (value.scope === EventScope.CLUB && value.clubId === "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["clubId"],
+      message: "Klub səviyyəli tədbir üçün klub seçilməlidir.",
+    });
+  }
+};
+
+export const createEventSchema = createEventFields.superRefine(eventContentRules);
 
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 

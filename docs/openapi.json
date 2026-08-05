@@ -29,8 +29,16 @@
       "description": "Sinif (class page) məzmunu. Hər cavab `visibilityWhere(viewer)` süzgəcindən keçir — icazəsiz sinif üçün 404 qaytarılır, 403 YOX."
     },
     {
+      "name": "Posts",
+      "description": "Paylaşımın TAM həyat dövrü: yaradılma, tək oxu, səthlərin yenilənməsi, silinmə. 🔴 Lentin SİYAHISI qəsdən `Cohorts` taqındadır — o, sinif səthidir və `{slug}` ilə əhatələnir; burada isə paylaşımın ÖZÜ resursdur (`/posts/{id}`) və inteqrasiya yazan adam CRUD-un dörd addımını bir bölmədə görür."
+    },
+    {
+      "name": "Memories",
+      "description": "Xatirənin TAM həyat dövrü: yaradılma, tək oxu, qismən yenilənmə, silinmə [M9]. 🔴 Sinfin xatirə SİYAHISI qəsdən `Cohorts` taqındadır — o, sinif səthidir və `{slug}` ilə əhatələnir; burada isə xatirənin ÖZÜ resursdur (`/memories/{id}`) və `Posts` taqı ilə eyni məntiq işləyir."
+    },
+    {
       "name": "Events",
-      "description": "Tədbirlər və Reunion."
+      "description": "Tədbirlər və Reunion. Yazma əməliyyatları (`POST` / `PATCH` / `DELETE`) 🔴 İKİ QAPIDAN keçir: görünürlük (görməyənə 404) və İDARƏETMƏ rolu (`EVENT_MANAGER_ROLES` — görüb idarə etməyənə 403)."
     },
     {
       "name": "Notifications",
@@ -2417,6 +2425,819 @@
           "data"
         ]
       },
+      "CreatedPost": {
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "description": "cuid",
+            "example": "clx1a2b3c4d5"
+          }
+        },
+        "required": [
+          "postId"
+        ]
+      },
+      "CreatedPostResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CreatedPost"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreatePostBody": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "FIRST_DAY",
+              "ORIENTATION",
+              "EVENT_PHOTOS",
+              "ACADEMIC_ACHIEVEMENT",
+              "SOCIAL_ACHIEVEMENT",
+              "TRIPS",
+              "EXAM_PERIOD",
+              "INTERNSHIP",
+              "CLUB_ACTIVITY",
+              "COMPETITION",
+              "CAPSTONE",
+              "GENERAL"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "TEXT",
+              "PHOTO",
+              "ALBUM",
+              "VIDEO",
+              "LINK",
+              "EVENT",
+              "ACHIEVEMENT",
+              "MEMORY"
+            ]
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "UNIVERSITY",
+              "CLASS",
+              "PRIVATE"
+            ]
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 5000
+          },
+          "occurredAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "linkUrl": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "linkTitle": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "linkImage": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "referencedEventId": {
+            "type": "string"
+          },
+          "showOnTimeline": {
+            "type": "boolean"
+          },
+          "showInAchievements": {
+            "type": "boolean"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "thumbUrl": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "IMAGE",
+                    "VIDEO",
+                    "FILE"
+                  ]
+                },
+                "mimeType": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "sizeBytes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "exclusiveMinimum": true
+                },
+                "caption": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "order": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "url",
+                "thumbUrl",
+                "type",
+                "mimeType",
+                "sizeBytes",
+                "width",
+                "height",
+                "caption",
+                "order"
+              ]
+            },
+            "maxItems": 12
+          },
+          "achievement": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": [
+                  "AWARD",
+                  "STARTUP",
+                  "PUBLICATION",
+                  "GRANT",
+                  "INTERNATIONAL_PROGRAM",
+                  "SPORTS",
+                  "VOLUNTEERING",
+                  "CAREER",
+                  "SOCIAL_PROJECT",
+                  "COMPETITION",
+                  "PATENT",
+                  "REPRESENTATION"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "organization": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "awardedAt": {
+                "type": "string"
+              },
+              "proofUrl": {
+                "type": "string",
+                "maxLength": 600
+              }
+            },
+            "required": [
+              "title",
+              "organization",
+              "awardedAt",
+              "proofUrl"
+            ]
+          },
+          "memory": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "SHORT_MEMORY",
+                  "UNIVERSITY_STORY",
+                  "THANKS_TEACHER",
+                  "THANKS_CLASSMATE",
+                  "UNFORGETTABLE_LESSON",
+                  "MEMORABLE_EVENT",
+                  "WHAT_UNI_GAVE_ME",
+                  "MESSAGE_TO_QU"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 4000
+              },
+              "dedicatedTo": {
+                "type": "string",
+                "maxLength": 160
+              }
+            },
+            "required": [
+              "title",
+              "body",
+              "dedicatedTo"
+            ]
+          }
+        },
+        "required": [
+          "category",
+          "kind",
+          "visibility",
+          "body",
+          "occurredAt",
+          "linkUrl",
+          "linkTitle",
+          "linkImage",
+          "referencedEventId",
+          "showOnTimeline",
+          "showInAchievements",
+          "media",
+          "achievement",
+          "memory"
+        ],
+        "example": {
+          "category": "GENERAL",
+          "kind": "TEXT",
+          "visibility": "CLASS",
+          "body": "Bu gün laboratoriyada ilk prototipi işə saldıq.",
+          "occurredAt": "2026-09-02T09:00",
+          "linkUrl": "",
+          "linkTitle": "",
+          "linkImage": "",
+          "referencedEventId": "",
+          "showOnTimeline": false,
+          "showInAchievements": false,
+          "media": [],
+          "achievement": {
+            "title": "",
+            "organization": "",
+            "awardedAt": "",
+            "proofUrl": ""
+          },
+          "memory": {
+            "title": "",
+            "body": "",
+            "dedicatedTo": ""
+          }
+        }
+      },
+      "FeedPostResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FeedPost"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdatedPostResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/FeedPost"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdatePostBody": {
+        "type": "object",
+        "properties": {
+          "showOnTimeline": {
+            "type": "boolean"
+          },
+          "showInAchievements": {
+            "type": "boolean"
+          },
+          "achievement": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string",
+                "enum": [
+                  "AWARD",
+                  "STARTUP",
+                  "PUBLICATION",
+                  "GRANT",
+                  "INTERNATIONAL_PROGRAM",
+                  "SPORTS",
+                  "VOLUNTEERING",
+                  "CAREER",
+                  "SOCIAL_PROJECT",
+                  "COMPETITION",
+                  "PATENT",
+                  "REPRESENTATION"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "organization": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "awardedAt": {
+                "type": "string"
+              },
+              "proofUrl": {
+                "type": "string",
+                "maxLength": 600
+              }
+            },
+            "required": [
+              "title",
+              "organization",
+              "awardedAt",
+              "proofUrl"
+            ]
+          }
+        },
+        "example": {
+          "showOnTimeline": true
+        }
+      },
+      "CreatedMemory": {
+        "type": "object",
+        "properties": {
+          "memoryId": {
+            "type": "string",
+            "description": "cuid",
+            "example": "clx1a2b3c4d5"
+          }
+        },
+        "required": [
+          "memoryId"
+        ]
+      },
+      "CreatedMemoryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CreatedMemory"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateMemoryBody": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SHORT_MEMORY",
+              "UNIVERSITY_STORY",
+              "THANKS_TEACHER",
+              "THANKS_CLASSMATE",
+              "UNFORGETTABLE_LESSON",
+              "MEMORABLE_EVENT",
+              "WHAT_UNI_GAVE_ME",
+              "MESSAGE_TO_QU"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "body": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 6000
+          },
+          "dedicatedTo": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "occurredAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "guidePlaceId": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "UNIVERSITY",
+              "CLASS",
+              "PRIVATE"
+            ]
+          },
+          "showInProfile": {
+            "type": "boolean"
+          },
+          "showInFeed": {
+            "type": "boolean"
+          },
+          "showInTimeline": {
+            "type": "boolean"
+          },
+          "showInYearbook": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "type",
+          "title",
+          "body",
+          "dedicatedTo",
+          "imageUrl",
+          "occurredAt",
+          "guidePlaceId",
+          "visibility",
+          "showInProfile",
+          "showInFeed",
+          "showInTimeline",
+          "showInYearbook"
+        ],
+        "example": {
+          "type": "MEMORABLE_EVENT",
+          "title": "İlk hakaton gecəmiz",
+          "body": "Bütün gecəni laboratoriyada keçirdik və səhər açılanda prototip nəhayət işlədi.",
+          "dedicatedTo": "",
+          "imageUrl": "",
+          "occurredAt": "2026-11-05T20:00",
+          "guidePlaceId": "",
+          "visibility": "CLASS",
+          "showInProfile": true,
+          "showInFeed": false,
+          "showInTimeline": false,
+          "showInYearbook": true
+        }
+      },
+      "MemoryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Memory"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdatedMemoryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Memory"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateMemoryBody": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "SHORT_MEMORY",
+              "UNIVERSITY_STORY",
+              "THANKS_TEACHER",
+              "THANKS_CLASSMATE",
+              "UNFORGETTABLE_LESSON",
+              "MEMORABLE_EVENT",
+              "WHAT_UNI_GAVE_ME",
+              "MESSAGE_TO_QU"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "body": {
+            "type": "string",
+            "minLength": 20,
+            "maxLength": 6000
+          },
+          "dedicatedTo": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "imageUrl": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "occurredAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "guidePlaceId": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "UNIVERSITY",
+              "CLASS",
+              "PRIVATE"
+            ]
+          },
+          "showInProfile": {
+            "type": "boolean"
+          },
+          "showInFeed": {
+            "type": "boolean"
+          },
+          "showInTimeline": {
+            "type": "boolean"
+          },
+          "showInYearbook": {
+            "type": "boolean"
+          }
+        },
+        "example": {
+          "showInYearbook": true
+        }
+      },
+      "CreatedEvent": {
+        "type": "object",
+        "properties": {
+          "eventId": {
+            "type": "string",
+            "description": "cuid",
+            "example": "clx1a2b3c4d5"
+          }
+        },
+        "required": [
+          "eventId"
+        ]
+      },
+      "CreatedEventResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CreatedEvent"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "CreateEventBody": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 3000
+          },
+          "startsAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "endsAt": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "onlineUrl": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "isOnline": {
+            "type": "boolean"
+          },
+          "capacity": {
+            "type": "string"
+          },
+          "registrationDeadline": {
+            "type": "string"
+          },
+          "agenda": {
+            "type": "string",
+            "maxLength": 6000
+          },
+          "contactId": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "UNIVERSITY",
+              "CLASS",
+              "PRIVATE"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "UNIVERSITY",
+              "FACULTY",
+              "CLUB",
+              "CLASS",
+              "REUNION"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "MEETING",
+              "TRIP",
+              "SEMINAR",
+              "WORKSHOP",
+              "CEREMONY",
+              "COMPETITION",
+              "SOCIAL",
+              "CAREER",
+              "OTHER"
+            ]
+          },
+          "facultyId": {
+            "type": "string"
+          },
+          "clubId": {
+            "type": "string"
+          },
+          "coverUrl": {
+            "type": "string",
+            "maxLength": 600
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "startsAt",
+          "endsAt",
+          "location",
+          "onlineUrl",
+          "isOnline",
+          "capacity",
+          "registrationDeadline",
+          "agenda",
+          "contactId",
+          "visibility",
+          "scope",
+          "category",
+          "facultyId",
+          "clubId",
+          "coverUrl"
+        ],
+        "example": {
+          "title": "Buraxılış görüşü",
+          "description": "Sinfin illik görüşü.",
+          "startsAt": "2027-05-20T18:00",
+          "endsAt": "2027-05-20T21:00",
+          "location": "Universitet konfrans zalı",
+          "onlineUrl": "",
+          "isOnline": false,
+          "capacity": "60",
+          "registrationDeadline": "2027-05-18T23:59",
+          "agenda": "",
+          "contactId": "",
+          "visibility": "CLASS",
+          "scope": "CLASS",
+          "category": "SOCIAL",
+          "facultyId": "",
+          "clubId": "",
+          "coverUrl": ""
+        }
+      },
+      "UpdatedEventResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Event"
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "UpdateEventBody": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 3000
+          },
+          "startsAt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "endsAt": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "onlineUrl": {
+            "type": "string",
+            "maxLength": 600
+          },
+          "isOnline": {
+            "type": "boolean"
+          },
+          "capacity": {
+            "type": "string"
+          },
+          "registrationDeadline": {
+            "type": "string"
+          },
+          "agenda": {
+            "type": "string",
+            "maxLength": 6000
+          },
+          "contactId": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "PUBLIC",
+              "UNIVERSITY",
+              "CLASS",
+              "PRIVATE"
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "UNIVERSITY",
+              "FACULTY",
+              "CLUB",
+              "CLASS",
+              "REUNION"
+            ]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "MEETING",
+              "TRIP",
+              "SEMINAR",
+              "WORKSHOP",
+              "CEREMONY",
+              "COMPETITION",
+              "SOCIAL",
+              "CAREER",
+              "OTHER"
+            ]
+          },
+          "facultyId": {
+            "type": "string"
+          },
+          "clubId": {
+            "type": "string"
+          },
+          "coverUrl": {
+            "type": "string",
+            "maxLength": 600
+          }
+        },
+        "example": {
+          "location": "Yeni məkan: A korpusu, 204"
+        }
+      },
       "SearchHit": {
         "type": "object",
         "properties": {
@@ -3327,7 +4148,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3429,7 +4250,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3529,7 +4350,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3616,7 +4437,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3698,7 +4519,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3780,7 +4601,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3880,7 +4701,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3979,7 +4800,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4086,7 +4907,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4179,7 +5000,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4266,7 +5087,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4365,7 +5186,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4599,7 +5420,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4717,7 +5538,124 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCohortPost",
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Sinifdə yeni paylaşım açır",
+        "description": "Paylaşım YOLDAKI sinfə yazılır — gövdədə `cohortId` YOXDUR. Üzv olmadığın sinif üçün cavab **404**-dür (403 YOX): sinfin mövcudluğu da məlumatdır.\n\nSəthlərə yayılma TƏK TRANSAKSİYADADIR: `showOnTimeline` → `TimelineEntry`, `showInAchievements` → `Achievement` (status `SUBMITTED`), sinif yoldaşlarına `Notification`. `PRIVATE` paylaşımda bildiriş göndərilmir — məzmunu görməyənə «yeni paylaşım var» demək özü sızmadır.\n\n⚠️ `media[].url` yalnız `/uploads/…` ola bilər (`POST /api/upload` cavabı). Xarici ünvan SƏSSİZCƏ atılır, xəta verilmir — lent kartı başqa saytdan şəkil çəkməməlidir.\n\n⚠️ `occurredAt` SƏTİRDİR (`2026-09-02T09:00`), `Date` deyil — eyni sxem brauzer formasında da işlənir və `z.coerce` sahə tiplərini dağıdardı.\n\n201 cavabında `Location` başlığı yaradılan resursun ünvanını verir.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "informasiya-tehlukesizliyi-2027"
+            },
+            "required": true,
+            "description": "Sinfin `slug`-ı — `GET /api/v1/cohorts` cavabından götürülür.",
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePostBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Paylaşım yaradıldı. `Location` başlığı `/api/v1/posts/{id}`-dir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedPostResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessiya kukisi yoxdur və ya etibarsızdır. Cavab JSON-dur — HTML yönləndirmə (`/login`) BAŞ VERMİR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "`Content-Type` `application/json` deyil. Bu, REST login üçün CSRF müdafiəsidir: brauzerin `<form>` elementi JSON göndərə bilmir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -4874,7 +5812,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5006,7 +5944,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5146,7 +6084,124 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCohortMemory",
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Sinifdə yeni xatirə yazır",
+        "description": "Xatirə YOLDAKI sinfə yazılır — gövdədə `cohortId` YOXDUR. Üzv olmadığın sinif üçün cavab **404**-dür (403 YOX): sinfin mövcudluğu da məlumatdır.\n\n🔴 `showInTimeline` YALNIZ `showInFeed` açıq olduqda `true` ola bilər — əks halda **422** (`TIMELINE_REQUIRES_FEED`). Səbəb sxemdədir: `TimelineEntry`-də Memory-yə FK YOXDUR, yəni xatirə xronologiyaya ANCAQ bağlı Post vasitəsilə düşür. Qayda İKİ QAT tətbiq olunur (Zod + servis) və heç biri route-da təkrarlanmır.\n\nSəthlərə yayılma TƏK TRANSAKSİYADADIR: `showInFeed` → `Post` (kind: MEMORY, eyni görünürlük), `showInTimeline` → `TimelineEntry`.\n\n⚠️ `imageUrl` yalnız `/uploads/…` ola bilər (`POST /api/upload` cavabı); xarici ünvan SƏSSİZCƏ atılır — kart başqa saytdan şəkil çəkməməlidir.\n\n⚠️ `occurredAt` SƏTİRDİR (`2026-11-05T20:00`), `Date` deyil — eyni sxem brauzer formasında da işlənir.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "informasiya-tehlukesizliyi-2027"
+            },
+            "required": true,
+            "description": "Sinfin `slug`-ı — `GET /api/v1/cohorts` cavabından götürülür.",
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMemoryBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Xatirə yaradıldı. `Location` başlığı `/api/v1/memories/{id}`-dir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedMemoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessiya kukisi yoxdur və ya etibarsızdır. Cavab JSON-dur — HTML yönləndirmə (`/login`) BAŞ VERMİR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "`Content-Type` `application/json` deyil. Bu, REST login üçün CSRF müdafiəsidir: brauzerin `<form>` elementi JSON göndərə bilmir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5245,7 +6300,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5344,7 +6399,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5443,7 +6498,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5633,7 +6688,124 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCohortEvent",
+        "tags": [
+          "Events"
+        ],
+        "summary": "Sinifdə yeni tədbir elan edir",
+        "description": "Tədbir YOLDAKI sinfə yazılır — gövdədə `cohortId` YOXDUR.\n\n🔴 ÜZVLÜK KİFAYƏT DEYİL: yaratma `EVENT_MANAGER_ROLES` (`CLASS_REPRESENTATIVE` / `EVENT_COORDINATOR`) rolunu tələb edir və rol hər sorğuda DB-dən oxunur. Rolsuz üzv **403** alır (sinfi görür, yəni mövcudluq sızmır), üzv OLMAYAN isə **404**.\n\n🔴 `scope = FACULTY` olduqda `facultyId` MƏCBURİDİR — çatışmasa **422** (`FACULTY_REQUIRED`). `endsAt` başlama vaxtından əvvəldirsə **422** (`INVALID_DATES`).\n\nYaratma TƏK TRANSAKSİYADADIR: `Event` + sinif üzvlərinə `INVITED` RSVP sətirləri + `EVENT_INVITE` bildirişləri + `AuditLog`. ⚠️ `PRIVATE` tədbirdə dəvət və bildiriş BURAXILIR — tədbiri görməyənə «sizi dəvət etdik» demək özü sızmadır.\n\n⚠️ Tarixlər və tutum SƏTİRDİR (`2027-05-20T18:00`, `\"60\"`) — eyni sxem brauzer formasında işlənir və `z.coerce` sahə tiplərini dağıdardı.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "informasiya-tehlukesizliyi-2027"
+            },
+            "required": true,
+            "description": "Sinfin `slug`-ı — `GET /api/v1/cohorts` cavabından götürülür.",
+            "name": "slug",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEventBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tədbir elan olundu. `Location` başlığı `/api/v1/events/{id}`-dir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessiya kukisi yoxdur və ya etibarsızdır. Cavab JSON-dur — HTML yönləndirmə (`/login`) BAŞ VERMİR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "`Content-Type` `application/json` deyil. Bu, REST login üçün CSRF müdafiəsidir: brauzerin `<form>` elementi JSON göndərə bilmir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5726,7 +6898,808 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateEvent",
+        "tags": [
+          "Events"
+        ],
+        "summary": "Tədbiri qismən yeniləyir",
+        "description": "QİSMƏN yeniləmə: göndərilməyən sahə DƏYİŞMİR — cari dəyərlər serverdə birləşdirilir.\n\n🔴 İcazə: tədbiri YARADAN, sinfin `EVENT_MANAGER_ROLES` rolu və ya universitet admini. Tədbiri görən, amma idarə etməyən üzv **403** alır; GÖRMƏYƏN **404**.\n\n🔴 `cohortId` DƏYİŞDİRİLƏ BİLMƏZ və gövdədə də yoxdur: sinif dəyişsəydi mövcud dəvətlər və RSVP sətirləri başqa sinfə «köçərdi».\n\n⚠️ Tədbir xronologiyaya əlavə olunubsa (`addedToTimeline`) törəmə qeyd EYNİ TRANSAKSİYADA yenilənir. Bu, məxfilik addımıdır: xronologiyanın görünürlüyü mənbədən kopyalanır, yəni tədbiri `PUBLIC`-dən `CLASS`-a daraltmaq köhnə qeydə toxunmasaydı daraltma SƏSSİZCƏ İŞLƏMƏZDİ.\n\n⚠️ Yeniləmə dəvətləri TƏKRAR GÖNDƏRMİR — bir yazı səhvini düzəltmək sinfə 28 bildiriş demək olmamalıdır.\n\nCavab YENİLƏNMİŞ tədbirdir.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Tədbirin `id`-si.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEventBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Yenilənmiş tədbir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedEventResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessiya kukisi yoxdur və ya etibarsızdır. Cavab JSON-dur — HTML yönləndirmə (`/login`) BAŞ VERMİR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "`Content-Type` `application/json` deyil. Bu, REST login üçün CSRF müdafiəsidir: brauzerin `<form>` elementi JSON göndərə bilmir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteEvent",
+        "tags": [
+          "Events"
+        ],
+        "summary": "Tədbiri silir (ləğv edir)",
+        "description": "İcazə `PATCH` ilə eynidir (yaradan / koordinator / admin).\n\n🔴 SİLMƏ `status = CANCELLED` YAZIR, sətir SİLİNMİR. Səbəb sxemdədir: `Event.status` `DRAFT | PUBLISHED | CANCELLED | COMPLETED` tanıyır, `DELETED` YOXDUR. Hard delete RSVP tarixçəsini və check-in qeydlərini cascade ilə aparardı — iştirak faktı isə hesabatın mənbəyidir. Müştəri üçün nəticə eynidir: tədbir ictimai siyahıdan çıxır.\n\n⚠️ Soft delete-də cascade İŞLƏMİR, ona görə `TimelineEntry` eyni transaksiyada AÇIQ şəkildə silinir və `addedToTimeline` bayrağı düşür.\n\n⚠️ İdempotent DEYİL: ikinci `DELETE` **404** verir.\n\n⚠️ Gövdə yoxdur, ona görə `Content-Type` da tələb olunmur (415 yoxdur).",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Tədbirin `id`-si.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Ləğv edildi. Gövdə YOXDUR."
+          },
+          "401": {
+            "description": "Sessiya kukisi yoxdur və ya etibarsızdır. Cavab JSON-dur — HTML yönləndirmə (`/login`) BAŞ VERMİR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/posts/{id}": {
+      "get": {
+        "operationId": "getPost",
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Tək paylaşım",
+        "description": "🔴 Görünməyən paylaşım üçün **404** — 403 YOX. Başqa sinfin `CLASS` paylaşımı üçün 403 qaytarsaydıq, «bu `id`-də nəsə var» faktı sızardı.\n\n⚠️ Anonim sorğu da qəbul olunur: `PUBLIC` paylaşım giriş etməmiş ziyarətçiyə açıqdır. Filtr DB səviyyəsindədir (`activeVisibleWhere`), cavab JS-də süzülmür.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Paylaşımın `id`-si — lent cavabından və ya yaratma cavabındakı `Location` başlığından götürülür.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paylaşım.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedPostResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bu endpoint autentifikasiya TƏLƏB ETMİR — 401 yalnız vahid xəta zərfinin forması kimi sənədləşdirilib, praktikada qaytarılmır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updatePostSurfaces",
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Paylaşımın səthlərini dəyişir",
+        "description": "QİSMƏN yeniləmə: göndərilməyən bayraq DƏYİŞMİR. Ona görə `PUT` deyil, `PATCH` — əməliyyat paylaşımın yalnız bir alt çoxluğuna (harada göründüyünə) toxunur, mətnə və mediaya YOX.\n\n🔴 Səthləri YALNIZ MÜƏLLİF idarə edir. Sinif yoldaşı (moderator da) **403** alır — bu, redaktədir, moderasiya əməliyyatı deyil. Paylaşımı GÖRMƏYƏN isə 403 yox, **404** alır: mövcudluq faktı sızmır.\n\n⚠️ `showInAchievements` ilk dəfə açılırsa `achievement` obyekti MƏCBURİDİR (`Achievement.title` / `.category` / `.awardedAt` sxemdə nullable deyil) — çatışmasa 422. Bayraq bağlananda nailiyyət SİLİNMİR, `ARCHIVED` olur: təsdiq tarixçəsi qalmalıdır.\n\nCavab YENİLƏNMİŞ paylaşımdır — ikinci `GET` lazım deyil.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Paylaşımın `id`-si — lent cavabından və ya yaratma cavabındakı `Location` başlığından götürülür.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePostBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Yenilənmiş paylaşım.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedPostResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessiya kukisi yoxdur və ya etibarsızdır. Cavab JSON-dur — HTML yönləndirmə (`/login`) BAŞ VERMİR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "`Content-Type` `application/json` deyil. Bu, REST login üçün CSRF müdafiəsidir: brauzerin `<form>` elementi JSON göndərə bilmir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deletePost",
+        "tags": [
+          "Posts"
+        ],
+        "summary": "Paylaşımı silir",
+        "description": "İcazə: MÜƏLLİF və ya həmin sinfin moderatoru. Moderasiya yolu ilə silinirsə `AuditLog` sətri MƏCBURİDİR və eyni transaksiyada yazılır.\n\n⚠️ Silmə SOFT-dur (`status = DELETED`), yəni `onDelete: Cascade` İŞƏ DÜŞMÜR: xronologiya qeydi həmin transaksiyada AÇIQ şəkildə silinir, nailiyyət isə `ARCHIVED` olur. Müştəri üçün nəticə eynidir — resurs artıq qaytarılmır.\n\n⚠️ İdempotent DEYİL: ikinci `DELETE` **404** verir.\n\n⚠️ Gövdə yoxdur, ona görə `Content-Type` da tələb olunmur (415 yoxdur). Brauzer `<form>`-u `DELETE` göndərə bilmir — cross-site risk onsuz da mövcud deyil.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Paylaşımın `id`-si — lent cavabından və ya yaratma cavabındakı `Location` başlığından götürülür.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Silindi. Gövdə YOXDUR (204 cavabın gövdəsi ola bilməz)."
+          },
+          "401": {
+            "description": "Sessiya kukisi yoxdur və ya etibarsızdır. Cavab JSON-dur — HTML yönləndirmə (`/login`) BAŞ VERMİR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/memories/{id}": {
+      "get": {
+        "operationId": "getMemory",
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Tək xatirə",
+        "description": "🔴 Görünməyən xatirə üçün **404** — 403 YOX. Başqa sinfin `CLASS` xatirəsi üçün 403 qaytarsaydıq «bu `id`-də nəsə var» faktı sızardı.\n\n⚠️ Anonim sorğu da qəbul olunur: `PUBLIC` xatirə Xankəndi bələdçisi səhifəsində onsuz da ictimaidir. Filtr DB səviyyəsindədir (`activeVisibleWhere` + `status ≠ DELETED`).",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Xatirənin `id`-si — sinif siyahısından və ya yaratma cavabındakı `Location` başlığından götürülür.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Xatirə.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bu endpoint autentifikasiya TƏLƏB ETMİR — 401 yalnız vahid xəta zərfinin forması kimi sənədləşdirilib, praktikada qaytarılmır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateMemory",
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Xatirəni qismən yeniləyir",
+        "description": "QİSMƏN yeniləmə: göndərilməyən sahə DƏYİŞMİR. Ona görə `PUT` deyil, `PATCH` — müştəri bütöv xatirəni göndərməyə məcbur deyil, cari dəyərlər serverdə birləşdirilir.\n\n🔴 Redaktə YALNIZ MÜƏLLİFİNDİR. Sinif yoldaşı (moderator da) **403** alır — moderator məzmunu SİLƏ bilər, amma başqasının xatirəsini yazmaq redaktə deyil, saxtakarlıq olardı. Xatirəni GÖRMƏYƏN isə 403 yox, **404** alır.\n\n🔴 `showInTimeline` BİRLƏŞMİŞ nəticədə `showInFeed` olmadan qalırsa **422** (`TIMELINE_REQUIRES_FEED`) — yoxlama servisdədir, çünki qayda göndərilən gövdəyə DEYİL, son vəziyyətə aiddir.\n\n⚠️ Səth bayraqları dəyişəndə törəmə sətirlər yenidən qurulur: `showInFeed` söndürülsə bağlı Post SOFT-DELETE olunur və xronologiya qeydi silinir (soft delete-də cascade İŞLƏMİR).\n\nCavab YENİLƏNMİŞ xatirədir — ikinci `GET` lazım deyil.",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Xatirənin `id`-si — sinif siyahısından və ya yaratma cavabındakı `Location` başlığından götürülür.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMemoryBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Yenilənmiş xatirə.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdatedMemoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sessiya kukisi yoxdur və ya etibarsızdır. Cavab JSON-dur — HTML yönləndirmə (`/login`) BAŞ VERMİR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "`Content-Type` `application/json` deyil. Bu, REST login üçün CSRF müdafiəsidir: brauzerin `<form>` elementi JSON göndərə bilmir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteMemory",
+        "tags": [
+          "Memories"
+        ],
+        "summary": "Xatirəni silir",
+        "description": "İcazə: MÜƏLLİF və ya həmin sinfin moderatoru. Moderasiya yolu ilə silinirsə `AuditLog` sətri MƏCBURİDİR və eyni transaksiyada yazılır (sahibin öz silməsi moderasiya deyil — sətir yazılmır).\n\n⚠️ Silmə SOFT-dur (`status = DELETED`), yəni `onDelete: Cascade` İŞƏ DÜŞMÜR: bağlı Post da soft-delete olunur və xronologiya qeydi həmin transaksiyada AÇIQ şəkildə silinir.\n\n⚠️ İdempotent DEYİL: ikinci `DELETE` **404** verir.\n\n⚠️ Gövdə yoxdur, ona görə `Content-Type` da tələb olunmur (415 yoxdur).",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "description": "Xatirənin `id`-si — sinif siyahısından və ya yaratma cavabındakı `Location` başlığından götürülür.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Silindi. Gövdə YOXDUR (204 cavabın gövdəsi ola bilməz)."
+          },
+          "401": {
+            "description": "Sessiya kukisi yoxdur və ya etibarsızdır. Cavab JSON-dur — HTML yönləndirmə (`/login`) BAŞ VERMİR.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5835,7 +7808,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -5967,7 +7940,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6085,7 +8058,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6192,7 +8165,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6286,7 +8259,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6379,7 +8352,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6466,7 +8439,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6615,7 +8588,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6733,7 +8706,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6887,7 +8860,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -7046,7 +9019,7 @@
             }
           },
           "429": {
-            "description": "Çox sayda uğursuz cəhd. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.",
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
             "content": {
               "application/json": {
                 "schema": {

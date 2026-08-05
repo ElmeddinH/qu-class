@@ -81,8 +81,16 @@ describe("əməliyyatlar", () => {
     // + 5 (Blok 11A: notifications · notifications/{id}/read ·
     // notifications/read-all · content/pages/{slug} · guide-places/{id})
     // + 5 (Blok 11B: admin/stats · admin/reports · admin/reports/{id}/resolve ·
-    // admin/audit · admin/users) = 33.
-    expect(operations.length).toBe(33);
+    // admin/audit · admin/users) = 33
+    // + 4 (Blok 14B — paylaşım CRUD-u: POST cohorts/{slug}/posts ·
+    // GET/PATCH/DELETE posts/{id}) = 37.
+    // + 7 (Blok 14C — EYNİ şablon iki modula):
+    //     · xatirə: POST cohorts/{slug}/memories + GET/PATCH/DELETE
+    //       memories/{id} (bu resursun oxu endpoint-i də YENİDİR)
+    //     · tədbir: POST cohorts/{slug}/events + PATCH/DELETE events/{id}
+    //       (GET events/{id} Blok 9S-dən onsuz da var idi)
+    // = 44. Yazma əməliyyatı 6-dır, yeni YOL isə 7 — fərq məhz budur.
+    expect(operations.length).toBe(44);
   });
 
   /**
@@ -356,14 +364,27 @@ describe("təhlükəsizlik sxemi", () => {
 describe("POST endpoint-ləri", () => {
   const posts = operations.filter((o) => o.method === "post");
 
-  it("altı POST var: auth × 3 + bildiriş × 2 + moderasiya qərarı", () => {
+  it("doqquz POST var: auth × 3 + bildiriş × 2 + moderasiya qərarı + paylaşım + xatirə + tədbir", () => {
     // ⚠️ Siyahı SABİT gözləmədir: yeni yazma endpoint-i əlavə edən adam
     // aşağıdaki İKİ testin (JSON gövdəsi + 415) əhatəsinə düşdüyünü görsün.
     // Blok 11A-da bildiriş işarələmə, Blok 11B-də şikayət qərarı əlavə olundu.
     //
+    // Blok 14B — `createCohortPost`. Testin MƏNASI dəyişmir: sadalanan hər
+    // POST-un NİYƏ orada olduğu bilinməlidir.
+    //   · login / logout / registerUser  → sessiya
+    //   · markNotificationRead / …ReadAll → bildiriş vəziyyəti
+    //   · resolveAdminReport              → moderasiya qərarı
+    //   · createCohortPost                → paylaşım yaradılması (CRUD-un «C»-si)
+    //   · createCohortMemory / …Event     → Blok 14C, EYNİ şablon
+    // `PATCH` və `DELETE` bu siyahıda YOXDUR — onlar `method === "post"`
+    // filtrinə düşmür və ayrıca aşağıda yoxlanılır.
+    //
     // 🔴 SİYAHIDA `/admin/audit` ÜÇÜN HEÇ NƏ YOXDUR VƏ OLMAYACAQ (TƏLƏ D) —
     // audit jurnalı yalnız əlavə olunur, yazma səthi açılmır.
     expect(posts.map((o) => o.operation.operationId).sort()).toEqual([
+      "createCohortEvent",
+      "createCohortMemory",
+      "createCohortPost",
       "login",
       "logout",
       "markAllNotificationsRead",
@@ -411,6 +432,217 @@ describe("POST endpoint-ləri", () => {
     expect(response).toBeDefined();
     // 204 cavabın gövdəsi ola bilməz.
     expect(response.content).toBeUndefined();
+  });
+});
+
+/**
+ * Blok 14B — Sprint 2 meyarı «CRUD tam işləyir» SƏNƏDDƏ sübut olunur.
+ *
+ * Yoxlayıcı Swagger-i açır və yalnız oxu görürsə nəticə "CRUD yoxdur" olur,
+ * kodda nə olmasından asılı olmayaraq. Ona görə dörd hərfin hər biri burada
+ * bərkidilir.
+ */
+describe("paylaşım CRUD-u (Blok 14B)", () => {
+  const postOps = operations.filter((o) => o.operation.tags?.[0] === "Posts");
+
+  it("dörd əməliyyat da `Posts` taqındadır", () => {
+    expect(postOps.map((o) => o.operation.operationId).sort()).toEqual([
+      "createCohortPost",
+      "deletePost",
+      "getPost",
+      "updatePostSurfaces",
+    ]);
+  });
+
+  it("C-R-U-D dörd METODLA elan olunub", () => {
+    const byId = new Map(postOps.map((o) => [o.operation.operationId, o]));
+
+    expect(byId.get("createCohortPost")?.method).toBe("post");
+    expect(byId.get("getPost")?.method).toBe("get");
+    expect(byId.get("updatePostSurfaces")?.method).toBe("patch");
+    expect(byId.get("deletePost")?.method).toBe("delete");
+  });
+
+  it("🔴 yazma əməliyyatları KUKA tələb edir, oxu isə anonimə açıqdır", () => {
+    const byId = new Map(postOps.map((o) => [o.operation.operationId, o.operation]));
+
+    for (const id of ["createCohortPost", "updatePostSurfaces", "deletePost"]) {
+      expect((byId.get(id)?.security as unknown[])?.length ?? 0, id).toBeGreaterThan(0);
+    }
+
+    // `PUBLIC` paylaşım giriş etməmiş ziyarətçiyə də açıqdır — `getEvent` ilə
+    // eyni qərar (`activeVisibleWhere` anonim üçün yalnız PUBLIC seçir).
+    expect(byId.get("getPost")?.security).toBeUndefined();
+  });
+
+  it("🔴 `DELETE` 204 qaytarır və gövdə sxemi YOXDUR", () => {
+    const remove = operations.find((o) => o.operation.operationId === "deletePost");
+    const response = remove?.operation.responses["204"] as { content?: unknown };
+
+    expect(response).toBeDefined();
+    expect(response.content).toBeUndefined();
+  });
+
+  it("🔴 `DELETE`-də 415 YOXDUR — gövdəsiz sorğuda məzmun tipi tələb olunmur", () => {
+    // Qoruma cross-site `<form>` POST-una qarşıdır; brauzer forması `DELETE`
+    // göndərə bilmir, yəni 415 burada yalnız süni maneə olardı.
+    const remove = operations.find((o) => o.operation.operationId === "deletePost");
+    expect(remove?.operation.responses).not.toHaveProperty("415");
+  });
+
+  it("🔴 yazma əməliyyatlarında 429 sənədləşdirilib (spam qapısı bağlıdır)", () => {
+    for (const id of ["createCohortPost", "updatePostSurfaces", "deletePost"]) {
+      const operation = operations.find((o) => o.operation.operationId === id);
+      expect(operation?.operation.responses, id).toHaveProperty("429");
+    }
+  });
+
+  it("`POST` 201 qaytarır və `Location` başlığını təsvir edir", () => {
+    const create = operations.find((o) => o.operation.operationId === "createCohortPost");
+    const created = create?.operation.responses["201"] as { description?: string };
+
+    expect(created).toBeDefined();
+    expect(created.description).toContain("Location");
+  });
+
+  it("🔴 yaratma gövdəsində `cohortId` YOXDUR — sinif YOLDAN gəlir", () => {
+    // İki mənbə olsaydı, `{slug}` ilə gövdənin ziddiyyəti hər çağırış
+    // nöqtəsində fərqli həll olunardı.
+    const schemas = document.components?.schemas as
+      | Record<string, { properties?: Record<string, unknown> }>
+      | undefined;
+
+    expect(Object.keys(schemas?.CreatePostBody?.properties ?? {})).not.toContain(
+      "cohortId",
+    );
+  });
+
+  it("🔴 qismən yeniləmə: `UpdatePostBody`-də MƏCBURİ sahə yoxdur", () => {
+    // Bayraqlardan biri məcburi olsaydı, tək bayraq göndərən müştəri o birini
+    // səssizcə söndürərdi.
+    const schemas = document.components?.schemas as
+      | Record<string, { required?: string[] }>
+      | undefined;
+
+    expect(schemas?.UpdatePostBody?.required).toBeUndefined();
+  });
+
+  it("🔴 yaratma nümunəsi DOĞRULAMADAN keçir — «Try it out» 422 verməsin", async () => {
+    const { CreatePostBodySchema } = await import("./schemas");
+    const schemas = document.components?.schemas as
+      | Record<string, { example?: unknown }>
+      | undefined;
+
+    const parsed = CreatePostBodySchema.safeParse(schemas?.CreatePostBody?.example);
+    expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
+  });
+});
+
+/**
+ * Blok 14C — EYNİ meyar iki modul üçün: xatirə və tədbirin yazma səthi
+ * SƏNƏDDƏ görünməlidir. Yoxlayıcı Swagger-i açıb yalnız oxu görürsə nəticə
+ * "yazma yoxdur" olur, kodda nə olmasından asılı olmayaraq.
+ */
+describe("xatirə və tədbir yazma səthi (Blok 14C)", () => {
+  const byId = new Map(operations.map((o) => [o.operation.operationId, o]));
+
+  it("xatirənin dörd əməliyyatı `Memories` taqındadır", () => {
+    const memoryOps = operations.filter((o) => o.operation.tags?.[0] === "Memories");
+
+    expect(memoryOps.map((o) => o.operation.operationId).sort()).toEqual([
+      "createCohortMemory",
+      "deleteMemory",
+      "getMemory",
+      "updateMemory",
+    ]);
+  });
+
+  it("altı yazma əməliyyatı DÜZGÜN METODLA elan olunub", () => {
+    expect(byId.get("createCohortMemory")?.method).toBe("post");
+    expect(byId.get("updateMemory")?.method).toBe("patch");
+    expect(byId.get("deleteMemory")?.method).toBe("delete");
+    expect(byId.get("createCohortEvent")?.method).toBe("post");
+    expect(byId.get("updateEvent")?.method).toBe("patch");
+    expect(byId.get("deleteEvent")?.method).toBe("delete");
+  });
+
+  const WRITE_IDS = [
+    "createCohortMemory",
+    "updateMemory",
+    "deleteMemory",
+    "createCohortEvent",
+    "updateEvent",
+    "deleteEvent",
+  ] as const;
+
+  it.each(WRITE_IDS)("%s — KUKA tələb edir və 429 sənədləşdirilib", (id) => {
+    const operation = byId.get(id)?.operation;
+
+    expect((operation?.security as unknown[])?.length ?? 0, id).toBeGreaterThan(0);
+    // Limitsiz yazma endpoint-i spam qapısıdır (`lib/api/rate-limit.ts`).
+    expect(operation?.responses, id).toHaveProperty("429");
+  });
+
+  it.each(["deleteMemory", "deleteEvent"] as const)(
+    "%s — 204 qaytarır, gövdə sxemi və 415 YOXDUR",
+    (id) => {
+      const operation = byId.get(id)?.operation;
+      const response = operation?.responses["204"] as { content?: unknown };
+
+      expect(response).toBeDefined();
+      expect(response.content).toBeUndefined();
+      // Brauzer `<form>`-u `DELETE` göndərə bilmir — məzmun tipi tələbi süni
+      // maneə olardı (paylaşım `DELETE`-i ilə eyni qərar).
+      expect(operation?.responses).not.toHaveProperty("415");
+    },
+  );
+
+  it.each(["CreateMemoryBody", "CreateEventBody"] as const)(
+    "🔴 %s gövdəsində `cohortId` YOXDUR — sinif YOLDAN gəlir",
+    (name) => {
+      const schemas = document.components?.schemas as
+        | Record<string, { properties?: Record<string, unknown> }>
+        | undefined;
+
+      expect(Object.keys(schemas?.[name]?.properties ?? {})).not.toContain("cohortId");
+    },
+  );
+
+  it.each(["UpdateMemoryBody", "UpdateEventBody"] as const)(
+    "🔴 %s-də MƏCBURİ sahə yoxdur (qismən yeniləmə)",
+    (name) => {
+      // Sahələrdən biri məcburi olsaydı, tək sahə göndərən müştəri qalanını
+      // səssizcə sıfırlardı.
+      const schemas = document.components?.schemas as
+        | Record<string, { required?: string[] }>
+        | undefined;
+
+      expect(schemas?.[name]?.required).toBeUndefined();
+    },
+  );
+
+  it("🔴 yaratma nümunələri DOĞRULAMADAN keçir — «Try it out» 422 verməsin", async () => {
+    const { CreateEventBodySchema, CreateMemoryBodySchema } = await import("./schemas");
+    const schemas = document.components?.schemas as
+      | Record<string, { example?: unknown }>
+      | undefined;
+
+    const memory = CreateMemoryBodySchema.safeParse(schemas?.CreateMemoryBody?.example);
+    expect(memory.success, JSON.stringify(memory.error?.issues)).toBe(true);
+
+    const event = CreateEventBodySchema.safeParse(schemas?.CreateEventBody?.example);
+    expect(event.success, JSON.stringify(event.error?.issues)).toBe(true);
+  });
+
+  it("201 cavabları `Location` başlığını təsvir edir", () => {
+    for (const id of ["createCohortMemory", "createCohortEvent"] as const) {
+      const created = byId.get(id)?.operation.responses["201"] as {
+        description?: string;
+      };
+
+      expect(created, id).toBeDefined();
+      expect(created.description, id).toContain("Location");
+    }
   });
 });
 

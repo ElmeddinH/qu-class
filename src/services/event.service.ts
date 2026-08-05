@@ -839,6 +839,202 @@ export async function createEvent(
   return { ok: true, value: { eventId } };
 }
 
+// ---------------------------------------------------------------------------
+// updateEvent / deleteEvent — Blok 14C
+//
+// 🔴 NİYƏ BU FUNKSİYALAR İNDİ YARANIR: `/api/v1/events/{id}` üçün `PATCH` və
+// `DELETE` lazımdır, servisdə isə yalnız `createEvent` var idi. Route handler
+// `prisma.*` çağıra bilməz (CLAUDE.md §4) — yazma məntiqi BURADA olmalıdır ki,
+// gələcək Server Action da eyni qapıdan keçsin.
+//
+// 🔴 QAPI `createEvent` İLƏ EYNİDİR: əvvəl gövdənin qüsurları
+// (`FACULTY_REQUIRED` · `INVALID_DATES`), sonra `canManageEvent`, sonra
+// transaksiya + `recordAudit`. Yeni `reason` ƏLAVƏ EDİLMİR — `lib/api/
+// mutation-result.ts` xəritəsi olduğu kimi qalır.
+// ---------------------------------------------------------------------------
+
+/**
+ * Yeniləmə girişi — yaratma ilə EYNİ sahələr, `cohortId` ƏVƏZİNƏ `eventId`.
+ *
+ * ⚠️ `cohortId` QƏSDƏN yoxdur: tədbirin sinfi redaktə ilə DƏYİŞMİR. Dəyişsəydi
+ * `createEvent`-in yaratdığı `INVITED` sətirlər və bildirişlər başqa sinfə
+ * "köçər", köhnə sinif isə qeydiyyatını itirərdi.
+ */
+export interface UpdateEventData extends Omit<CreateEventData, "cohortId"> {
+  eventId: string;
+}
+
+/**
+ * Tədbiri yeniləyir.
+ *
+ * TƏK TRANSAKSİYA:
+ *   1. `Event` sahələri
+ *   2. `TimelineEntry` — YALNIZ tədbir xronologiyaya əlavə olunubsa
+ *   3. `AuditLog` (TƏLƏ T42 — `recordAudit` yeganə yazma yoludur)
+ *
+ * 🔴 (2) MƏXFİLİK ADDIMIDIR, gözəllik deyil: xronologiya qeydinin
+ * `visibility`-si MƏNBƏDƏN kopyalanır (`buildEventTimelineEntry`). Tədbirin
+ * görünürlüyü `PUBLIC`-dən `CLASS`-a daraldılanda köhnə qeyd `PUBLIC` qalsaydı,
+ * daraltma SƏSSİZCƏ İŞLƏMƏZDİ və başlıq/xülasə açıq xronologiyada görünərdi.
+ * `upsert` işlədilir, çünki `TimelineEntry.eventId` `@unique`-dir (T11).
+ *
+ * ⚠️ Dəvətlər və bildirişlər TƏKRAR GÖNDƏRİLMİR: redaktə hər dəfə sinfə mesaj
+ * atsaydı, bir yazı səhvini düzəltmək 28 nəfərə bildiriş demək olardı.
+ */
+export async function updateEvent(
+  viewer: UserViewer,
+  data: UpdateEventData,
+): Promise<EventMutationResult> {
+  if (data.scope === EventScope.FACULTY && !data.facultyId) {
+    return { ok: false, reason: "FACULTY_REQUIRED" };
+  }
+  if (data.endsAt !== null && data.endsAt.getTime() <= data.startsAt.getTime()) {
+    return { ok: false, reason: "INVALID_DATES" };
+  }
+
+  // Rol qapısı — `loadManageableEvent` `NOT_FOUND` / `FORBIDDEN` verir.
+  const loaded = await loadManageableEvent(viewer, data.eventId);
+  if (!loaded.ok) return loaded;
+
+  const current = await prisma.event.findUnique({
+    where: { id: data.eventId },
+    select: { id: true, cohortId: true, status: true, addedToTimeline: true, summary: true },
+  });
+
+  if (!current || current.status === EventStatus.CANCELLED) {
+    return { ok: false, reason: "NOT_FOUND" };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.event.update({
+      where: { id: data.eventId },
+      data: {
+        clubId: data.clubId,
+        facultyId: data.scope === EventScope.FACULTY ? data.facultyId : null,
+        scope: data.scope,
+        category: data.category,
+        title: data.title,
+        description: data.description,
+        agenda: data.agenda,
+        startsAt: data.startsAt,
+        endsAt: data.endsAt,
+        location: data.location,
+        onlineUrl: data.onlineUrl,
+        isOnline: data.isOnline,
+        capacity: data.capacity,
+        registrationDeadline: data.registrationDeadline,
+        coverUrl: data.coverUrl,
+        contactId: data.contactId,
+        visibility: data.visibility,
+      },
+    });
+
+    if (current.addedToTimeline && current.cohortId !== null) {
+      const entry = buildEventTimelineEntry({
+        eventId: current.id,
+        cohortId: current.cohortId,
+        title: data.title,
+        description: data.description,
+        summary: current.summary,
+        location: data.location,
+        category: data.category,
+        startsAt: data.startsAt,
+        visibility: data.visibility,
+      });
+
+      await tx.timelineEntry.upsert({
+        where: { eventId: current.id },
+        create: entry,
+        update: {
+          title: entry.title,
+          summary: entry.summary,
+          category: entry.category,
+          occurredAt: entry.occurredAt,
+          academicYear: entry.academicYear,
+          visibility: entry.visibility,
+        },
+      });
+    }
+
+    // ⚠️ TƏLƏ T42 — metadata MƏTN DAŞIMIR (`safeAuditMetadata` ağ siyahısı).
+    await recordAudit(tx, {
+      actorId: viewer.userId,
+      action: AuditAction.UPDATE,
+      entityType: NotificationEntityType.EVENT,
+      entityId: data.eventId,
+      metadata: {
+        operation: "updateEvent",
+        ...(current.cohortId === null ? {} : { cohortId: current.cohortId }),
+        scope: data.scope,
+        category: data.category,
+        visibility: data.visibility,
+      },
+    });
+  });
+
+  return { ok: true, value: null };
+}
+
+/**
+ * Tədbiri silir.
+ *
+ * 🔴 SİLMƏ `status = CANCELLED`-DİR, sətir SİLİNMİR. Səbəb sxemdədir:
+ * `Event.status` dörd dəyər tanıyır (`DRAFT | PUBLISHED | CANCELLED |
+ * COMPLETED`) və `DELETED` YOXDUR. Yeni status dəyəri əlavə etmək enum +
+ * miqrasiya + `PUBLIC_EVENT_STATUSES` toxunuşu deməkdir; `CANCELLED` isə
+ * onsuz da "artıq keçərli deyil" mənasını daşıyır və ictimai siyahıdan çıxır
+ * (`visibleWithStatus(viewer, PUBLIC_EVENT_STATUSES)`). Hard delete də seçilə
+ * bilərdi, amma o, RSVP tarixçəsini və check-in qeydlərini cascade ilə
+ * APARARDI — iştirak faktı isə hesabatın mənbəyidir.
+ *
+ * ⚠️ Soft delete-də `onDelete: Cascade` İŞƏ DÜŞMÜR (TƏLƏ T4 / Blok 8-in TƏLƏ
+ * C dərsi), ona görə `TimelineEntry` EYNİ transaksiyada AÇIQ şəkildə silinir
+ * və `addedToTimeline` bayrağı düşür.
+ *
+ * ⚠️ İdempotent DEYİL: artıq ləğv edilmiş tədbir üçün `NOT_FOUND` qaytarılır
+ * (`deletePost` / `deleteMemory` ilə eyni davranış — "sildim, amma yox idi"
+ * cavabı skriptin səhvini gizlədərdi).
+ */
+export async function deleteEvent(
+  viewer: UserViewer,
+  eventId: string,
+): Promise<EventMutationResult> {
+  const loaded = await loadManageableEvent(viewer, eventId);
+  if (!loaded.ok) return loaded;
+
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, cohortId: true, status: true },
+  });
+
+  if (!event || event.status === EventStatus.CANCELLED) {
+    return { ok: false, reason: "NOT_FOUND" };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // İZ ƏVVƏL, məzmun sonra — `deleteMemory` ilə eyni sıra.
+    await recordAudit(tx, {
+      actorId: viewer.userId,
+      action: AuditAction.DELETE,
+      entityType: NotificationEntityType.EVENT,
+      entityId: eventId,
+      metadata: {
+        operation: "deleteEvent",
+        ...(event.cohortId === null ? {} : { cohortId: event.cohortId }),
+      },
+    });
+
+    await tx.event.update({
+      where: { id: eventId },
+      data: { status: EventStatus.CANCELLED, addedToTimeline: false },
+    });
+
+    await tx.timelineEntry.deleteMany({ where: { eventId } });
+  });
+
+  return { ok: true, value: null };
+}
+
 /** `EVENT_MANAGER_ROLES` yoxlaması — admin istisnadır. */
 async function hasEventManagerRole(
   viewer: UserViewer,

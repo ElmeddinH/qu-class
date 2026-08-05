@@ -22,7 +22,7 @@ import { unstable_rethrow } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
 import { buildCsv, csvFileName } from "@/lib/csv";
-import { EventScope, type RsvpStatus as RsvpStatusType } from "@/lib/enums";
+import { type RsvpStatus as RsvpStatusType } from "@/lib/enums";
 import { eventScopeLabel, rsvpStatusLabel } from "@/lib/labels";
 import {
   addEventPhotos,
@@ -40,6 +40,7 @@ import {
   type EventMutationFailure,
 } from "@/services/event.service";
 
+import { toCreateEventData } from "./event-input";
 import {
   addEventPhotosSchema,
   attendeeActionSchema,
@@ -140,27 +141,13 @@ export async function createEventAction(
 
     const data = parsed.data;
 
-    const result = await createEvent(viewer, {
-      cohortId: data.cohortId,
-      scope: data.scope,
-      category: data.category,
-      facultyId: data.scope === EventScope.FACULTY ? emptyToNull(data.facultyId) : null,
-      clubId: data.scope === EventScope.CLUB ? emptyToNull(data.clubId) : null,
-      title: data.title,
-      description: emptyToNull(data.description),
-      startsAt: new Date(data.startsAt),
-      endsAt: data.endsAt === "" ? null : new Date(data.endsAt),
-      location: emptyToNull(data.location),
-      onlineUrl: emptyToNull(data.onlineUrl),
-      isOnline: data.isOnline,
-      capacity: data.capacity === "" ? null : Number.parseInt(data.capacity, 10),
-      registrationDeadline:
-        data.registrationDeadline === "" ? null : new Date(data.registrationDeadline),
-      agenda: emptyToNull(data.agenda),
-      contactId: emptyToNull(data.contactId),
-      visibility: data.visibility,
-      coverUrl: emptyToNull(data.coverUrl),
-    });
+    // ⚠️ Çevirmə (sətir → `Date` / `number`, `scope`-a görə təmizləmə)
+    // `features/events/event-input.ts`-dədir — `/api/v1` route-u ilə EYNİ
+    // funksiya (Blok 14C).
+    const result = await createEvent(
+      viewer,
+      toCreateEventData(data, data.cohortId),
+    );
 
     if (!result.ok) return { ok: false, message: FAILURE_MESSAGES[result.reason] };
 

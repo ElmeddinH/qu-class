@@ -24,17 +24,14 @@ import {
   deleteMemory,
   updateMemory,
   type MemoryMutationFailure,
-  type MemoryWriteData,
 } from "@/services/memory.service";
 
+import { toMemoryWriteData } from "./memory-input";
 import {
   createMemorySchema,
-  emptyToNull,
   memoryIdSchema,
   updateMemorySchema,
   TIMELINE_REQUIRES_FEED_MESSAGE,
-  type CreateMemoryInput,
-  type UpdateMemoryInput,
 } from "./schemas";
 
 export interface MemoryActionResult<T = undefined> {
@@ -78,34 +75,10 @@ function revalidateMemorySurfaces(slug: string): void {
   revalidatePath(`/class/${slug}`);
 }
 
-/**
- * Yüklənmiş şəklin ünvanı həqiqətən bizim yükləmə qovluğundandırmı?
- * (`features/feed/actions.ts` → `isUploadPath` ilə eyni səbəb: xarici ünvan
- * qəbul etsək kart başqa saytdan şəkil çəkərdi.)
- */
-function toUploadPath(value: string): string | null {
-  const url = emptyToNull(value);
-  if (url === null) return null;
-  return url.startsWith("/uploads/") && !url.includes("..") ? url : null;
-}
-
-/** Forma dəyərlərini servis girişinə çevirir — TƏLƏ T3-ün ödənişi MƏHZ BURADA. */
-function toWriteData(data: CreateMemoryInput | UpdateMemoryInput): MemoryWriteData {
-  return {
-    type: data.type,
-    title: data.title,
-    body: data.body,
-    dedicatedTo: emptyToNull(data.dedicatedTo),
-    imageUrl: toUploadPath(data.imageUrl),
-    occurredAt: new Date(data.occurredAt),
-    guidePlaceId: emptyToNull(data.guidePlaceId),
-    visibility: data.visibility,
-    showInProfile: data.showInProfile,
-    showInFeed: data.showInFeed,
-    showInTimeline: data.showInTimeline,
-    showInYearbook: data.showInYearbook,
-  };
-}
+// ⚠️ Forma dəyərlərinin servis girişinə çevrilməsi (TƏLƏ T3) ARTIQ BURADA
+// DEYİL — `./memory-input.ts`-dədir, çünki eyni çevirmə `/api/v1` route
+// handler-inə də lazımdır və `"use server"` faylından yalnız `async` funksiya
+// ixrac oluna bilir (Blok 14C).
 
 // ---------------------------------------------------------------------------
 // createMemory
@@ -129,7 +102,7 @@ export async function createMemoryAction(
 
     const result = await createMemory(viewer, {
       cohortId: parsed.data.cohortId,
-      ...toWriteData(parsed.data),
+      ...toMemoryWriteData(parsed.data),
     });
 
     if (!result.ok) return { ok: false, message: FAILURE_MESSAGES[result.reason] };
@@ -166,7 +139,7 @@ export async function updateMemoryAction(
 
     const result = await updateMemory(viewer, {
       memoryId: parsed.data.memoryId,
-      ...toWriteData(parsed.data),
+      ...toMemoryWriteData(parsed.data),
     });
 
     if (!result.ok) return { ok: false, message: FAILURE_MESSAGES[result.reason] };

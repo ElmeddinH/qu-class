@@ -16,12 +16,18 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   LOGIN_MAX_ATTEMPTS,
   LOGIN_WINDOW_MS,
+  WRITE_MAX_REQUESTS,
+  WRITE_WINDOW_MS,
   checkLoginRate,
   clearLoginAttempts,
+  consumeWriteRate,
+  enforceWriteRate,
   loginAttemptKey,
   recordFailedLogin,
   requestIp,
   resetLoginRateLimiter,
+  resetWriteRateLimiter,
+  writeRateKey,
 } from "./rate-limit";
 
 const KEY = loginAttemptKey("rep@qu.edu.az", "127.0.0.1");
@@ -164,5 +170,108 @@ describe("requestIp", () => {
     });
 
     expect(requestIp(request)).toBe("198.51.100.9");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Yazma sayğacı (Blok 14B)
+//
+// 🔴 Login sayğacından FƏRQİ: burada UĞURLU sorğu da sayılır. 500 uğurlu
+// paylaşım da spam-dır və "uğursuzluğu" olmayan əməliyyatda uğursuzluq
+// saymağın mənası yoxdur.
+// ---------------------------------------------------------------------------
+
+const WRITE_KEY = writeRateKey("usr_1", "posts");
+
+beforeEach(() => {
+  resetWriteRateLimiter();
+});
+
+describe("writeRateKey", () => {
+  it("🔴 açar `userId`-dir, IP DEYİL — NAT arxasında kampus bloklanmasın", () => {
+    expect(WRITE_KEY).toBe("usr_1|posts");
+  });
+
+  it("əhatə AYRI büdcədir — paylaşım limiti xatirə limitini yemir", () => {
+    expect(writeRateKey("usr_1", "posts")).not.toBe(writeRateKey("usr_1", "memories"));
+  });
+});
+
+describe("consumeWriteRate", () => {
+  it("ilk sorğu keçir və qalan sayı bir azalır", () => {
+    const verdict = consumeWriteRate(WRITE_KEY, T0);
+
+    expect(verdict.allowed).toBe(true);
+    expect(verdict.remaining).toBe(WRITE_MAX_REQUESTS - 1);
+  });
+
+  it("🔴 UĞURLU sorğular da sayılır — hədd tam dolur", () => {
+    for (let i = 0; i < WRITE_MAX_REQUESTS; i += 1) {
+      expect(consumeWriteRate(WRITE_KEY, T0).allowed, `sorğu ${i + 1}`).toBe(true);
+    }
+
+    expect(consumeWriteRate(WRITE_KEY, T0).allowed).toBe(false);
+  });
+
+  it("hədd aşılanda `Retry-After` üçün müsbət saniyə verir", () => {
+    for (let i = 0; i < WRITE_MAX_REQUESTS; i += 1) consumeWriteRate(WRITE_KEY, T0);
+
+    const verdict = consumeWriteRate(WRITE_KEY, T0);
+    expect(verdict.retryAfterSeconds).toBeGreaterThan(0);
+    expect(verdict.retryAfterSeconds).toBeLessThanOrEqual(WRITE_WINDOW_MS / 1000);
+  });
+
+  it("🔴 BLOKLANMIŞ cəhd sayğacı UZATMIR — sabit pəncərə, sürüşən deyil", () => {
+    for (let i = 0; i < WRITE_MAX_REQUESTS; i += 1) consumeWriteRate(WRITE_KEY, T0);
+
+    // Pəncərənin ortasında daha 50 cəhd — bitmə anı dəyişməməlidir.
+    const half = T0 + WRITE_WINDOW_MS / 2;
+    for (let i = 0; i < 50; i += 1) consumeWriteRate(WRITE_KEY, half);
+
+    // Pəncərə bitən kimi yenidən icazə var.
+    expect(consumeWriteRate(WRITE_KEY, T0 + WRITE_WINDOW_MS).allowed).toBe(true);
+  });
+
+  it("pəncərə bitəndən sonra sayğac sıfırlanır", () => {
+    for (let i = 0; i < WRITE_MAX_REQUESTS; i += 1) consumeWriteRate(WRITE_KEY, T0);
+    expect(consumeWriteRate(WRITE_KEY, T0).allowed).toBe(false);
+
+    const after = T0 + WRITE_WINDOW_MS + 1;
+    expect(consumeWriteRate(WRITE_KEY, after).remaining).toBe(WRITE_MAX_REQUESTS - 1);
+  });
+
+  it("fərqli istifadəçilər bir-birini bloklamır", () => {
+    const other = writeRateKey("usr_2", "posts");
+    for (let i = 0; i < WRITE_MAX_REQUESTS; i += 1) consumeWriteRate(WRITE_KEY, T0);
+
+    expect(consumeWriteRate(other, T0).allowed).toBe(true);
+  });
+
+  it("🔴 login sayğacı ilə ANBARLAR AYRIDIR", () => {
+    for (let i = 0; i < WRITE_MAX_REQUESTS; i += 1) consumeWriteRate(WRITE_KEY, T0);
+
+    // Yazma həddi dolsa da giriş cəhdləri toxunulmaz qalır.
+    expect(checkLoginRate(KEY, T0).remaining).toBe(LOGIN_MAX_ATTEMPTS);
+  });
+});
+
+describe("enforceWriteRate", () => {
+  it("hədd altında `null` qaytarır — route davam edir", () => {
+    expect(enforceWriteRate("usr_3", "posts")).toBeNull();
+  });
+
+  it("🔴 hədd aşılanda 429 + `Retry-After` başlığı", async () => {
+    for (let i = 0; i < WRITE_MAX_REQUESTS; i += 1) enforceWriteRate("usr_4", "posts");
+
+    const response = enforceWriteRate("usr_4", "posts");
+    expect(response).not.toBeNull();
+    expect(response?.status).toBe(429);
+
+    // ⚠️ `Retry-After` OLMASA müştəri dərhal yenidən vurur (RFC 9110 §10.2.3).
+    const retryAfter = response?.headers.get("retry-after");
+    expect(Number(retryAfter)).toBeGreaterThan(0);
+
+    const body = (await response?.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("TOO_MANY_REQUESTS");
   });
 });

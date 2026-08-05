@@ -78,8 +78,26 @@ const memoryShape = {
   ...surfaceShape,
 };
 
+/**
+ * Xatirənin SAHƏLƏRİ — çarpaz qayda (`memorySurfaceRules`) HƏLƏ tətbiq
+ * olunmadan.
+ *
+ * 🔴 NİYƏ AYRICA İXRAC OLUNUR (Blok 14C, `features/feed/schemas.ts` →
+ * `createPostFields` ilə EYNİ SƏBƏB): `/api/v1` gövdə sxemi (`lib/api/
+ * schemas.ts`) eyni sahələri işlədir, amma `cohortId` ONDA YOXDUR — REST-də
+ * sinif YOLDAN gəlir (`/cohorts/{slug}/memories`). Üstəlik `PATCH` gövdəsi
+ * `.partial()`-dır. Hər ikisi üçün effekt (`superRefine`) qoyulmamış OBYEKT
+ * lazımdır: `ZodEffects`-in `.omit()` və `.partial()` metodları YOXDUR.
+ *
+ * ⚠️ Sahə qaydaları BURADA TƏK NÜSXƏDİR — forma da, API da bunu işlədir.
+ */
+export const memoryFields = z.object(memoryShape);
+
+/** Doğrulanmış xatirə sahələri — `cohortId` / `memoryId` DAXİL DEYİL. */
+export type MemoryFieldsInput = z.infer<typeof memoryFields>;
+
 /** 🔴 TƏLƏ A — bir yerdə yazılır, hər iki sxemə tətbiq olunur. */
-function refineSurfaces(
+export function memorySurfaceRules(
   value: { showInFeed: boolean; showInTimeline: boolean },
   ctx: z.RefinementCtx,
 ): void {
@@ -101,7 +119,7 @@ export const createMemorySchema = z
     cohortId: z.string().trim().min(1, "Sinif müəyyən edilməyib."),
     ...memoryShape,
   })
-  .superRefine(refineSurfaces);
+  .superRefine(memorySurfaceRules);
 
 export type CreateMemoryInput = z.infer<typeof createMemorySchema>;
 
@@ -110,7 +128,7 @@ export const updateMemorySchema = z
     memoryId: z.string().trim().min(1, "Xatirə tapılmadı."),
     ...memoryShape,
   })
-  .superRefine(refineSurfaces);
+  .superRefine(memorySurfaceRules);
 
 export type UpdateMemoryInput = z.infer<typeof updateMemorySchema>;
 
