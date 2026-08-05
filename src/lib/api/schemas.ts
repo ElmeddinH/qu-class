@@ -40,6 +40,7 @@ import {
   FaqCategorySchema,
   GUIDE_CATEGORY_VALUES,
   GuideCategorySchema,
+  MEDIA_TYPE_VALUES,
   MEMORY_TYPE_VALUES,
   NOTIFICATION_TYPE_VALUES,
   NotificationTypeSchema,
@@ -861,6 +862,61 @@ export const SearchResultsSchema = z
     achievements: z.array(SearchHitSchema),
   })
   .openapi("SearchResults");
+
+// ---------------------------------------------------------------------------
+// Zərfsiz köhnə endpoint-lər — `/api/upload`, `.../ics` (TƏLƏ F)
+//
+// 🔴 Bu ikisi `/api/v1` DEYİL və `lib/api/respond.ts` zərfindən keçmir (bax
+// həmin faylın başlığındakı qeyd: `/api/upload` ADI ORADA `/api/feed` və
+// `/api/search` ilə YANAŞI çəkilir — "zərfsiz, qəsdən"). Ona görə bu sxemlər
+// `envelope()` / `ApiErrorSchema`-dan İSTİFADƏ ETMİR: cavab forması v1-dən
+// FƏRQLİDİR və sənəd real cavaba uyğun olmalıdır, müqavilə şablonuna yox.
+// ---------------------------------------------------------------------------
+
+/**
+ * `/api/upload` və `.../ics`-in xəta cavabı — `{ error: "mətn" }`.
+ *
+ * ⚠️ v1-in `ApiErrorSchema`-sı İLƏ QARIŞDIRMA: orada `error.code` +
+ * `error.message` iç-içədir, burada `error` BİRBAŞA sətirdir. İki ayrı sxem
+ * saxlanılır ki, gələcəkdə biri dəyişəndə digəri səhvən "sinxronlaşmasın".
+ */
+export const UnwrappedErrorSchema = z
+  .object({ error: z.string() })
+  .openapi("UnwrappedError", { example: { error: "Fayl boşdur." } });
+
+/** `GET /api/upload` cavabı — müştəri formanı göndərmədən limitləri bilsin. */
+export const UploadLimitsSchema = z
+  .object({
+    maxBytes: z.number().int().positive().openapi({
+      description: "Xam faylın (optimizasiyadan ƏVVƏL) maksimum ölçüsü.",
+      example: 10 * 1024 * 1024,
+    }),
+    mimeTypes: z.array(z.string()).openapi({
+      description: "Qəbul edilən MIME növlərinin AĞ SİYAHISI.",
+      example: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+    }),
+  })
+  .openapi("UploadLimits");
+
+/**
+ * `POST /api/upload` cavabı (201) — `MediaAsset` sətrinin sahələri, amma
+ * sətrin ÖZÜ deyil: yükləmə anında hələ `postId` yoxdur (bax
+ * `services/storage.ts` başlığı). Müştəri bu obyekti formada saxlayır və
+ * `createPost` / `createMemory`-yə ötürür.
+ */
+export const UploadedMediaAssetSchema = z
+  .object({
+    url: z.string().openapi({ description: "`/uploads/…` nisbi yolu.", example: "/uploads/2026/09/c1a2b3.webp" }),
+    thumbUrl: z.string().openapi({ description: "400px kiçik variant." }),
+    type: z.enum(MEDIA_TYPE_VALUES).openapi({
+      description: "Hazırda YALNIZ `IMAGE` qaytarılır — sxem `MediaAsset` sütunu ilə eyni enum-u paylaşır.",
+    }),
+    mimeType: z.string().openapi({ example: "image/webp", description: "Həmişə `image/webp` — optimizasiya WebP-ə çevirir." }),
+    sizeBytes: z.number().int().nonnegative(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+  })
+  .openapi("UploadedMediaAsset");
 
 // ---------------------------------------------------------------------------
 // Query sxemləri (sadə hallar — mürəkkəb filtrlər saf modullardan gəlir)

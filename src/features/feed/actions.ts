@@ -20,7 +20,7 @@ import { revalidatePath } from "next/cache";
 import { unstable_rethrow } from "next/navigation";
 
 import { requireUser } from "@/lib/auth";
-import { PostKind, ReportEntityType } from "@/lib/enums";
+import { ReportEntityType } from "@/lib/enums";
 import {
   createComment,
   createPost,
@@ -30,12 +30,14 @@ import {
   toggleReaction,
   updatePostSurfaces,
   type FeedComment,
-  type MediaAssetData,
   type PostMutationFailure,
 } from "@/services/post.service";
 import { createReport } from "@/services/report.service";
 
-import type { AchievementFanoutInput } from "./fanout";
+// ⚠️ Çevirmə köməkçiləri Blok 14B-də `post-input.ts`-ə köçdü: `/api/v1`
+// route-ları da onları işlədir və `"use server"` faylından saf funksiya ixrac
+// oluna bilmir. Davranış eynidir, yalnız yeri dəyişib.
+import { toAchievementInput, toCreatePostData } from "./post-input";
 import {
   createCommentSchema,
   createPostSchema,
@@ -45,8 +47,6 @@ import {
   reportPostSchema,
   toggleReactionSchema,
   updatePostSurfacesSchema,
-  type AchievementDetailsInput,
-  type MediaAssetInput,
 } from "./schemas";
 
 // ---------------------------------------------------------------------------
@@ -94,59 +94,6 @@ function revalidateFeedSurfaces(slug: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Çevirmələr (T3 — sətir → Date / null MƏHZ BURADA olur)
-// ---------------------------------------------------------------------------
-
-/**
- * Yüklənmiş şəklin ünvanı həqiqətən bizim yükləmə qovluğundandırmı?
- *
- * Media obyektləri müştəridən gəlir (`/api/upload` cavabı formada saxlanılır),
- * yəni ixtiyari `url` göndərilə bilər. Xarici ünvan qəbul etsək lent kartı
- * başqa saytdan şəkil çəkərdi (izləmə pikseli, qarışıq məzmun). Yalnız
- * `/uploads/` ilə başlayan nisbi yol keçir.
- */
-function isUploadPath(url: string): boolean {
-  return url.startsWith("/uploads/") && !url.includes("..");
-}
-
-function toMediaData(media: MediaAssetInput[]): MediaAssetData[] {
-  return media
-    .filter((asset) => isUploadPath(asset.url))
-    .map((asset, index) => ({
-      url: asset.url,
-      thumbUrl: emptyToNull(asset.thumbUrl),
-      type: asset.type,
-      mimeType: emptyToNull(asset.mimeType),
-      sizeBytes: asset.sizeBytes,
-      width: asset.width,
-      height: asset.height,
-      caption: emptyToNull(asset.caption),
-      // Sıra formadakı MÖVCUD ardıcıllıqdan götürülür — müştərinin göndərdiyi
-      // `order` dəyərinə güvənilmir (təkrar və boşluq ola bilər).
-      order: index,
-    }));
-}
-
-/**
- * Inline nailiyyət formunu servis girişinə çevirir.
- * `null` qaytarır → nailiyyət tələb olunmur (sxem bunu artıq yoxlayıb).
- */
-function toAchievementInput(
-  details: AchievementDetailsInput,
-  required: boolean,
-): AchievementFanoutInput | null {
-  if (!required || !details.category) return null;
-
-  return {
-    category: details.category,
-    title: details.title,
-    organization: emptyToNull(details.organization),
-    awardedAt: new Date(details.awardedAt),
-    proofUrl: emptyToNull(details.proofUrl),
-  };
-}
-
-// ---------------------------------------------------------------------------
 // createPost
 // ---------------------------------------------------------------------------
 
@@ -166,34 +113,7 @@ export async function createPostAction(
     }
 
     const data = parsed.data;
-    const needsAchievement =
-      data.kind === PostKind.ACHIEVEMENT || data.showInAchievements;
-
-    const result = await createPost(viewer, {
-      cohortId: data.cohortId,
-      category: data.category,
-      kind: data.kind,
-      visibility: data.visibility,
-      body: emptyToNull(data.body),
-      occurredAt: new Date(data.occurredAt),
-      linkUrl: emptyToNull(data.linkUrl),
-      linkTitle: emptyToNull(data.linkTitle),
-      linkImage: emptyToNull(data.linkImage),
-      referencedEventId: emptyToNull(data.referencedEventId),
-      showOnTimeline: data.showOnTimeline,
-      showInAchievements: data.showInAchievements,
-      media: toMediaData(data.media),
-      achievement: toAchievementInput(data.achievement, needsAchievement),
-      memory:
-        data.kind === PostKind.MEMORY && data.memory.type
-          ? {
-              type: data.memory.type,
-              title: data.memory.title,
-              body: data.memory.body,
-              dedicatedTo: emptyToNull(data.memory.dedicatedTo),
-            }
-          : null,
-    });
+    const result = await createPost(viewer, toCreatePostData(data, data.cohortId));
 
     if (!result.ok) return { ok: false, message: FAILURE_MESSAGES[result.reason] };
 

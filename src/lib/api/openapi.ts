@@ -109,9 +109,12 @@ import {
   SessionSchema,
   SupportOfferEntrySchema,
   TimelineItemSchema,
+  UnwrappedErrorSchema,
   UpdateEventBodySchema,
   UpdateMemoryBodySchema,
   UpdatePostBodySchema,
+  UploadedMediaAssetSchema,
+  UploadLimitsSchema,
   ViewerCohortSchema,
   WhereAreWeNowSchema,
   YearbookEntrySchema,
@@ -170,6 +173,15 @@ export const API_TAGS = [
       "(`recipientId = viewer.userId`).",
   },
   { name: "Search", description: "Qlobal axtarış (istifadəçi, paylaşım, tədbir, nailiyyət)." },
+  {
+    name: "Media",
+    description:
+      "Şəkil yükləmə (`multipart/form-data`). 🔴 `/api/v1` DEYİL və v1 zərfindən " +
+      "keçmir — cavab `MediaAsset` sahələrini birbaşa (`{ data }` olmadan) " +
+      "qaytarır, çünki mövcud müştərilər (`MediaUploader`, `MemoryComposer`, " +
+      "`EventAlbum`) onu belə istehlak edir (TƏLƏ F). Xəta forması da fərqlidir " +
+      "— `{ error: \"mətn\" }`, v1-in `{ error: { code, message } }`-i YOX.",
+  },
   {
     name: "Admin",
     description:
@@ -1400,6 +1412,49 @@ path({
 });
 
 // ---------------------------------------------------------------------------
+// Events — təqvim ixracı (Sprint 2 boşluğu)
+//
+// 🔴 `/api/v1` DEYİL, amma XARİCİ müqavilədir: cavab Google Calendar /
+// Outlook kimi xarici alətlərə verilir, `text/calendar`-dır (JSON DEYİL) və
+// v1 zərfindən keçmir — buna görə `content` tipini əl ilə göstərmək
+// (`jsonResponse` YOX) məcburidir. Xəta forması `/api/upload` ilə eynidir
+// (`UnwrappedErrorSchema`) — bax həmin bölmənin başlığındakı qeyd.
+// ---------------------------------------------------------------------------
+
+path({
+  method: "get",
+  path: "/api/events/{id}/ics",
+  operationId: "downloadEventIcs",
+  tags: ["Events"],
+  summary: "Tədbiri `.ics` təqvim faylı kimi endirir",
+  description:
+    "«Təqvimə əlavə et» (spec §14) — Google Calendar / Outlook kimi xarici " +
+    "proqramlar bu faylı birbaşa idxal edir.\n\n" +
+    "🔴 GÖRÜNÜRLÜK BURADA DA yoxlanılır (`getEventForCalendar` → " +
+    "`visibleWithStatus`): `(app)` prefiksi middleware-i keçir, amma başqa " +
+    "sinfin `CLASS` tədbirinin `id`-sini bilən giriş etmiş istifadəçi " +
+    "faylı endirə BİLMƏZ — görünməyən tədbir **404** verir.\n\n" +
+    "⚠️ Sessiyasız sorğu JSON 401 DEYİL, **307** ilə `/login`-ə " +
+    "yönləndirilir (`requireUser()` səhifə kimi çağırılıb) — kalendar " +
+    "proqramı 401 gözləyirsə redirect-i xəta kimi göstərə bilər, bu qəsdəndir.\n\n" +
+    "⚠️ `Content-Disposition: attachment` və faylın adı tədbirin " +
+    "başlığından qurulur; `Cache-Control: no-store` — tədbir redaktə oluna " +
+    "bilər, köhnə fayl keşdən verilməməlidir.",
+  request: { params: EventIdParams },
+  responses: {
+    200: {
+      description: "Təqvim faylı (`BEGIN:VCALENDAR…`).",
+      content: {
+        "text/calendar": {
+          schema: z.string().openapi({ example: "BEGIN:VCALENDAR\nVERSION:2.0\n…" }),
+        },
+      },
+    },
+    404: jsonResponse("Tədbir tapılmadı və ya viewer-ə görünmür.", UnwrappedErrorSchema),
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Search
 // ---------------------------------------------------------------------------
 
@@ -1425,6 +1480,72 @@ path({
       envelope(SearchResultsSchema, "SearchResponse"),
     ),
     ...commonResponses({ isPublic: true }),
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Media — `/api/upload` (TƏLƏ F, Sprint 2 boşluğu)
+//
+// 🔴 Bu iki əməliyyat `/api/v1`-in NƏ zərfindən (`envelope`/`listEnvelope`),
+// NƏ də xəta sxemindən (`ApiErrorSchema`) istifadə edir — real cavaba uyğun
+// AYRI sxemlər (`UploadLimitsSchema`, `UploadedMediaAssetSchema`,
+// `UnwrappedErrorSchema`) yazılıb. `commonResponses()` da İŞLƏDİLMİR: həmin
+// köməkçi 401/403/404/422/429/500-ü v1 xəta zərfi ilə sənədləşdirir, bu route
+// isə onlardan heç birini bu formada qaytarmır.
+//
+// ⚠️ Sessiyasız sorğu JSON 401 YOX, **307 → `/login`** alır: route handler
+// `requireUser()`-i birbaşa çağırır (səhifə kimi), v1 kimi `unauthenticated()`
+// JSON-u YOX. Bu, sənədlə sübut olunan FƏRQDİR — Swagger «Try it out» bunu
+// redirect kimi göstərəcək, 401 kimi yox.
+// ---------------------------------------------------------------------------
+
+path({
+  method: "get",
+  path: "/api/upload",
+  operationId: "getUploadLimits",
+  tags: ["Media"],
+  summary: "Yükləmə limitlərini qaytarır",
+  description:
+    "Müştəri (`MediaUploader`, `MemoryComposer`, `EventAlbum`) formanı " +
+    "serverə göndərmədən ölçü/format yoxlaması apara bilsin deyə.\n\n" +
+    "⚠️ Sessiyasız sorğu JSON **401** DEYİL, **307** ilə `/login`-ə " +
+    "yönləndirilir (`requireUser()` səhifə kimi çağırılıb).",
+  responses: {
+    200: jsonResponse("Yükləmə limitləri.", UploadLimitsSchema),
+  },
+});
+
+path({
+  method: "post",
+  path: "/api/upload",
+  operationId: "uploadMedia",
+  tags: ["Media"],
+  summary: "Şəkil yükləyir və optimizasiya edir",
+  description:
+    "`multipart/form-data`, sahə adı `file`. Server `sharp` ilə WebP-ə " +
+    "çevirir (əsas + 400px thumb) və nəticəni `public/uploads/YYYY/MM/`-ə " +
+    "yazır (`services/storage.ts`).\n\n" +
+    "🔴 Cavab `MediaAsset` SƏTRİ DEYİL — sətir hələ YARANMAYIB (`postId` " +
+    "yoxdur). Müştəri obyekti formada saxlayır və `POST " +
+    "/api/v1/cohorts/{slug}/posts` (və ya xatirə/tədbir ekvivalenti) " +
+    "gövdəsinə ötürür.\n\n" +
+    "🔴 **Ölçü aşımı 413 DEYİL, 400-dür** — route handler `TOO_LARGE`-ı " +
+    "digər doğrulama xətaları ilə eyni statusa yazır " +
+    "(`saveImage`-in nəticəsi `WRITE_FAILED` olmadıqca həmişə 400). " +
+    "Yalnız yazma xətası (`WRITE_FAILED`) 500 alır.\n\n" +
+    "⚠️ MIME ağ siyahısı: `image/jpeg` · `image/png` · `image/webp` · " +
+    "`image/gif`. SVG QƏSDƏN yoxdur (skript daşıya bilər, `public/`-dan " +
+    "eyni mənbədən verilir).\n\n" +
+    "⚠️ Sessiyasız sorğu JSON 401 DEYİL, 307 ilə `/login`-ə yönləndirilir.",
+  responses: {
+    201: jsonResponse("Optimizasiya olunmuş şəkil sahələri.", UploadedMediaAssetSchema),
+    400: jsonResponse(
+      "Sorğu `multipart/form-data` deyil / `file` sahəsi yoxdur / fayl " +
+        "boşdur / çox böyükdür (10 MB-dan artıq) / dəstəklənməyən növdür / " +
+        "oxunmadı — hamısı EYNİ statusdadır, mesaj səbəbi ayırd edir.",
+      UnwrappedErrorSchema,
+    ),
+    500: jsonResponse("Diskə yazma uğursuz oldu.", UnwrappedErrorSchema),
   },
 });
 

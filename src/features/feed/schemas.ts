@@ -162,126 +162,152 @@ export type MemoryDetailsInput = z.infer<typeof memoryDetailsSchema>;
 // createPost
 // ---------------------------------------------------------------------------
 
-export const createPostSchema = z
-  .object({
-    /**
-     * ⚠️ Bu, müştərinin göstərdiyi sinifdir və TƏK BAŞINA ETİBARLI DEYİL.
-     * `createPost` servis funksiyası viewer-in həmin cohort-da üzvlüyünü
-     * DB-dən yenidən yoxlayır (bax post.service.ts).
-     */
-    cohortId: z.string().trim().min(1, "Sinif müəyyən edilməyib."),
-    category: postCategoryField,
-    kind: postKindField,
-    visibility: visibilityField,
-    body: z.string().trim().max(MAX_BODY_LENGTH, `Maksimum ${MAX_BODY_LENGTH} simvol.`),
-    /** `<input type="datetime-local">` dəyəri — sətir qalır (T3). */
-    occurredAt: z
-      .string()
-      .trim()
-      .min(1, "Tarix seçilməlidir.")
-      .refine(isParsableDate, "Tarix düzgün deyil."),
-    linkUrl: optionalUrl(),
-    linkTitle: optionalText(200),
-    linkImage: optionalUrl(),
-    referencedEventId: z.string().trim(),
-    showOnTimeline: z.boolean(),
-    showInAchievements: z.boolean(),
-    media: z
-      .array(mediaAssetSchema)
-      .max(MAX_MEDIA_PER_POST, `Bir paylaşımda maksimum ${MAX_MEDIA_PER_POST} şəkil.`),
-    achievement: achievementDetailsSchema,
-    memory: memoryDetailsSchema,
-  })
-  .superRefine((value, ctx) => {
-    // --- Mətn ---
-    if (value.kind === PostKind.TEXT && value.body.length === 0) {
+/**
+ * Paylaşımın SAHƏLƏRİ — çarpaz qaydalar (`postContentRules`) HƏLƏ tətbiq
+ * olunmadan.
+ *
+ * 🔴 NİYƏ AYRICA İXRAC OLUNUR (Blok 14B): `/api/v1` gövdə sxemi (`lib/api/
+ * schemas.ts` → `CreatePostBodySchema`) EYNİ sahələri işlədir, amma `cohortId`
+ * ONDA YOXDUR — REST-də sinif YOLDAN gəlir (`/cohorts/{slug}/posts`) və
+ * müştərinin gövdədə göstərdiyi ikinci sinif dəyəri yalnız qarışıqlıq yaradar.
+ * `.omit({ cohortId: true })` yaza bilmək üçün effekt (`superRefine`) qoyulmamış
+ * OBYEKT lazımdır: `ZodEffects`-in `.omit()` metodu YOXDUR.
+ *
+ * ⚠️ Sahə qaydaları BURADA TƏK NÜSXƏDİR. Forma da, API da bunu işlədir —
+ * ikisini ayrı yazsaydıq eyni gövdə brauzerdə keçib REST-də düşərdi (və ya
+ * əksi).
+ */
+export const createPostFields = z.object({
+  /**
+   * ⚠️ Bu, müştərinin göstərdiyi sinifdir və TƏK BAŞINA ETİBARLI DEYİL.
+   * `createPost` servis funksiyası viewer-in həmin cohort-da üzvlüyünü
+   * DB-dən yenidən yoxlayır (bax post.service.ts).
+   */
+  cohortId: z.string().trim().min(1, "Sinif müəyyən edilməyib."),
+  category: postCategoryField,
+  kind: postKindField,
+  visibility: visibilityField,
+  body: z.string().trim().max(MAX_BODY_LENGTH, `Maksimum ${MAX_BODY_LENGTH} simvol.`),
+  /** `<input type="datetime-local">` dəyəri — sətir qalır (T3). */
+  occurredAt: z
+    .string()
+    .trim()
+    .min(1, "Tarix seçilməlidir.")
+    .refine(isParsableDate, "Tarix düzgün deyil."),
+  linkUrl: optionalUrl(),
+  linkTitle: optionalText(200),
+  linkImage: optionalUrl(),
+  referencedEventId: z.string().trim(),
+  showOnTimeline: z.boolean(),
+  showInAchievements: z.boolean(),
+  media: z
+    .array(mediaAssetSchema)
+    .max(MAX_MEDIA_PER_POST, `Bir paylaşımda maksimum ${MAX_MEDIA_PER_POST} şəkil.`),
+  achievement: achievementDetailsSchema,
+  memory: memoryDetailsSchema,
+});
+
+/**
+ * Paylaşımın ÇARPAZ sahə qaydaları (növ → hansı sahə məcburidir).
+ *
+ * ⚠️ Parametr `cohortId`-siz tiplənib: qayda onu OXUMUR, ona görə həm forma
+ * girişi (cohortId VAR), həm də API gövdəsi (cohortId YOX) eyni funksiyaya
+ * verilə bilir. Tip genişdir, davranış eynidir.
+ */
+export type PostContentInput = Omit<z.infer<typeof createPostFields>, "cohortId">;
+
+export const postContentRules = (value: PostContentInput, ctx: z.RefinementCtx) => {
+  // --- Mətn ---
+  if (value.kind === PostKind.TEXT && value.body.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["body"],
+      message: "Paylaşım mətni boş ola bilməz.",
+    });
+  }
+
+  // --- Şəkil ---
+  if (MEDIA_REQUIRED_KINDS.includes(value.kind) && value.media.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["media"],
+      message: "Ən azı bir şəkil əlavə edin.",
+    });
+  }
+
+  // --- Keçid ---
+  if (value.kind === PostKind.LINK && value.linkUrl === "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["linkUrl"],
+      message: "Keçid ünvanı tələb olunur.",
+    });
+  }
+
+  // --- Tədbir ---
+  if (value.kind === PostKind.EVENT && value.referencedEventId === "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["referencedEventId"],
+      message: "Tədbir seçilməlidir.",
+    });
+  }
+
+  // --- Nailiyyət ---
+  // `showInAchievements` işarələnibsə növ TEXT olsa da nailiyyət sətri
+  // yaranacaq: `Achievement.title`, `.category`, `.awardedAt` sxemdə
+  // nullable DEYİL, yəni bu üç sahə hər iki halda tələb olunur.
+  if (value.kind === PostKind.ACHIEVEMENT || value.showInAchievements) {
+    if (!value.achievement.category) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["body"],
-        message: "Paylaşım mətni boş ola bilməz.",
+        path: ["achievement", "category"],
+        message: "Nailiyyət kateqoriyası seçilməlidir.",
       });
     }
-
-    // --- Şəkil ---
-    if (MEDIA_REQUIRED_KINDS.includes(value.kind) && value.media.length === 0) {
+    if (value.achievement.title.length < 3) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["media"],
-        message: "Ən azı bir şəkil əlavə edin.",
+        path: ["achievement", "title"],
+        message: "Nailiyyətin adı ən azı 3 simvol olmalıdır.",
       });
     }
-
-    // --- Keçid ---
-    if (value.kind === PostKind.LINK && value.linkUrl === "") {
+    if (!isParsableDate(value.achievement.awardedAt)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["linkUrl"],
-        message: "Keçid ünvanı tələb olunur.",
+        path: ["achievement", "awardedAt"],
+        message: "Nailiyyət tarixi tələb olunur.",
       });
     }
+  }
 
-    // --- Tədbir ---
-    if (value.kind === PostKind.EVENT && value.referencedEventId === "") {
+  // --- Xatirə ---
+  if (value.kind === PostKind.MEMORY) {
+    if (!value.memory.type) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        path: ["referencedEventId"],
-        message: "Tədbir seçilməlidir.",
+        path: ["memory", "type"],
+        message: "Xatirə növü seçilməlidir.",
       });
     }
-
-    // --- Nailiyyət ---
-    // `showInAchievements` işarələnibsə növ TEXT olsa da nailiyyət sətri
-    // yaranacaq: `Achievement.title`, `.category`, `.awardedAt` sxemdə
-    // nullable DEYİL, yəni bu üç sahə hər iki halda tələb olunur.
-    if (value.kind === PostKind.ACHIEVEMENT || value.showInAchievements) {
-      if (!value.achievement.category) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["achievement", "category"],
-          message: "Nailiyyət kateqoriyası seçilməlidir.",
-        });
-      }
-      if (value.achievement.title.length < 3) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["achievement", "title"],
-          message: "Nailiyyətin adı ən azı 3 simvol olmalıdır.",
-        });
-      }
-      if (!isParsableDate(value.achievement.awardedAt)) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["achievement", "awardedAt"],
-          message: "Nailiyyət tarixi tələb olunur.",
-        });
-      }
+    if (value.memory.title.length < 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["memory", "title"],
+        message: "Xatirənin başlığı ən azı 3 simvol olmalıdır.",
+      });
     }
-
-    // --- Xatirə ---
-    if (value.kind === PostKind.MEMORY) {
-      if (!value.memory.type) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["memory", "type"],
-          message: "Xatirə növü seçilməlidir.",
-        });
-      }
-      if (value.memory.title.length < 3) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["memory", "title"],
-          message: "Xatirənin başlığı ən azı 3 simvol olmalıdır.",
-        });
-      }
-      if (value.memory.body.length < 10) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["memory", "body"],
-          message: "Xatirə mətni ən azı 10 simvol olmalıdır.",
-        });
-      }
+    if (value.memory.body.length < 10) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["memory", "body"],
+        message: "Xatirə mətni ən azı 10 simvol olmalıdır.",
+      });
     }
-  });
+  }
+};
+
+export const createPostSchema = createPostFields.superRefine(postContentRules);
 
 export type CreatePostInput = z.infer<typeof createPostSchema>;
 
