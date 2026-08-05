@@ -13,6 +13,68 @@ versiyalama [SemVer](https://semver.org/)-dir.
 
 ---
 
+## Sprint 2 — 2026-08-05
+
+`/api/v1` OXUYAN bir səth olmaqdan çıxıb — paylaşım, xatirə və tədbir üçün
+tam CRUD təmin edir. Server Action və REST route eyni çevirmə köməkçilərini
+paylaşır, məntiq dublikat olmur.
+
+| Ölçü | Dəyər |
+|---|---|
+| `/api/v1` route | 36 (əvvəl 34) |
+| `/api/v1` sənədləşən əməliyyat | 44 + 3 v1-dən kənar = 47 (əvvəl 33) |
+| Vitest | **1759 keçdi** (65 fayl, əvvəl 1510 / 61) |
+| Playwright | **212 keçdi** (20 fayl) |
+
+### Blok 14A — statik OpenAPI export
+
+`98a3f66`
+
+**Əlavə olundu**
+
+- `npm run docs:openapi` → `docs/openapi.json` statik snapshot, drift
+  qoruyucu testlə (`src/lib/api/openapi.test.ts` → "docs/openapi.json drift
+  qoruyucusu").
+
+### Blok 14B — paylaşım (post) yazma səthi
+
+`867c81b` `a817b8f` `e6fd5e3`
+
+**Əlavə olundu**
+
+- `POST /api/v1/cohorts/{slug}/posts` — paylaşım yaradılması (media,
+  nailiyyət və xatirə fan-out-u ilə birlikdə, `createPost` servisi üzərindən).
+- `GET/PATCH/DELETE /api/v1/posts/{id}` — CRUD-un qalan üç hərfi
+  (`getPost`, `updatePostSurfaces`, `deletePost`).
+- `src/features/feed/post-input.ts` — Server Action (`createPost` action) VƏ
+  REST route-un **paylaşdığı** çevirmə köməkçiləri (`toCreatePostData`,
+  `toAchievementInput`, `toMediaData`). Əvvəllər yalnız `actions.ts`-də idi;
+  "use server" faylından saf funksiya ixrac oluna bilmədiyi üçün ayrı modula
+  çıxarıldı — iki səth eyni məntiqi çağırır, dublikat yazılmayıb.
+
+**Test**
+
+- `tests/integration/posts-crud.db.test.ts` — mutasiya xəta xəritələməsi
+  (404/403/422) və məxfilik reqressiyaları (`PRIVATE`/`CLASS` sızmır).
+- `tests/e2e/api-docs.spec.ts` — sənəddəki əməliyyat sayı 33 → 47 düzəldildi
+  (Sprint 2-dən əvvəlki sabit gözləmə köhnəlmişdi, test QIRMIZI idi).
+
+### Blok 14C — xatirə və tədbir yazma səthi
+
+`867c81b`
+
+**Əlavə olundu**
+
+- `POST /api/v1/cohorts/{slug}/memories` + `GET/PATCH/DELETE
+  /api/v1/memories/{id}`.
+- `POST /api/v1/cohorts/{slug}/events` + `PATCH/DELETE /api/v1/events/{id}`
+  (`GET` Blok 9S-dən onsuz da var idi).
+- Hər iki modulda: yazma `429` (spam qapısı) və `security` (kuka) sənədləşib,
+  `DELETE` `204` qaytarır və `415` elan etmir (brauzer `<form>`-u `DELETE`
+  göndərə bilmir).
+
+---
+
 ## [1.0.0] — 2026-07-31
 
 Holberton School final təhvil paketi. **17 modulun hamısı icra olunub**,

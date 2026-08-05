@@ -485,3 +485,49 @@ yəni əl ilə yazılmış YAML köhnələ bilmir.
 ⚠️ v1 qatı bir yerdə UI-dan **daha məhduddur**: üzv olmadığın sinif üçün
 endpoint `404` qaytarır (`src/lib/api/cohort-scope.ts`), səhifə isə boş siyahı
 göstərir. `403` yerinə `404` — resursun **mövcudluğu** da məlumatdır.
+
+## 8. Sənədə salınmayan daxili route-lar
+
+`src/app/api` altında `/api/v1`-dən kənar 6 route var. İkisi (`/api/upload`,
+`.../ics`) **ictimai müqavilədir** və OpenAPI sənədinə salınıb (`Media` /
+`Events` taqları, `src/lib/api/openapi.ts`). Qalan dördü **daxili UI
+detalıdır** — sənədə salınmır, çünki xarici müştəri onları HEÇ VAXT çağırmır
+(brauzer naviqasiyası və ya UI-ın öz `fetch` kontraktı):
+
+| Route | Niyə sənəddə yox |
+|---|---|
+| `/api/feed` | `FeedList` → `useInfiniteQuery` üçün UI müqaviləsidir; sənədlənmiş qarşılığı `/api/v1/cohorts/{slug}/posts`-dur (TƏLƏ F — bax `src/app/api/v1/cohorts/[slug]/posts/route.ts`). |
+| `/api/search` | ⌘K palitrasının UI müqaviləsidir; sənədlənmiş qarşılığı `/api/v1/search`-dır (TƏLƏ F — bax `src/app/api/v1/search/route.ts`). |
+| `/api/session/expired` | Auth.js yönləndirmə dövrəsini kəsən daxili qaçış yoludur — brauzer `Location` naviqasiyası ilə çağırılır, JSON müştərisi yoxdur, `redirect()` server komponentindən yazıla bilmədiyi üçün route handler kimi mövcuddur. |
+| `/api/auth/[...nextauth]` | Auth.js v5-in ÖZ protokoludur (`handlers`-dən birbaşa) — bizim müqavilə deyil, kitabxananın daxili sorğu-cavab formatını daşıyır. |
+
+⚠️ Bu, boşluğu **örtmək** deyil, **qərarı sənədləşdirməkdir**: müdafiədə
+«niyə sənəddə deyil?» sualının cavabı budur. Ağ siyahı kod səviyyəsində
+`src/lib/api/openapi.test.ts` → `UNDOCUMENTED_ROUTE_WHITELIST`-də bərkidilib
+— yeni v1-dən kənar route əlavə olunanda test aşır və müəllif ya sənədə
+salmalı, ya buraya (və o siyahıya) səbəblə yazmalıdır.
+
+### `/api/upload` — niyə (a)
+
+Fayl yükləmə real xarici müqavilədir: müştəri `multipart/form-data`
+göndərir, server ölçü/format doğrulayır və `MediaAsset` sahələrini qaytarır.
+Sənəddə (`Media` taqı) ölçü limiti, icazəli MIME tipləri VƏ real status
+kodları göstərilir.
+
+🔴 Başlanğıc fərziyyə ölçü aşımının **413** olduğu idi — kodu oxumadan qəbul
+edilsəydi sənəd YALAN olardı: route handler (`src/app/api/upload/route.ts`)
+`TOO_LARGE`-ı digər doğrulama xətaları ilə eyni statusa, **400**-ə yazır;
+yalnız disk yazma xətası (`WRITE_FAILED`) 500 alır.
+
+⚠️ Cavab v1 zərfindən (`{ data }`) keçmir və xəta forması da fərqlidir
+(`{ error: "mətn" }`, v1-in `{ error: { code, message } }`-i YOX) —
+`src/lib/api/respond.ts` başlığındakı qeyd bunu qəsdən elan edir (TƏLƏ F).
+Sessiyasız sorğu da fərqlidir: `requireUser()` səhifə kimi çağırıldığı üçün
+JSON 401 yox, **307 → `/login`** qaytarılır.
+
+### `.../events/{id}/ics` — niyə (a)
+
+Təqvim faylı Google Calendar / Outlook kimi xarici alətlərə verilir —
+xarici müqavilədir. Sənəddə cavab `text/calendar` kimi (JSON YOX) elan
+olunub və `Content-Disposition` / `Cache-Control` başlıqları təsvirdə
+izah edilib.

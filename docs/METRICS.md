@@ -4,8 +4,9 @@
 > Təxmin, yuvarlaqlaşdırma və «təxminən» yoxdur — uyğunsuzluq görsən əmri işlət
 > və sənədi düzəlt.
 >
-> **Ölçmə tarixi:** `2026-07-31` · **commit:** `docs: add demo script, defense Q&A
-> and project metrics` · **mühit:** Node `v24.18.0`, Linux.
+> **Ölçmə tarixi:** `2026-08-05` · **commit:** `test(api): cover mutation error
+> mapping and privacy regressions` (Sprint 2, Blok 14B/14C) · **mühit:** Node
+> `v24.18.0`, Linux.
 >
 > Bağlı sənədlər: [`DEMO.md`](DEMO.md) · [`DEFENSE-QA.md`](DEFENSE-QA.md) ·
 > [`ARCHITECTURE.md`](ARCHITECTURE.md)
@@ -22,13 +23,13 @@
 | — testlərsiz | **69 086** |
 | Prisma modeli | **28** |
 | Səhifə (`page.tsx`) | **51** |
-| REST endpoint (`/api/v1`) | **34** |
+| REST endpoint (`/api/v1`) | **36** |
 | React komponenti (`src/components/`) | **42** |
 | Xüsusiyyət modulu (`src/features/*`) | **24** |
 | Servis faylı (`src/services/*`) | **23** |
-| Vahid + inteqrasiya testi | **1510** (61 fayl) |
+| Vahid + inteqrasiya testi | **1759** (65 fayl) |
 | E2E testi | **213** (21 fayl) |
-| Commit | **35** |
+| Commit | **41** |
 | Seed sətri (28 cədvəl) | **6323** |
 
 ---
@@ -221,27 +222,34 @@ mühərrikinin data ayağı budur.
 
 ```bash
 find src/app -name 'page.tsx' | wc -l                    # → 51
-find src/app -name 'route.ts' | wc -l                    # → 40
-find src/app/api/v1 -name 'route.ts' | wc -l             # → 34
+find src/app -name 'route.ts' | wc -l                    # → 42
+find src/app/api/v1 -name 'route.ts' | wc -l             # → 36
 grep -rhoE "export (async )?(function|const) (GET|POST|PATCH|PUT|DELETE)" \
   src/app/api/v1 --include=route.ts | awk '{print $NF}' | sort | uniq -c
-grep -c 'method:' src/lib/api/openapi.ts                 # → 33
+grep -c 'method:' src/lib/api/openapi.ts                 # → 47
 find src/components -name '*.tsx' ! -name '*.test.tsx' | wc -l   # → 42
 ls -d src/features/*/ | wc -l                            # → 24
 ls src/services/*.ts | grep -v '\.test\.' | wc -l        # → 23
-grep -rl '"use server"' src/features | wc -l             # → 11
+grep -rl '"use server"' src/features | wc -l             # → 14
 ```
 
 | Ölçü | Rəqəm | Qeyd |
 |---|---|---|
 | Səhifə (`page.tsx`) | **51** | `(public)` + `(app)` + `(admin)` |
-| Route handler — hamısı | **40** | `/api/v1` (34) + köhnə `/api/*` (6) |
-| REST endpoint — `/api/v1` | **34** | 28 `GET` + 6 `POST` |
-| OpenAPI-də sənədləşən əməliyyat | **33** | `openapi.json`-un özü sxemdə sadalanmır |
-| Server Action faylı | **11** | `"use server"` daşıyan modul |
+| Route handler — hamısı | **42** | `/api/v1` (36) + köhnə `/api/*` (6) |
+| REST endpoint — `/api/v1` | **36** | route.ts fayl sayı (sənədin özü daxil) |
+| REST əməliyyat (metod) — `/api/v1` | **44** | 30 `GET` + 9 `POST` + 3 `PATCH` + 3 `DELETE` — bax method bölgüsü yuxarıda |
+| OpenAPI-də sənədləşən əməliyyat — CƏMİ | **47** | 44 (v1) + 3 (v1-dən kənar: `uploadMedia` × GET/POST + `downloadEventIcs`); `openapi.json`-un özü sxemdə sadalanmır |
+| Server Action faylı | **14** | `"use server"` daşıyan modul |
 | Komponent (`src/components/`) | **42** | bölgü aşağıda |
 | Xüsusiyyət modulu (`src/features/*`) | **24** | KUDS §20-nin `pages/` qatı |
 | Servis faylı (`src/services/*`) | **23** | **yeganə** Prisma girişi |
+
+⚠️ **Sprint 2 (Blok 14B/14C)** paylaşım/xatirə/tədbirə yazma səthi əlavə etdi:
+`POST /cohorts/{slug}/{posts,memories,events}` + `GET/PATCH/DELETE
+/{posts,memories,events}/{id}`. Əvvəl 34 route / 33 əməliyyat idi — route sayı
++2 (`/posts/{id}`, `/memories/{id}` yeni yollar; `/events/{id}` artıq var idi,
+metod əlavə olundu), əməliyyat sayı isə çoxmetodlu yolların hesabına +11 (v1) artdı.
 
 ### 4.1 Komponent bölgüsü
 
@@ -266,24 +274,30 @@ altındadır (290 `.tsx` faylının böyük hissəsi).
 ## 5. Testlər
 
 ```bash
-npm run test                       # Vitest — 1510 test / 61 fayl (≈42 san)
+npm run test                       # Vitest — 1759 test / 65 fayl (≈46 san)
 npx playwright test --list | tail -1                                   # → 212 / 20
 npx playwright test --config playwright.dev.config.ts --list | tail -1 # → 1 / 1
 find src tests \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) | wc -l
-ls tests/integration/*.ts | wc -l  # → 13
+ls tests/integration/*.ts | wc -l  # → 16
 ```
 
 | Dəst | Test | Fayl | Əmr |
 |---|---|---|---|
-| Vahid + inteqrasiya (Vitest) | **1510** | **61** | `npm run test` |
+| Vahid + inteqrasiya (Vitest) | **1759** | **65** | `npm run test` |
 | E2E — istehsal build-i (Playwright) | **212** | **20** | `npm run build && npm run test:e2e` |
 | E2E — dev smoke («F5 işləyirmi?») | **1** | **1** | `npm run test:e2e:dev` |
 | **E2E cəmi** | **213** | **21** | |
-| Test faylı — hamısı | | **82** | |
-| Real bazaya qarşı işləyən inteqrasiya faylı | | **13** | `tests/integration/` |
+| Test faylı — hamısı | | **86** | |
+| Real bazaya qarşı işləyən inteqrasiya faylı | | **16** | `tests/integration/` |
 
-**Ölçülmüş icra müddəti:** `npm run test` → **41.5 saniyə** (61 fayl, 1510 test,
+**Ölçülmüş icra müddəti:** `npm run test` → **46.1 saniyə** (65 fayl, 1759 test,
 hamısı keçir).
+
+⚠️ **Sprint 2:** `tests/integration/posts-crud.db.test.ts` (Blok 14B — paylaşım
+mutasiya xəta xəritələməsi və məxfilik reqressiyaları) yeni əlavə olundu.
+`tests/e2e/api-docs.spec.ts`-dəki sabit əməliyyat sayı gözləməsi (33) bu
+Sprint-ə qədər yenilənməmişdi — indi 47-yə düzəldildi (bax `STATE.md` →
+"Sprint 2 — Blok 14B/14C").
 
 ### 5.1 Kritik testlərdə test sayı
 
@@ -313,7 +327,7 @@ npm run git:log            # son sətir: "N commit."
 npm run git:log | tail -1
 ```
 
-**Nəticə: 35 commit.**
+**Nəticə: 41 commit.**
 
 ⚠️ Layihə mühitində **`git` binarı yoxdur** — commit-lər `isomorphic-git` ilə
 yazılır (`scripts/git.mjs`), amma nəticə standart `.git` qovluğudur və

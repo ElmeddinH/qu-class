@@ -1669,3 +1669,48 @@ söykənir. `(admin)`-də heç bir səhifə `notFound()` çağırmır → orada 
 `next start` REBUILD-DƏN SONRA yenidən qaldırılmalıdır. Köhnə server köhnə
 HTML-i verir, brauzer artıq mövcud olmayan chunk hash-lərini istəyir → 400 →
 Lighthouse «Best Practices 96» göstərir. Kodun deyil, ölçmənin nasazlığıdır.
+
+---
+
+## Sprint 2 — Blok 14B/14C — bitdi (REST yazma səthi)
+
+`/api/v1` paylaşım/xatirə/tədbir üçün tam CRUD alır. `src/features/feed/post-input.ts`
+Server Action və REST route arasında paylaşılan çevirmə köməkçilərini daşıyır —
+"use server" faylından saf funksiya ixrac oluna bilmədiyi üçün ayrılıb.
+
+```
+npx tsc --noEmit  ✓    npm run lint  ✓    npm run build  ✓
+vitest      1759 passed   (65 fayl, əvvəl 1510 / 61)
+playwright   212 passed   (20 fayl)
+```
+
+### Hazırkı vəziyyət cədvəli
+
+| Ölçü | Rəqəm | Mənbə |
+|---|---:|---|
+| `/api/v1` route (sənədin özü daxil) | 36 | `find src/app/api/v1 -name route.ts \| wc -l` |
+| Sənədləşən əməliyyat (v1) | 44 | `src/lib/api/openapi.test.ts` → "bütün v1 endpoint-ləri sənəddədir" |
+| Sənədləşən əməliyyat (v1-dən kənar: upload×2 + ics) | 3 | eyni fayl |
+| Sənədləşən əməliyyat — CƏMİ | 47 | `tests/e2e/api-docs.spec.ts` → "operationId var" |
+| Vitest | 1759 / 65 fayl | `npm run test` |
+| Playwright | 212 / 20 fayl | `npm run test:e2e` |
+| `npx tsc --noEmit` | təmiz | |
+| `npm run lint` | təmiz | |
+| `npm run build` | təmiz | |
+| `docs/openapi.json` drift | yoxdur | `npm run docs:openapi` sonra fayl dəyişmir |
+
+### Tapılan və düzəldilən boşluq
+
+`tests/e2e/api-docs.spec.ts`-dəki sabit gözləmə (`expect(count).toBe(33)`)
+Blok 14B/14C-dən sonra köhnəlmişdi — sənəd 47 əməliyyat elan edir, test isə 33
+gözləyirdi. `npm run build && npm run test:e2e` işlədəndə **qırmızı** çıxdı.
+`src/lib/api/openapi.test.ts`-dəki qarşılığı (`v1Operations.length` → 44) artıq
+Blok 14B/14C-nin özündə yenilənmişdi; e2e faylı unudulmuşdu. Hər iki fayl indi
+eyni riyaziyyata istinad edir.
+
+### Dayanma nöqtəsi
+
+Push **qəsdən işlədilməyib** — PAT istifadəçidədir, token bu terminalda
+interaktiv oxuna bilməz (bax `scripts/git.mjs` başlığı). `npm run git:push`
+hazırdır: işə düşməzdən əvvəl auditi AYRI PROSES kimi çağırır, tapıntı varsa
+şəbəkəyə çıxmadan dayanır.

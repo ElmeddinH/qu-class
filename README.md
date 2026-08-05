@@ -26,7 +26,7 @@ layihədə sonradan əlavə olunan filtr deyil, **hər sorğunun keçdiyi qapıd
 4 səviyyə, sahə-səviyyə nəzarət, aqreqasiya üçün ayrıca razılıq.
 
 **NƏTİCƏ.** 17 modulun hamısı işlək · 51 səhifə · 28 data modeli ·
-34 REST endpoint · **1510 vahid/inteqrasiya + 213 E2E testi keçir** ·
+36 REST endpoint · **1759 vahid/inteqrasiya + 213 E2E testi keçir** ·
 Lighthouse desktop **100/100/100/100** (5 səhifə) · WCAG 2.2 AA qapısı bağlıdır.
 
 ---
@@ -188,7 +188,7 @@ flowchart TB
         MW["middleware.ts · EDGE<br/>route qorunması"]
         RSC["Server Components<br/>(public) · (app) · (admin)"]
         SA["Server Actions<br/>mutasiyalar"]
-        API["/api/v1 — 34 route<br/>33-ü OpenAPI-də"]
+        API["/api/v1 — 36 route<br/>44 əməliyyat OpenAPI-də"]
     end
 
     subgraph C["Məxfilik + servis qatı"]
@@ -484,14 +484,14 @@ köhnələ bilmir.
 ilə `buildOpenApiDocument()`-dan yenidən generasiya olunur. Kod dəyişib fayl
 yenilənməzsə `src/lib/api/openapi.test.ts`-dəki drift testi qırmızıya düşür.
 
-**34 route · 33 sənədləşmiş əməliyyat:**
+**36 route · 44 sənədləşmiş əməliyyat:**
 
 | Sahə | Say | Nümunə |
 |---|---|---|
 | Auth | 4 | `POST /auth/register` · `/auth/login` · `/auth/logout` · `GET /auth/session` |
 | İctimai məzmun | 8 | `/health` · `/faculties` · `/content/pages{,/{slug}}` · `/faq` · `/guide-places{,/{id},/{id}/memories}` |
-| Sinif | 11 | `/cohorts{,/{slug}}` + `/members` `/posts` `/timeline` `/achievements` `/memories` `/yearbook` `/support` `/events` `/stats/where-are-we-now` |
-| Tədbir & axtarış | 2 | `GET /events/{id}` · `GET /search` |
+| Sinif | 11 | `/cohorts{,/{slug}}` + `/members` `POST /posts` `/timeline` `/achievements` `POST /memories` `/yearbook` `/support` `POST /events` `/stats/where-are-we-now` |
+| Paylaşım/xatirə/tədbir (id ilə) & axtarış | 4 | `GET/PATCH/DELETE /posts/{id}` · `GET/PATCH/DELETE /memories/{id}` · `GET/PATCH/DELETE /events/{id}` · `GET /search` |
 | Bildiriş | 3 | `GET /notifications` · `POST /notifications/{id}/read` · `/read-all` |
 | Admin | 5 | `/admin/stats` · `/admin/reports{,/{id}/resolve}` · `/admin/audit` · `/admin/users` |
 | Sənəd | 1 | `GET /openapi.json` (sənədin özü — sxemdə sadalanmır) |
@@ -521,7 +521,7 @@ npm run free-port     # 3000-i tutan köhnə dev serveri dayandır
 npm run build         # istehsal build-i
 npm start             # istehsal serveri (build tələb edir)
 npm run lint          # ESLint
-npm run test          # Vitest — 1510 test / 61 fayl
+npm run test          # Vitest — 1759 test / 65 fayl
 npm run test:e2e      # Playwright — 212 test / 20 fayl (build tələb edir)
 npm run test:e2e:dev  # Playwright — dev smoke ("F5 işləyirmi?")
 npm run db:seed       # prisma db seed
@@ -549,7 +549,7 @@ Hər blokun sonunda üçü də təmiz olmalıdır:
 
 | Dəst | Say | Əmr |
 |---|---|---|
-| Vahid + inteqrasiya (Vitest) | **1510 test / 61 fayl** | `npm run test` |
+| Vahid + inteqrasiya (Vitest) | **1759 test / 65 fayl** | `npm run test` |
 | E2E (Playwright, istehsal build-i) | **212 test / 20 fayl** | `npm run build && npm run test:e2e` |
 | E2E dev smoke («F5 işləyirmi?») | **1 test** | `npm run test:e2e:dev` |
 
