@@ -134,7 +134,11 @@ test("openapi.json etibarlı sənəddir və hər əməliyyatda operationId var",
   // + 5 (Blok 11A: bildirişlər × 3 · content/pages/{slug} · guide-places/{id})
   // + 5 (Blok 11B: admin/stats · admin/reports · admin/reports/{id}/resolve ·
   // admin/audit · admin/users) = 33.
-  expect(count).toBe(33);
+  // + 4 (Blok 14B — paylaşım CRUD-u) + 7 (Blok 14C — xatirə + tədbir yazma
+  // səthi) = 44 v1 əməliyyatı + 3 v1-dən kənar (Sprint 2: uploadMedia ·
+  // getUploadLimits · downloadEventIcs) = 47. Bax `src/lib/api/openapi.test.ts`
+  // — eyni riyaziyyat orada təfərrüatlı izah olunub.
+  expect(count).toBe(47);
 
   // Kuka adı sənəddə göstərilir — «Try it out» üçün kritikdir.
   expect(document.components.securitySchemes.cookieAuth?.name).toContain(

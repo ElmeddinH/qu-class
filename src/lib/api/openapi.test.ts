@@ -12,7 +12,7 @@
 // Hər ikisi səssiz səhvdir — ona görə forma testlə bərkidilir.
 // ============================================================================
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -47,7 +47,65 @@ const operations = Object.entries(document.paths ?? {}).flatMap(([path, item]) =
     })),
 );
 
+/**
+ * `/api/v1` altındaki əməliyyatlar — v1-in VAHİD müqaviləsinə (zərf, 401
+ * forması, JSON gövdə + 415) bağlı testlər BUNUN üzərində işləyir.
+ *
+ * 🔴 `/api/upload` və `.../ics` bu siyahıda YOXDUR: onlar v1 zərfindən
+ * keçmir (bax `openapi.ts` → "Media" / "Events — təqvim ixracı" bölmələri) və
+ * v1-ə xas qaydaları onlara tətbiq etmək sənədi YALAN edərdi.
+ */
+const v1Operations = operations.filter((o) => o.path.startsWith("/api/v1"));
+
 const TAG_NAMES = API_TAGS.map((tag) => tag.name);
+
+// ---------------------------------------------------------------------------
+// AĞ SİYAHI — v1-dən kənar route-lar (TAPŞIRIQ 4)
+//
+// `src/app/api` altında (v1 xaric) tapılan HƏR route ya sənəddə OLMALIDIR,
+// ya da bu siyahıda SƏBƏBLƏ yer almalıdır. Yeni route əlavə olunanda test
+// AŞIR — müəllif ya sənədə salır, ya buraya səbəblə yazır (TAPŞIRIQ-dakı
+// tələb məhz budur).
+// ---------------------------------------------------------------------------
+
+/**
+ * Sənədə salınmayan daxili route-lar. Hər sətrin səbəbi
+ * `docs/ARCHITECTURE.md` § "Sənədə salınmayan daxili route-lar"da da var —
+ * ikisi eyni qərarın iki üzüdür (kod ↔ nəsr).
+ */
+const UNDOCUMENTED_ROUTE_WHITELIST: Record<string, string> = {
+  "/api/feed": "UI müqaviləsi (FeedList → useInfiniteQuery); sənədlənmiş qarşılıq /api/v1/cohorts/{slug}/posts (TƏLƏ F).",
+  "/api/search": "UI müqaviləsi (⌘K palitrası); sənədlənmiş qarşılıq /api/v1/search (TƏLƏ F).",
+  "/api/session/expired": "Auth.js yönləndirmə dövrəsini kəsən daxili qaçış yolu — brauzer naviqasiyası ilə çağırılır, JSON müştərisi yoxdur.",
+  "/api/auth/[...nextauth]":
+    "Auth.js v5-in ÖZ daxili protokolu (`handlers`-dən birbaşa) — bizim müqavilə deyil. " +
+    "Segment `[...nextauth]` KATCH-ALL olduğu üçün `{param}`-a çevrilmir (bax `toRoutePath`).",
+};
+
+/** `[id]` / `[slug]` → `{id}` / `{slug}`. Catch-all seqment (`[...x]`) TOXUNULMUR. */
+function toRoutePath(segments: string): string {
+  return segments.replace(/\[([^.\]]+)\]/g, "{$1}");
+}
+
+/** `src/app/api` altında bütün `route.ts` fayllarının URL yolu, kök `/api`-dən. */
+function discoverApiRoutes(): string[] {
+  const root = join(process.cwd(), "src", "app", "api");
+
+  function walk(dir: string, prefix: string): string[] {
+    const found: string[] = [];
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        found.push(...walk(full, `${prefix}/${entry}`));
+      } else if (entry === "route.ts") {
+        found.push(prefix);
+      }
+    }
+    return found;
+  }
+
+  return walk(root, "/api").map(toRoutePath);
+}
 
 describe("sənədin başlığı", () => {
   it("OpenAPI 3.0 sənədidir", () => {
@@ -90,8 +148,23 @@ describe("əməliyyatlar", () => {
     //     · tədbir: POST cohorts/{slug}/events + PATCH/DELETE events/{id}
     //       (GET events/{id} Blok 9S-dən onsuz da var idi)
     // = 44. Yazma əməliyyatı 6-dır, yeni YOL isə 7 — fərq məhz budur.
-    expect(operations.length).toBe(44);
+    expect(v1Operations.length).toBe(44);
   });
+
+  it(
+    "Sprint 2 boşluğu: v1-dən kənar 2 route sənədə əlavə olundu (3 əməliyyat)",
+    () => {
+      // `/api/upload` (GET + POST) və `.../ics` (GET) — bax `openapi.ts`
+      // "Media" / "Events — təqvim ixracı" bölmələri. v1-ə DAXİL DEYİLLƏR,
+      // ona görə yuxarıdaki 44-ə DAXİL EDİLMİRLƏR.
+      const nonV1 = operations.filter((o) => !o.path.startsWith("/api/v1"));
+      expect(nonV1.map((o) => o.operation.operationId).sort()).toEqual([
+        "downloadEventIcs",
+        "getUploadLimits",
+        "uploadMedia",
+      ]);
+    },
+  );
 
   /**
    * 🔴 TƏLƏ D — AUDIT JURNALI YALNIZ ƏLAVƏ OLUNUR (Blok 11B).
@@ -192,7 +265,7 @@ describe("əməliyyatlar", () => {
     },
   );
 
-  it.each(operations.map((o) => [o.label, o] as const))(
+  it.each(v1Operations.map((o) => [o.label, o] as const))(
     "%s — 401 cavabı sənədləşdirilib",
     (_label, { operation }) => {
       // ⚠️ İctimai endpoint-lərdə 401 vahid xəta ZƏRFİNİN forması kimi
@@ -200,6 +273,20 @@ describe("əməliyyatlar", () => {
       expect(operation.responses).toHaveProperty("401");
     },
   );
+
+  /**
+   * 🔴 `/api/upload` və `.../ics` 401 SƏNƏDLƏMİR — bu, unudulma DEYİL.
+   * `requireUser()` səhifə kimi çağırılıb: sessiyasız sorğu JSON 401 yox,
+   * 307 ilə `/login`-ə yönləndirilir. 401 yazmaq real davranışı YALAN
+   * göstərərdi (bax `openapi.ts` "Media" bölməsinin başlığı).
+   */
+  it.each(
+    operations
+      .filter((o) => !o.path.startsWith("/api/v1"))
+      .map((o) => [o.label, o] as const),
+  )("%s — 401 QƏSDƏN sənədlənməyib (307 redirect)", (_label, { operation }) => {
+    expect(operation.responses).not.toHaveProperty("401");
+  });
 
   it.each(operations.map((o) => [o.label, o] as const))(
     "%s — uğur cavabı 2xx-dir və sxemi var",
@@ -362,7 +449,11 @@ describe("təhlükəsizlik sxemi", () => {
 });
 
 describe("POST endpoint-ləri", () => {
-  const posts = operations.filter((o) => o.method === "post");
+  // 🔴 v1-ə MƏHDUD: `uploadMedia` (`POST /api/upload`) da `method === "post"`
+  // filtrinə düşərdi, amma o, `multipart/form-data` göndərir (JSON YOX) və
+  // 415 sənədləmir — v1-in JSON+415 qaydası ona aid deyil (aşağıdakı ayrı
+  // "Media" describe blokunda yoxlanılır).
+  const posts = v1Operations.filter((o) => o.method === "post");
 
   it("doqquz POST var: auth × 3 + bildiriş × 2 + moderasiya qərarı + paylaşım + xatirə + tədbir", () => {
     // ⚠️ Siyahı SABİT gözləmədir: yeni yazma endpoint-i əlavə edən adam
@@ -644,6 +735,124 @@ describe("xatirə və tədbir yazma səthi (Blok 14C)", () => {
       expect(created.description, id).toContain("Location");
     }
   });
+});
+
+/**
+ * Sprint 2 boşluğu — TAPŞIRIQ 1/2: `/api/upload` (a) və `.../ics` (a) v1-in
+ * DIŞINDA olsalar da real müqavilədirlər. Testlər onların v1-DƏN FƏRQLİ
+ * cavab formasını (zərfsiz, öz xəta sxemi, 401 yox) bərkidir.
+ */
+describe("Media və təqvim ixracı — v1-dən kənar, amma sənədli (Sprint 2)", () => {
+  const byId = new Map(operations.map((o) => [o.operation.operationId, o]));
+
+  it("üç əməliyyat da düzgün taqda və metoddadır", () => {
+    expect(byId.get("getUploadLimits")?.method).toBe("get");
+    expect(byId.get("getUploadLimits")?.operation.tags).toEqual(["Media"]);
+
+    expect(byId.get("uploadMedia")?.method).toBe("post");
+    expect(byId.get("uploadMedia")?.operation.tags).toEqual(["Media"]);
+
+    expect(byId.get("downloadEventIcs")?.method).toBe("get");
+    expect(byId.get("downloadEventIcs")?.operation.tags).toEqual(["Events"]);
+  });
+
+  it("🔴 heç biri v1 zərfi işlətmir — `{ data }` deyil, xam sahələr", () => {
+    // `UploadedMediaAsset` `registerPath`-də `$ref`-lə bağlanıb — real forma
+    // `components.schemas`-dadır, `responses` yalnız istinad daşıyır.
+    const schemas = document.components?.schemas as
+      | Record<string, { properties?: Record<string, unknown> }>
+      | undefined;
+    const properties = schemas?.UploadedMediaAsset?.properties ?? {};
+
+    expect(properties).not.toHaveProperty("data");
+    expect(properties).toHaveProperty("url");
+    expect(properties).toHaveProperty("sizeBytes");
+  });
+
+  it("🔴 ölçü aşımı 400-dür, 413 DEYİL", () => {
+    // Başlanğıc fərziyyə 413 idi — koda baxmadan qəbul edilməzdi (TAPŞIRIQ-da
+    // «kor-koranə qəbul etmə» xəbərdarlığı var idi). Route handler `TOO_LARGE`-ı
+    // digər doğrulama xətaları ilə eyni statusa (400) yazır.
+    const upload = byId.get("uploadMedia")?.operation;
+    expect(upload?.responses).toHaveProperty("400");
+    expect(upload?.responses).not.toHaveProperty("413");
+  });
+
+  it("uploadMedia JSON gövdə/415 elan ETMİR — multipart, v1 qaydası tətbiq olunmur", () => {
+    const upload = byId.get("uploadMedia")?.operation;
+    expect(upload?.responses).not.toHaveProperty("415");
+  });
+
+  it("downloadEventIcs cavabı `text/calendar`-dır, `application/json` YOX", () => {
+    const ics = byId.get("downloadEventIcs")?.operation.responses["200"] as {
+      content?: Record<string, unknown>;
+    };
+
+    expect(ics?.content).toHaveProperty("text/calendar");
+    expect(ics?.content).not.toHaveProperty("application/json");
+  });
+
+  it("downloadEventIcs `{id}` yol parametrini elan edir", () => {
+    const ics = byId.get("downloadEventIcs")?.operation;
+    const idParam = (ics?.parameters ?? []).find((p) => p.name === "id");
+
+    expect(idParam, "id parametri yoxdur").toBeDefined();
+    expect(idParam?.in).toBe("path");
+  });
+});
+
+/**
+ * TAPŞIRIQ 4 — AĞ SİYAHI. `src/app/api` altında (v1 xaric) tapılan HƏR route
+ * ya sənəddə (yuxarıdaki `document.paths`) olmalıdır, ya da
+ * `UNDOCUMENTED_ROUTE_WHITELIST`-də səbəblə yazılmalıdır. Yeni route əlavə
+ * olunanda (sənədlənməyib və ağ siyahıda yoxdursa) bu test AŞIR.
+ */
+describe("v1-dən kənar route-ların AĞ SİYAHISI", () => {
+  const discovered = discoverApiRoutes().filter((p) => !p.startsWith("/api/v1"));
+  const documentedPaths = new Set(Object.keys(document.paths ?? {}));
+
+  it("kəşf olunan route sayı gözlənilənlə üst-üstə düşür", () => {
+    // Sabit gözləmə: yeni fayl (v1 xaricində) əlavə olunanda bu testin
+    // dayanması müəllifi aşağıdakı «hər route ya sənəddə, ya ağ siyahıda»
+    // testinə baxmağa məcbur edir.
+    expect(discovered.sort()).toEqual(
+      [
+        "/api/auth/[...nextauth]",
+        "/api/events/{id}/ics",
+        "/api/feed",
+        "/api/search",
+        "/api/session/expired",
+        "/api/upload",
+      ].sort(),
+    );
+  });
+
+  it.each(discovered.map((p) => [p, p] as const))(
+    "%s — sənəddədir YA DA ağ siyahıda səbəblə yazılıb",
+    (_label, routePath) => {
+      const documented = documentedPaths.has(routePath);
+      const whitelisted = Object.prototype.hasOwnProperty.call(
+        UNDOCUMENTED_ROUTE_WHITELIST,
+        routePath,
+      );
+
+      if (!documented && !whitelisted) {
+        throw new Error(
+          `«${routePath}» nə OpenAPI sənədində, nə də ağ siyahıdadır. ` +
+            "Ya (a) ictimai müqavilədirsə `openapi.ts`-ə sal, ya da (b) daxili " +
+            "UI detalıdırsa `UNDOCUMENTED_ROUTE_WHITELIST`-ə səbəblə əlavə et " +
+            "(bax `docs/ARCHITECTURE.md` § «Sənədə salınmayan daxili route-lar»).",
+        );
+      }
+
+      // Whitelist-ə düşübsə sənəddə OLMAMALIDIR — əks halda iki mənbə
+      // ziddiyyət təşkil edər (test hansının doğru olduğunu deyə bilməz).
+      if (whitelisted) {
+        expect(documented, `«${routePath}» HƏM sənəddə, HƏM ağ siyahıdadır`).toBe(false);
+        expect(UNDOCUMENTED_ROUTE_WHITELIST[routePath].length).toBeGreaterThan(10);
+      }
+    },
+  );
 });
 
 describe("nümunələr (example)", () => {
