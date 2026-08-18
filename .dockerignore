@@ -49,6 +49,9 @@ prisma/dev.db-journal
 prisma/*.db-journal
 prisma/*.db-wal
 prisma/*.db-shm
+# Build anında builder mərhələsi ÖZÜ yaradır — kontekstdən gələn köhnə nüsxə
+# yalnız qarışıqlıq yaradardı.
+prisma/seed-template.db
 
 # --- istifadəçi yükləmələri: image-də DEYİL, volume-da yaşayır ---------------
 # `docker-entrypoint.sh` konteyner startında `/app/public/uploads`-ı silib

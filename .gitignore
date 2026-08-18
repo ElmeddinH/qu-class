@@ -79,3 +79,8 @@ next-env.d.ts
 # yalnız server işləyəndə mövcuddur, yoxlayıcı isə repoya baxıb sənədi
 # görməlidir. `npm run docs:openapi` ilə yenidən generasiya olunur (Zod
 # sxemlərindən törəyir); drift-i `src/lib/api/openapi.test.ts` tutur.
+
+# Docker build anında yaradılan demo baza ŞABLONU (bax `Dockerfile` → builder,
+# `docs/DECISIONS.md` QD-018). Konteynerin içində yaşayır; addımı lokalda
+# təkrarlayan tərtibatçının 1.4 MB-lıq faylı təsadüfən commit etməməsi üçün.
+/prisma/seed-template.db
