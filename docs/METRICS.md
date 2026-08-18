@@ -35,7 +35,7 @@
 | Servis faylı (`src/services/*`) | **24** |
 | Vahid + inteqrasiya testi | **1844** (68 fayl) |
 | E2E testi | **220** (22 fayl) |
-| Commit | **51** |
+| Commit | **54** |
 | Seed sətri (28 cədvəl) | **6323** |
 
 ---
@@ -365,7 +365,7 @@ npm run git:log            # son sətir: "N commit."
 npm run git:log | tail -1
 ```
 
-**Nəticə: 51 commit.**
+**Nəticə: 54 commit.**
 
 ⚠️ Layihə mühitində **`git` binarı yoxdur** — commit-lər `isomorphic-git` ilə
 yazılır (`scripts/git.mjs`), amma nəticə standart `.git` qovluğudur və
