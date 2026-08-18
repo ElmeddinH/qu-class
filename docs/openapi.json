@@ -4639,6 +4639,107 @@
         }
       }
     },
+    "/api/v1/openapi.json": {
+      "get": {
+        "operationId": "getOpenApiDocument",
+        "tags": [
+          "System"
+        ],
+        "summary": "Maşınoxunan OpenAPI sənədi",
+        "description": "Swagger UI-ın (`/docs`) oxuduğu EYNİ sənəd. Müştəri generatorları (`openapi-generator`, `orval`) birbaşa bu ünvandan işləyə bilər.\n\n⚠️ Cavab v1 zərfindən (`{ data }`) KEÇMİR — kök obyekt OpenAPI 3.0 sənədinin ÖZÜDÜR.\n\n⚠️ `force-static`: sənəd Zod sxemlərindən build anında qurulur və DB-yə toxunmur. `Cache-Control: public, max-age=60`.\n\n⚠️ Repodakı `docs/openapi.json` bu cavabın SNAPSHOT-ıdır; drift qoruyucusu (`openapi.test.ts`) ikisinin eyniliyini hər testdə yoxlayır.",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.0 sənədi.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "openapi": {
+                      "type": "string",
+                      "example": "3.0.0"
+                    },
+                    "info": {
+                      "type": "object",
+                      "properties": {}
+                    },
+                    "paths": {
+                      "type": "object",
+                      "properties": {}
+                    }
+                  },
+                  "required": [
+                    "openapi",
+                    "info",
+                    "paths"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bu endpoint autentifikasiya TƏLƏB ETMİR — 401 yalnız vahid xəta zərfinin forması kimi sənədləşdirilib, praktikada qaytarılmır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Rol tələb edən əməliyyat (koordinator / moderator / admin) üçün səlahiyyət yoxdur. ⚠️ Yalnız ROL qapılarında işlədilir — görünürlük qapısı 404 verir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resurs mövcud deyil VƏ YA viewer-in ona icazəsi yoxdur. İki hal QƏSDƏN ayırd edilmir: 403 cavabı resursun mövcudluğunu sızdırardı.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Doğrulama uğursuz oldu. `error.details` massivi sahə → mesaj cütlərini daşıyır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Sayğac həddi aşıldı. `Retry-After` başlığı gözləmə müddətini (saniyə) bildirir.\n\n⚠️ İKİ FƏRQLİ SAYĞAC var: girişdə yalnız UĞURSUZ cəhdlər sayılır (10 dəqiqədə 5), yazma əməliyyatlarında isə HƏR sorğu sayılır (1 dəqiqədə 20, açar `userId`). Bax `lib/api/rate-limit.ts`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Serverdə gözlənilməz xəta. Detal yalnız server logundadır.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/faculties": {
       "get": {
         "operationId": "listFaculties",

@@ -2,16 +2,16 @@
 
 `npm run git:audit` (`scripts/git-audit.mjs`) tərəfindən yaradılır. Şəbəkəsiz, yalnız oxu. Tapılan hər dəyər **maskalanır** (ilk 4 simvol + `****`) — hesabatın özü sızma mənbəyinə çevrilməməlidir.
 
-Son işlədilmə: `2026-08-18T14:04:23.453Z`
+Son işlədilmə: `2026-08-18T15:19:55.832Z`
 
 ## Xülasə
 
 | Ölçü | Dəyər |
 | --- | --- |
-| Gəzilən commit | 48 (HEAD-dən kökə, `depth: Infinity`) |
-| Tarixçədəki unikal yol | 651 |
-| Tarixçədəki unikal blob | 982 |
-| İndeksdə izlənən fayl | 648 |
+| Gəzilən commit | 49 (HEAD-dən kökə, `depth: Infinity`) |
+| Tarixçədəki unikal yol | 669 |
+| Tarixçədəki unikal blob | 1018 |
+| İndeksdə izlənən fayl | 663 |
 | 🔴 Bloklayan tapıntı | 0 |
 | ⚠️ Xəbərdarlıq | 0 |
 
@@ -49,8 +49,8 @@ Tərsinə təsdiq (bunlar İZLƏNMƏLİDİR):
 
 | Rol | Ad | E-poçt | Commit sayı |
 | --- | --- | --- | --- |
-| author | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 48 |
-| committer | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 48 |
+| author | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 49 |
+| committer | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 49 |
 
 ⚠️ **T33** — GitHub commit-i töhfə qrafikinə yalnız e-poçt hesaba bağlı olduqda yazır. Uyğunsuzluq push-DAN ƏVVƏL düzəldilməlidir: sonrakı düzəliş bütün commit SHA-larını dəyişir.
 

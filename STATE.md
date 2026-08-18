@@ -1831,3 +1831,173 @@ gözləyən dizayn sualıdır**.
 ### Dayanma nöqtəsi
 
 Deploy hələ də `FLY_API_TOKEN` gözləyir (Blok 12A) — bu blok ona toxunmayıb.
+
+---
+
+## Sprint 3/4 — Blok 12E — bitdi (OpenAPI kor nöqtəsi + keyfiyyət təkrar ölçməsi)
+
+**Hədəf:** Sprint 3/4-ün qalan meyarları — S3-B5 · S3 meyar 4, 5 · S4-B5 ·
+S4 meyar 6. Meyar 3, 7 (S3) və 5, 8 (S4) deploy-dan asılıdır və **açıq qalır**.
+
+### Girişdə tapılan vəziyyət — işin yarısı ARTIQ EDİLMİŞDİ
+
+Bloka başlayanda üç bənd əvvəlki bloklarda bağlanmış çıxdı. **Yenidən
+yazılmadı — yoxlanıldı və sübutu qeyd edildi:**
+
+| Bənd | Vəziyyət | Sübut |
+| --- | --- | --- |
+| `coverUrl` idarə olunan sahə | ✅ artıq bağlı (`3b765e3`) | `CONTROLLED_PROFILE_FIELDS` = **22**, default **CLASS**, `buildProfileView` düzləndirir (`user.service.ts:342`), `tests/integration/cover-privacy.db.test.ts` mövcud |
+| backfill | ✅ artıq işlədilib | `npm run db:backfill -- --dry` → «istifadəçi: 125 · sahə: 22 · çatışmayan sətir YOXDUR» |
+| T22 `CardTitle` başlıq semantikası | ✅ artıq bağlı | `components/kuds/SectionCard.tsx` → `CardHeading` (`role="heading"` + **konfiqurasiya olunan** `aria-level`, default 2). TƏLƏ H riayət olunub: `/login`, `/register` `CardTitle` içində REAL `<h1>` işlədir — `role="heading"` ƏLAVƏ EDİLMƏYİB, ikiqat başlıq yaranmır |
+| `@axe-core/playwright` | ✅ artıq lock-da | `package.json` devDependency `^4.12.1` |
+
+⚠️ Testlərdəki «21 sahə» hardcode-u da artıq yox idi — saylar
+`CONTROLLED_PROFILE_FIELDS.length`-dən oxunur (yalnız test ADLARINDA «22» sözü
+nəsr kimi qalıb). Yəni TƏLƏ G-nin düzgün həlli onsuz da tətbiq olunmuşdu.
+
+### 1. 🔴 OpenAPI drift qoruyucusunun KOR NÖQTƏSİ — bağlandı
+
+Gəzici test `src/app/api`-ni gəzirdi, amma nəticəni `!p.startsWith("/api/v1")`
+ilə süzürdü — yəni qoruyucu **məhz ictimai müqavilənin yaşadığı yerə
+baxmırdı**. Nəticə: kodda 53 əməliyyat, sənəddə 52, fərq **`GET
+/api/v1/openapi.json`** — və heç bir test şikayət etmirdi.
+
+- Filtr **götürüldü**; gəzici indi 42 route faylının hamısını əhatə edir.
+- Elan edilməmiş əməliyyat **sənədə əlavə edildi** (ağ siyahıya YOX): `System`
+  taqının öz təsviri onsuz da «sağlamlıq yoxlaması **və sənəd**» deyirdi, yəni
+  sənəd öz-özü ilə ziddiyyətdə idi. `/docs` Swagger UI və müştəri generatorları
+  məhz bu ünvandan oxuyur — ictimai müqavilədir.
+- Ağ siyahıda **4 route** qaldı (5 əməliyyat): `/api/auth/[...nextauth]`,
+  `/api/feed`, `/api/search`, `/api/session/expired` — hər biri səbəb sətri ilə.
+  ⚠️ Tapşırıqdakı siyahı `/api/upload` və `/api/events/[id]/ics`-i də ağ siyahıya
+  yazırdı; **KODDAN yoxlanıldı və o, yanlışdır** — ikisi də sənəddədir
+  (`Media` / `Events` taqları, 3 əməliyyat). Onlar ağ siyahıya salınsaydı
+  «həm sənəddə, həm siyahıda» testi aşardı.
+- **48 sənəddə + 5 ağ siyahıda = 53/53.** Elan edilməmiş əməliyyat qalmadı.
+
+**Tələlər:**
+- **A** (dinamik seqment) — `toRoutePath` ONSUZ DA var idi, amma **öz testi yox
+  idi**. Altı vahid testi əlavə olundu (tək/çox seqment, statik yol, seqmentdəki
+  NÖQTƏ — `openapi.json` real qovluq adıdır — catch-all toxunulmur, və
+  çevrilmiş yolun sənədin REAL açarı ilə üst-üstə düşməsi).
+- **B** (route qrupları) — gəzicinin kökü `src/app/api`-dir;
+  `src/app/uploads/[...path]/route.ts` (12A) siyahıya düşmür. Yoxlanıldı.
+- **C** (snapshot köhnəlməsi) — `npm run docs:openapi` işlədildi,
+  `docs/openapi.json` commit edildi (38 yol / 48 əməliyyat).
+- **D** (ikiqat sxem qeydiyyatı) — yeni əməliyyatın cavab sxemi **adlandırılmadı**
+  (`.openapi("Ad")` yoxdur), inline `passthrough` obyektdir → registry-yə düşmür.
+
+🔴 **Bir gözləntini «keçsin deyə» dəyişmək istəmədim və düzgün olan tərəf
+KODDU.** Yeni əməliyyata əvvəlcə `commonResponses()` VERMƏDİM (məntiq:
+`force-static` route 401 qaytara bilməz). Test aşdı: v1-in HƏR əməliyyatı 401-i
+**vahid xəta zərfinin forması** kimi elan etməlidir və `PUBLIC_401`-in mətni
+onsuz da «praktikada qaytarılmır» deyir — qonşu `/api/v1/health` eynidir.
+Qayda düzgün idi, mənim istisnam səhv: `commonResponses({ isPublic: true })`
+əlavə edildi. Sabit `44` → `45` yeniləndi (səbəbi şərhdə).
+
+### 2. 🔴 axe + Lighthouse — TƏKRAR ölçmə REQRESSİYA TAPDI
+
+**axe:** 24 skan (12 səhifə × anonim/giriş etmiş) → **dörd təsir səviyyəsinin
+hamısında 0 pozuntu**. 12C-də qapı yalnız serious/critical idi; bu ölçmədə
+`moderate`/`minor` də boşdur.
+
+**Lighthouse desktop:** açılış səhifəsi **Performance 88 · CLS 0.223** verdi
+(12C-də 100 · 0). Tək sıçrayış, node = `<footer>`.
+
+**Səbəb — ölçülüb:** Blok 12D `(landing)/loading.tsx`-ə ümumi
+`PageSkeleton variant="cards"` qoymuşdu. JS söndürülmüş brauzerlə (axının
+birinci hissəsi) ölçüldü:
+
+| | footer-in yeri | sənəd hündürlüyü |
+| --- | ---: | ---: |
+| skeleton | **730 px** — 940 px-lik ekranın İÇİNDƏ | 1 280 px |
+| məzmun | **5 794 px** | 6 463 px |
+
+`PublicShell`-in footer-i Suspense sərhədindən **kənardadır**, ona görə skeleton
+anında görünür, sonra 5 000 px tullanır. Bu, `PageSkeleton`-un ÖZ müqaviləsinin
+pozulması idi (fayl başlığı: «skeleton real səhifənin FORMASINI təqlid edir»).
+
+**Düzəliş:** `src/features/welcome/WelcomeSkeleton.tsx` — hero + üç bölmə × üç
+kart (12D-dəki `YearbookSkeleton` idiomu ilə eyni).
+Nəticə: **Performance 99 · CLS 0**, footer skeleton anında **1 773 px**.
+Beş desktop səhifəsinin hamısı bütün hədəfləri keçir.
+
+**Qapı:** `tests/e2e/landing-cls.spec.ts` (**yeni**, 3 test) — desktop 1350×940
+və mobil 412×823 ekranda footer-in ekrandan kənarda olmasını tələb edir.
+⚠️ **Qapının boş olmadığı sübut edildi:** köhnə `loading.tsx` müvəqqəti geri
+qaytarıldı, test məhz gözlənilən mesajla AŞDI («footer 730px-də…»), sonra
+düzəliş bərpa olundu. Mobil ölçüdə köhnə skeleton da keçirdi — bağlayıcı
+yoxlama **desktop**-dur.
+
+**Qəbul edilmiş tapıntılar** (`docs/quality-report-12c.md` §10): 24–43 px
+toxunma hədəfləri (shadcn primitivləri, `ui/` toxunulmaz; WCAG 24 px qapısı
+ödənilib — iki primitivdəki istisna 12D-də açıq yazılıb) · `/home` mobil
+yönləndirmə xərci · `/` SEO 91 (ölçmə artefaktı — `meta-description` HƏM
+HTML-də, HƏM final DOM-da var, yoxlanıldı) · mobil TBT səs-küyü.
+
+⚠️ **Kuki bannerinin CLS 0.035-i bu ölçmədə 0-dır** — desktop və mobil, beş
+səhifənin hamısı. README №11 buna görə yeniləndi.
+
+⚠️ **İki dəfə yaşadığım ölçmə tələsi:** `pkill` köhnə `next start`-ı öldürməmişdi,
+yeni proses portu tuta bilmədi və səssizcə çıxdı → Lighthouse **KÖHNƏ build-i**
+ölçdü və düzəliş «işləmir» kimi göründü. Yoxlama:
+`ps -eo pid,lstart,cmd | grep next-server` — başlama vaxtı build-dən SONRA olmalıdır.
+
+### 3. QD-019 — demo admin parolu (variant **b**)
+
+Sənədləşdirilmiş demo parolu (`Test1234!`) canlı saytda `admin@qu.edu.az` üçün
+də keçərli olacaqdı. Ölçülmüş fərq: **admin fərqi dərəcə deyil, NÖVDÜR** —
+`changeSystemRole` (`admin-users.service.ts`) istənilən hesabı
+`UNIVERSITY_ADMIN`-ə yüksəldə bilir, yəni bir dəfəlik giriş **qalıcı** nəzarətə
+çevrilir; sonradan parolu dəyişsək belə təcavüzkarın açdığı ikinci admin qalır.
+
+Audit jurnalı bunu bağlamır: `recordAudit` YALNIZ ƏLAVƏ olunur — **izlənəbilirlik
+geri qaytarma deyil** və anonim ziyarətçinin `actorId`-si heç nə vermir.
+«Sintetik datadır, bərpa edərik» arqumenti də ölçüldü və **yanlış çıxdı**: canlı
+baza tək volume-dadır (ehtiyat nüsxə yox), seed canlıda qadağandır (25 cədvəldə
+`deleteMany`) — bərpa = volume-u silmək.
+
+**Seçim (b):** canlıda YALNIZ admin parolu rotasiya olunur; `rep` · `moderator` ·
+`coordinator` · `alumni` toxunulmur — dörd cohort rolunu göstərən nümayiş
+dəyəri onlardadır və zərər radiusları `visibilityWhere` + soft delete ilə
+çərçivələnib. Lokalda heç nə dəyişmir (`Test1234!` qalır, 20+ e2e faylı və
+`seed.ts` toxunulmadı). İcra anı: **ilk deploy**.
+
+### 4. Canlı e2e — İCRA EDİLMƏDİ (token gözlənilir)
+
+`curl -s -o /dev/null -w "%{http_code}" https://qu-class.fly.dev/api/v1/health`
+→ **`000`, çıxış kodu 6 (DNS həll olunmur)**. Yəni app hələ yaradılmayıb —
+təxmin edilmədi, YOXLANILDI. Altı canlı yoxlamanın heç biri işlədilmədi.
+
+**Hazırlıq edildi (TƏLƏ K):** `playwright.config.ts`-də `webServer` bloku indi
+**şərtlidir** — `E2E_BASE_URL` verilibsə lokal server ÜMUMİYYƏTLƏ qaldırılmır.
+Əvvəlki halda `reuseExistingServer` 3100-dəki lokal serveri götürərdi və
+«canlı» adlanan dəst səssizcə LOKAL bazanı yoxlayardı: yaşıl nəticə heç nə
+sübut etməzdi. Yoxlanıldı: `E2E_BASE_URL=… npx playwright test --list` → 219
+test siyahılanır, lokal server qaldırılmır.
+
+Qalan tələlər (L: yazan testləri canlıda işlətmə · M: `FIXED_NOW` uzaqda
+tətbiq olunmur · N: kuki adı `SESSION_COOKIE_NAME`-dən · O: rate-limit)
+token gələndə tətbiq olunacaq — bu blokda yalnız qeyd edilib.
+
+### Dəyişən fayllar
+
+**Yeni:** `src/features/welcome/WelcomeSkeleton.tsx` ·
+`tests/e2e/landing-cls.spec.ts`
+**Redaktə:** `src/lib/api/openapi.ts` (+`getOpenApiDocument`) ·
+`src/lib/api/openapi.test.ts` (filtr götürüldü, `toRoutePath` testləri, 44→45) ·
+`src/app/(public)/(landing)/loading.tsx` · `playwright.config.ts` ·
+`docs/openapi.json` (törəmə) · `docs/ARCHITECTURE.md` §8 ·
+`docs/DECISIONS.md` (+QD-019) · `docs/SPRINT-3-4-AUDIT.md` (+§16) ·
+`docs/quality-report-12c.md` (+§8–11) · `docs/lighthouse/**/README.md` (törəmə) ·
+`README.md`
+
+**Toxunulmayanlar:** `src/components/ui/` · `prisma/schema.prisma` ·
+`prisma/migrations/` · `src/services/storage.ts` · deploy artefaktları
+(`Dockerfile`, `fly.toml`, `docker-entrypoint.sh`, `scripts/deploy.mjs`) ·
+`prisma/seed.ts`. Yeni tətbiq asılılığı **əlavə edilmədi**.
+
+### Dayanma nöqtəsi
+
+Kod tərəfində bağlanmamış audit tapıntısı qalmayıb. Açıq qalan altı sprint
+meyarının hamısı **tək** girişdən asılıdır: `FLY_API_TOKEN`.

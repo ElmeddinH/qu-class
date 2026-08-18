@@ -70,8 +70,18 @@ test("filtrlər URL-dədir və nəticəni dəyişir", async ({ page }) => {
   await login(page, MEMBER_EMAIL);
   await page.goto("/notifications");
 
-  await page.getByRole("link", { name: "Oxunmamış", exact: true }).click();
+  const unreadChip = page.getByRole("link", { name: "Oxunmamış", exact: true });
+  await unreadChip.click();
   await expect(page).toHaveURL(/status=unread/);
+
+  // 🔴 URL DƏYİŞMƏSİ RENDER-İN BİTMƏSİ DEMƏK DEYİL. `<Link>` client
+  // naviqasiyasında ünvan RSC cavabı commit olunmadan ƏVVƏL yenilənir; həmin
+  // pəncərədə növbəti klik köhnə DOM düyününə düşür və naviqasiya İTİR.
+  // Çip `aria-current="true"` alanda yeni server render-i commit olunub —
+  // yəni bu gözləmə sabit vaxt deyil, VƏZİYYƏT gözləməsidir (T19 idiomu,
+  // `directory.spec.ts`-dəki `expect.poll` ilə eyni məntiq).
+  // Bu olmadan test tək işləyəndə keçir, tam dəstdə (yüklü maşında) sınırdı.
+  await expect(unreadChip).toHaveAttribute("aria-current", "true");
 
   // Filtrdən sonra göstərilən HƏR kart oxunmamışdır.
   const cards = page.locator("[data-unread]");
@@ -81,7 +91,9 @@ test("filtrlər URL-dədir və nəticəni dəyişir", async ({ page }) => {
   }
 
   // Tip filtri status filtrini SIFIRLAMIR (ikisi birlikdə işləyir).
-  await page.getByRole("link", { name: "Sistem", exact: true }).click();
+  const systemChip = page.getByRole("link", { name: "Sistem", exact: true });
+  await systemChip.click();
+  await expect(systemChip).toHaveAttribute("aria-current", "true");
   await expect(page).toHaveURL(/status=unread/);
   await expect(page).toHaveURL(/type=SYSTEM/);
 });

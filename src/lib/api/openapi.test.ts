@@ -54,18 +54,31 @@ const operations = Object.entries(document.paths ?? {}).flatMap(([path, item]) =
  * 🔴 `/api/upload` və `.../ics` bu siyahıda YOXDUR: onlar v1 zərfindən
  * keçmir (bax `openapi.ts` → "Media" / "Events — təqvim ixracı" bölmələri) və
  * v1-ə xas qaydaları onlara tətbiq etmək sənədi YALAN edərdi.
+ *
+ * ⚠️ `GET /api/v1/openapi.json` isə BU siyahıdadır və 401/415 qaydalarına
+ * tabedir, LAKİN cavab gövdəsi zərfsizdir — sənədin özünü `{ data }`-ya
+ * salmaq onu maşınla oxunmaz edərdi. Zərf üçün ayrıca qapı YOXDUR (heç bir
+ * test bütün v1 200-lərindən `{ data }` tələb etmir), ona görə bu istisna
+ * mövcud qoruyucuları zəiflətmir.
  */
 const v1Operations = operations.filter((o) => o.path.startsWith("/api/v1"));
 
 const TAG_NAMES = API_TAGS.map((tag) => tag.name);
 
 // ---------------------------------------------------------------------------
-// AĞ SİYAHI — v1-dən kənar route-lar (TAPŞIRIQ 4)
+// AĞ SİYAHI — `src/app/api` altındaki BÜTÜN route-lar
 //
-// `src/app/api` altında (v1 xaric) tapılan HƏR route ya sənəddə OLMALIDIR,
-// ya da bu siyahıda SƏBƏBLƏ yer almalıdır. Yeni route əlavə olunanda test
-// AŞIR — müəllif ya sənədə salır, ya buraya səbəblə yazır (TAPŞIRIQ-dakı
-// tələb məhz budur).
+// `src/app/api` altında tapılan HƏR route ya sənəddə OLMALIDIR, ya da bu
+// siyahıda SƏBƏBLƏ yer almalıdır. Yeni route əlavə olunanda test AŞIR —
+// müəllif ya sənədə salır, ya buraya səbəblə yazır.
+//
+// 🔴 KOR NÖQTƏNİN BAĞLANIŞI (Sprint 3/4 auditi §5.3). Gəzici əvvəl
+// `/api/v1`-i İSTİSNA EDİRDİ, yəni qoruyucu məhz ictimai müqavilənin
+// yaşadığı yerə BAXMIRDI: yeni `/api/v1/...` route əlavə edən adam sənədə
+// heç nə yazmasa test YAŞIL qalırdı. Audit bunu belə tutdu —
+// `GET /api/v1/openapi.json` 53 əməliyyatdan yeganə elan edilməmişi idi və
+// heç bir test bundan şikayət etmirdi. Filtr GÖTÜRÜLDÜ; həmin əməliyyat
+// `openapi.ts` → «System» bölməsində sənədləşdirildi.
 // ---------------------------------------------------------------------------
 
 /**
@@ -148,7 +161,11 @@ describe("əməliyyatlar", () => {
     //     · tədbir: POST cohorts/{slug}/events + PATCH/DELETE events/{id}
     //       (GET events/{id} Blok 9S-dən onsuz da var idi)
     // = 44. Yazma əməliyyatı 6-dır, yeni YOL isə 7 — fərq məhz budur.
-    expect(v1Operations.length).toBe(44);
+    // + 1 (bu blok — `GET /api/v1/openapi.json`): route Blok 9S-dən BƏRİ
+    //   mövcud idi, amma sənədə düşməmişdi və gəzici qoruyucu `/api/v1`-i
+    //   istisna etdiyi üçün heç nə şikayət etmirdi (audit §5.3 «kor nöqtə»).
+    // = 45.
+    expect(v1Operations.length).toBe(45);
   });
 
   it(
@@ -802,20 +819,72 @@ describe("Media və təqvim ixracı — v1-dən kənar, amma sənədli (Sprint 2
 });
 
 /**
- * TAPŞIRIQ 4 — AĞ SİYAHI. `src/app/api` altında (v1 xaric) tapılan HƏR route
+ * AĞ SİYAHI. `src/app/api` altında tapılan HƏR route — `/api/v1` DAXİL —
  * ya sənəddə (yuxarıdaki `document.paths`) olmalıdır, ya da
  * `UNDOCUMENTED_ROUTE_WHITELIST`-də səbəblə yazılmalıdır. Yeni route əlavə
  * olunanda (sənədlənməyib və ağ siyahıda yoxdursa) bu test AŞIR.
  */
-describe("v1-dən kənar route-ların AĞ SİYAHISI", () => {
-  const discovered = discoverApiRoutes().filter((p) => !p.startsWith("/api/v1"));
+/**
+ * 🔴 TƏLƏ A — ÇEVİRMƏNİN ÖZÜ ÖLÇÜLÜR. Fayl sistemi `[slug]`, OpenAPI `{slug}`
+ * yazır. `toRoutePath` səhv olsa aşağıdakı ağ siyahı testi HƏR dinamik route
+ * üçün «sənəddə yoxdur» deyərdi — 20+ saxta tapıntı, hamısı eyni səbəbdən.
+ * Qoruyucunun özünə güvənmək üçün əvvəlcə çevirici sübut olunur.
+ */
+describe("toRoutePath — fayl seqmenti → OpenAPI yolu", () => {
+  it("tək dinamik seqmenti `{param}`-a çevirir", () => {
+    expect(toRoutePath("/api/v1/posts/[id]")).toBe("/api/v1/posts/{id}");
+  });
+
+  it("bir yolda BİRDƏN ÇOX dinamik seqmenti çevirir", () => {
+    expect(toRoutePath("/api/v1/cohorts/[slug]/events/[id]")).toBe(
+      "/api/v1/cohorts/{slug}/events/{id}",
+    );
+  });
+
+  it("statik yolu OLDUĞU KİMİ saxlayır", () => {
+    expect(toRoutePath("/api/v1/health")).toBe("/api/v1/health");
+  });
+
+  it("seqmentdəki NÖQTƏYƏ toxunmur (`openapi.json` real qovluq adıdır)", () => {
+    expect(toRoutePath("/api/v1/openapi.json")).toBe("/api/v1/openapi.json");
+  });
+
+  it("🔴 catch-all seqment (`[...x]`) çevrilmir — OpenAPI-də qarşılığı yoxdur", () => {
+    // `{...nextauth}` ETİBARSIZ OpenAPI-dir; catch-all route ya sənədə heç
+    // düşmür, ya ağ siyahıya gedir (bax `/api/auth/[...nextauth]`).
+    expect(toRoutePath("/api/auth/[...nextauth]")).toBe("/api/auth/[...nextauth]");
+  });
+
+  it("🔴 çevrilmiş yol sənəddəki REAL açarla üst-üstə düşür", () => {
+    // Bağlayıcı sübut: çevirici sənədin öz açar formatını verir.
+    expect(Object.keys(document.paths ?? {})).toContain(
+      toRoutePath("/api/v1/cohorts/[slug]/posts"),
+    );
+  });
+});
+
+describe("BÜTÜN api route-larının AĞ SİYAHISI", () => {
+  const discovered = discoverApiRoutes();
   const documentedPaths = new Set(Object.keys(document.paths ?? {}));
 
-  it("kəşf olunan route sayı gözlənilənlə üst-üstə düşür", () => {
-    // Sabit gözləmə: yeni fayl (v1 xaricində) əlavə olunanda bu testin
-    // dayanması müəllifi aşağıdakı «hər route ya sənəddə, ya ağ siyahıda»
-    // testinə baxmağa məcbur edir.
-    expect(discovered.sort()).toEqual(
+  it("🔴 gəzici `/api/v1`-i də əhatə edir — kor nöqtə qapalıdır", () => {
+    // Bu testin ÖZÜ filtrin geri qayıtmasını tutur: kimsə `discoverApiRoutes()`
+    // nəticəsini yenidən `!p.startsWith("/api/v1")` ilə süzsə burada sıfır v1
+    // route qalar və test aşar. Aşağıdakı «hər route ya sənəddə, ya ağ
+    // siyahıda» testi onda SƏSSİZCƏ boşalardı — ona görə qapı ayrıca lazımdır.
+    const v1Discovered = discovered.filter((p) => p.startsWith("/api/v1"));
+
+    expect(v1Discovered.length).toBeGreaterThan(30);
+    expect(v1Discovered).toContain("/api/v1/openapi.json");
+  });
+
+  it("v1-dən KƏNAR route-ların siyahısı gözlənilənlə üst-üstə düşür", () => {
+    // Sabit gözləmə: v1 xaricində yeni fayl əlavə olunanda bu testin dayanması
+    // müəllifi aşağıdakı «hər route ya sənəddə, ya ağ siyahıda» testinə
+    // baxmağa məcbur edir. (v1 tərəfində sabit siyahı SAXLANMIR — 36 sətirlik
+    // siyahı hər endpoint-də əl ilə yenilənərdi; oranı elə həmin «sənəddə ya
+    // ağ siyahıda» qapısı tutur.)
+    expect(discovered.filter((p) => !p.startsWith("/api/v1")).sort()).toEqual(
       [
         "/api/auth/[...nextauth]",
         "/api/events/{id}/ics",

@@ -452,3 +452,171 @@ yenidən yaradılır. Xülasə markdown-ları (`docs/lighthouse/README.md`,
 modal, klaviatura qısayolu ilə açılan modal) `triggerRef` null olur və fokus
 `<body>`-yə düşür — brauzerin öz bərpası isə artıq ləğv edilib. Hər idarə olunan
 `DialogContent` `useDialogFocusRestore()` idarəedicisini almalıdır.
+
+---
+
+# Blok 12E — YENİDƏN ÖLÇMƏ (Sprint 3/4 qalan meyarları)
+
+> 12C-nin rəqəmləri **2026-07-31**-dəndir və o vaxtdan iki blok keçib
+> (12A deploy artefaktları, 12D yüklənmə vəziyyəti + 51 səhifəlik responsive
+> matrisi). Bu bölmə həmin ölçmələri **eyni alətlərlə təkrarlayır** — yuxarıdakı
+> 12C mətni tarixi qeyd kimi olduğu kimi saxlanılır, silinmir.
+>
+> Tarix: **2026-08-18** · Baza: `next start` · `http://127.0.0.1:3100`
+
+## 8. axe — 12 səhifə × 2 vəziyyət, TƏKRAR ÖLÇMƏ
+
+`npx playwright test tests/e2e/a11y.spec.ts` → **24 skan, 24-ü yaşıl.**
+
+| Təsir səviyyəsi | Node sayı |
+| --- | ---: |
+| `critical` | **0** |
+| `serious` | **0** |
+| `moderate` | **0** |
+| `minor` | **0** |
+
+⚠️ Sıfır YALNIZ `serious`/`critical`-da deyil — **dörd səviyyənin hamısında**.
+12C-də qapı yalnız serious/critical idi və `moderate`/`minor` «sayılır, amma
+qırmızı etmir» kimi yazılmışdı; bu ölçmədə onlar da boşdur.
+
+Skan edilən 12 səhifə (hər biri anonim + giriş etmiş): `/` · `/faq` ·
+`/khankendi` · `/login` · `/register` · `/home` · `/class/[slug]` ·
+`/class/[slug]/directory` · `/class/[slug]/timeline` · `/class/[slug]/map` ·
+`/me/privacy` · `/admin`.
+
+⚠️ Anonim vəziyyətdə səkkiz yol `/login`-ə yönləndirilir (`finalPath` JSON-da
+qeyd olunur) — yəni onlar «qorunan səhifənin əlçatanlığı» yox, **yönləndirmə
+hədəfinin** əlçatanlığını ölçür. Bu, qüsur deyil, ölçmənin oxunuşudur.
+
+⚠️ TƏLƏ J qüvvədədir: skandan əvvəl skeletonların yox olması `expect.poll` ilə
+gözlənilir (`tests/e2e/settle.ts`). Skeleton görünən anda skan edilsəydi
+`color-contrast` qaydası boz qutulara baxıb saxta tapıntı verərdi.
+
+## 9. 🔴 Lighthouse — AÇILIŞ SƏHİFƏSİNDƏ REQRESSİYA TAPILDI VƏ DÜZƏLDİLDİ
+
+### Tapıntı
+
+Desktop preset açılış səhifəsini **Performance 88 · CLS 0.223** ölçdü.
+12C-də eyni səhifə **100 · CLS 0** idi. Sıçrayış TƏK idi və node göstərilmişdi:
+
+```
+layout-shifts → score 0.2234 → body.antialiased > div.flex > footer.border-t
+```
+
+### Səbəb — ölçülüb, təxmin edilməyib
+
+Blok 12D `(landing)/loading.tsx` əlavə etmişdi:
+`PageSkeleton variant="cards"`. Səhifə JS söndürülmüş brauzerdə (yəni axının
+**birinci** hissəsində, Suspense fallback-i yerində) ölçüldü:
+
+| Vəziyyət | `<footer>`-in yeri | Sənəd hündürlüyü |
+| --- | ---: | ---: |
+| Skeleton (fallback) | **730 px** | 1 280 px |
+| Məzmun gəldikdən sonra | **5 794 px** | 6 463 px |
+
+`PublicShell`-in footer-i Suspense sərhədindən **kənardadır**, yəni skeleton
+anında 940 px-lik ekranın **İÇİNDƏ** görünür, sonra 5 000 px aşağı tullanır.
+Bu, ölçü cihazının şıltaqlığı deyil — istifadəçinin gözü ilə görünən sıçrayışdır.
+
+⚠️ Səbəb `PageSkeleton`-un ÖZ müqaviləsinin pozulması idi: fayl başlığı
+«skeleton real səhifənin FORMASINI təqlid edir» deyir, `count` prop-unun sənədi
+isə «real səhifədəki İLK EKRAN sayına yaxın olmalıdır» tələb edir. Açılış
+səhifəsi kart şəbəkəsi deyil — hero + doqquz bölmədir.
+
+### Düzəliş
+
+`src/features/welcome/WelcomeSkeleton.tsx` — real səhifənin formasını verən
+skeleton (hero bloku + üç bölmə × üç kart). Eyni idiom Blok 12D-də
+`YearbookSkeleton` üçün işlədilmişdi.
+
+| | Əvvəl | Sonra |
+| --- | ---: | ---: |
+| `/` desktop Performance | 88 ❌ | **99 ✅** |
+| `/` desktop CLS | **0.223** | **0** |
+| Skeleton anında footer | 730 px (ekranın içində) | **1 773 px** (kənarda) |
+
+🔴 **Hədəf «skeletonu 6 400 px etmək» DEYİL** — 6 400 px-lik boz qutu absurd
+olardı. Hədəf ölçülə biləndir: footer **hər iki vəziyyətdə** ekrandan kənarda
+qalsın. CLS yalnız viewport-da GÖRÜNƏN elementlərin sıçrayışını sayır.
+
+### Qapı — rəqəm sənəddə yox, testdə saxlanılır
+
+`tests/e2e/landing-cls.spec.ts` (**yeni**, 3 test). Desktop (1350×940) və mobil
+(412×823) ekranda `javaScriptEnabled: false` ilə axının birinci hissəsi ölçülür
+və footer-in ekrandan kənarda olması tələb olunur.
+
+⚠️ **Qapı boş deyil — sübut edilib.** Köhnə `loading.tsx` müvəqqəti geri
+qaytarıldı və test məhz gözlənilən mesajla AŞDI:
+
+```
+✘ desktop: skeleton anında footer EKRANDAN KƏNARDADIR
+  Error: Skeleton çox qısadır: footer 730px-də, yəni 940px-lik ekranın
+  İÇİNDƏ başlayır.
+```
+
+Mobil ölçüdə köhnə skeleton da keçirdi (412 px-də kartlar alt-alta düşür və
+skeleton onsuz da 823 px-i aşır) — yəni bağlayıcı yoxlama **desktop**-dur.
+
+### Desktop — yekun (5 səhifə)
+
+| Səhifə | Performance | Accessibility | Best Practices | SEO | LCP | TBT | CLS |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `/` | **99 ✅** | 100 ✅ | 100 ✅ | 91 ✅ | 0.8 s | 0 ms | **0** |
+| `/home` | 99 ✅ | 100 ✅ | 100 ✅ | 100 ✅ | 0.9 s | 0 ms | 0 |
+| `/class/[slug]/directory` | 100 ✅ | 100 ✅ | 100 ✅ | 100 ✅ | 0.8 s | 0 ms | 0 |
+| `/class/[slug]/map` | 100 ✅ | 100 ✅ | 100 ✅ | 100 ✅ | 0.8 s | 0 ms | 0 |
+| `/admin` | 100 ✅ | 100 ✅ | 100 ✅ | 100 ✅ | 0.7 s | 0 ms | 0 |
+
+**Beş səhifənin hamısı bütün hədəfləri keçdi.**
+
+⚠️ `/` üçün SEO **91** (12C-də 100) — `meta-description` auditi «yoxdur» deyir.
+Yoxlanıldı: təsvir **HƏM** serverin verdiyi HTML-dədir (bayt 20 092), **HƏM**
+hidratasiyadan sonrakı DOM-dadır. Səbəb `loading.tsx` ilə gələn axındır —
+metadata shell-dən SONRAKI hissədə göndərilir və Lighthouse-un snapshot anı
+bəzən ondan əvvələ düşür. Yəni bu, **ölçmə artefaktıdır**, sənədin özündə
+boşluq deyil; hədəf (≥ 90) hər halda keçilib.
+
+### Mobil — iki işlətmə, ölçmə səs-küyü açıq göstərilir
+
+| Səhifə | 12C | 12E · 1-ci | 12E · 2-ci | Hədəf |
+| --- | ---: | ---: | ---: | --- |
+| `/` | 92 | 92 ✅ | 91 ✅ | ≥ 90 |
+| `/home` | 87 | 78 ❌ | 86 ❌ | ≥ 90 |
+| `/class/[slug]/directory` | 94 | 87 ❌ | 88 ❌ | ≥ 90 |
+| `/class/[slug]/map` | 92 | 90 ✅ | 91 ✅ | ≥ 90 |
+| `/admin` | 90 | 83 ❌ | 85 ❌ | ≥ 90 |
+
+🔴 **Bu rəqəmlər kod reqressiyası kimi OXUNMAMALIDIR.** İki işlətmə arasında
+FCP və LCP demək olar dəyişmir, **TBT isə 2–3 dəfə tərpənir** (60 → 400 ms
+aralığı, EYNİ build). Mobil profil «4× zəiflədilmiş CPU» simulyasiyasıdır və
+ölçən maşının öz yükünə həssasdır (`load average` ölçmə anında 2.6–3.1 idi).
+Desktop profilində eyni build sabit şəkildə 99–100 verir.
+
+✅ **Sabit və reproduksiya olunan yaxşılaşma:** CLS mobil profildə **bütün beş
+səhifədə 0** — 12C-də `/directory` 0.035 idi (kuki banneri). Yəni §5-in 7-ci
+məhdudiyyəti bu ölçmədə görünmür.
+
+## 10. Qəbul edilmiş tapıntılar — səbəbi ilə
+
+| # | Tapıntı | Niyə qəbul edilir |
+| ---: | --- | --- |
+| 1 | **24–43 px toxunma hədəfləri** (351 element) | shadcn primitivlərinin öz ölçüsüdür (`h-9` = 36 px) və `src/components/ui/` CLAUDE.md §1-ə görə toxunulmazdır. **WCAG 2.2 AA-nın 24 px qapısı ödənilib**; 44 px KUDS **tövsiyəsidir**, qapı deyil. ⚠️ İki primitiv (`Checkbox` 16×16, `Switch` 36×20) 24 px-in ALTINDADIR — bax §5 №9 və `STATE.md` 12D bölməsi: bu, açıq **dizayn sualıdır**, ölçülüb və gizlədilmir |
+| 2 | **`/home` mobil Performance 90-dan aşağı** | `/home` istifadəçinin əsas sinfinə **yönləndirir** (məhsul qərarı, PLAN.md §4.2); Lighthouse `redirects` auditində ~600 ms itki yazır. Hədəf səhifə birbaşa ölçüləndə fərq itir. Yönləndirməni silmək məhsul davranışını dəyişməkdir |
+| 3 | **`/` SEO 91** | Ölçmə artefaktı — `meta-description` həm HTML-də, həm final DOM-dadır (yuxarıda sübut). Hədəf keçilib |
+| 4 | **Mobil TBT səs-küyü** | Ölçən maşının yükündən asılıdır; iki işlətmə cədvəldə YAN-YANA verilib ki, tək rəqəm həqiqətdən çox şey vəd etməsin |
+
+⚠️ Kuki bannerinin CLS-i (12C-də 0.035) bu ölçmədə **0-dır** — «qəbul edilmiş
+tapıntı» siyahısında saxlanmır, çünki artıq ölçülmür.
+
+## 11. Alətlər — 12E-də əlavə olunanlar
+
+| Əmr | Nə edir | Çıxış |
+| --- | --- | --- |
+| `npx playwright test tests/e2e/landing-cls.spec.ts` | açılış skeletonu footer-i ekrandan kənarda saxlayırmı | — (qapı) |
+| `LH_PRESET=mobile LH_OUT_DIR=docs/lighthouse/mobile npm run audit:lighthouse` | mobil profil | `docs/lighthouse/mobile/README.md` |
+
+⚠️ **§2.2-dəki ölçmə tələsi 12E-də DƏ baş verdi və vaxt itirdi.** `pkill` köhnə
+`next start`-ı öldürməmişdi, yeni proses portu tuta bilmədi və səssizcə çıxdı —
+Lighthouse **KÖHNƏ build-i** ölçdü, «düzəliş işləmir» kimi göründü. Yoxlama
+üsulu: `ps -eo pid,lstart,cmd | grep next-server` — prosesin BAŞLAMA VAXTI
+build-dən sonra olmalıdır.

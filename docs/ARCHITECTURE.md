@@ -504,8 +504,35 @@ detalıdır** — sənədə salınmır, çünki xarici müştəri onları HEÇ V
 ⚠️ Bu, boşluğu **örtmək** deyil, **qərarı sənədləşdirməkdir**: müdafiədə
 «niyə sənəddə deyil?» sualının cavabı budur. Ağ siyahı kod səviyyəsində
 `src/lib/api/openapi.test.ts` → `UNDOCUMENTED_ROUTE_WHITELIST`-də bərkidilib
-— yeni v1-dən kənar route əlavə olunanda test aşır və müəllif ya sənədə
-salmalı, ya buraya (və o siyahıya) səbəblə yazmalıdır.
+— yeni route əlavə olunanda test aşır və müəllif ya sənədə salmalı, ya buraya
+(və o siyahıya) səbəblə yazmalıdır.
+
+### 🔴 Qoruyucunun kor nöqtəsi — bağlandı
+
+Gəzici test uzun müddət `/api/v1`-i **istisna edirdi**, yəni qoruyucu məhz
+ictimai müqavilənin yaşadığı yerə baxmırdı: yeni `/api/v1/...` route əlavə edən
+adam sənədə heç nə yazmasa test **yaşıl** qalırdı. Sprint 3/4 auditi (§5.3)
+nəticəni belə tapdı — kodda **53** əməliyyat var idi, sənəddə **52**, fərq isə
+`GET /api/v1/openapi.json` idi və heç bir test bundan şikayət etmirdi.
+
+Filtr götürüldü (gəzici indi `src/app/api`-nin **hamısını** əhatə edir) və həmin
+əməliyyat sənədləşdirildi (`System` taqı). Cari vəziyyət:
+
+| Ölçü | Rəqəm |
+|---|---|
+| Gəzilən `route.ts` faylı | **42** |
+| Sənəddəki yol / əməliyyat | **38** / **48** |
+| Ağ siyahıdakı route (yuxarıdakı cədvəl) | **4** (5 əməliyyat — `[...nextauth]` GET+POST) |
+| **Yekun** | **48 + 5 = 53** — elan edilməmiş əməliyyat **yoxdur** |
+
+⚠️ Gəzici `src/app/api` ağacından KƏNARA çıxmır: `src/app/uploads/[...path]/route.ts`
+(Blok 12A — volume-dakı şəkilləri verən statik fayl xidməti) API müqaviləsi deyil
+və siyahıya düşmür.
+
+⚠️ Dinamik seqment çevirməsi (`[slug]` → `{slug}`, catch-all `[...x]` isə
+**toxunulmadan** qalır) `toRoutePath`-dədir və onun ÖZÜ ayrıca vahid testlərlə
+ölçülür — çevirici səhv olsaydı qoruyucu hər dinamik route üçün saxta tapıntı
+verərdi.
 
 ### `/api/upload` — niyə (a)
 

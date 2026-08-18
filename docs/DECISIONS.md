@@ -853,3 +853,82 @@ müqayisə edildi:
 ⚠️ Yəni determinizm **məzmun səviyyəsindədir, bayt səviyyəsində deyil**: SQLite
 səhifə yerləşdirmə sırası işlətmədən-işlətməyə dəyişir. Şablonu `sha256sum` ilə
 müqayisə etmək yanlış nəticə verər — məzmunla müqayisə edilməlidir.
+
+---
+
+## QD-019 — Canlı instansiyada demo ADMİN parolu dəyişdirilir, üzv hesabları qalır
+
+**Status:** qəbul edilib (Blok 12E, 2026-08-18) · Variant: **(b)** ·
+Tətbiq anı: **ilk deploy** (`FLY_API_TOKEN` gəldiyi an — bax QD-018).
+
+### Kontekst
+
+`README.md` §«Test hesabları» beş seed hesabını və onların ORTAQ parolunu
+(`Test1234!`) açıq yazır. Bu, lokal qiymətləndirmə üçün məqsədyönlüdür:
+Holberton nəzarətçisi reponu klonlayıb `npm run db:seed` işlədir və dörd cohort
+rolunu (`MEMBER` · `CLASS_REPRESENTATIVE` · `EVENT_COORDINATOR` ·
+`CLASS_MODERATOR`) dərhal görə bilir.
+
+Deploy (QD-018) bu tənliyi dəyişir: eyni sətirlər **internetdəki** instansiyaya
+da açılır. Siyahıdakı hesablardan biri `admin@qu.edu.az` →
+**`UNIVERSITY_ADMIN`**-dir, yəni README-ni oxuyan hər kəs canlı saytda tam
+administrator kimi girə bilər. Bu, layihənin öz təhlükəsizlik iddiaları
+(`docs/SECURITY.md`) ilə birbaşa ziddiyyət təşkil edir.
+
+### Ölçülmüş risk — admin fərqi DƏRƏCƏ deyil, NÖVDÜR
+
+Üzv hesablarının (rep / moderator / coordinator / alumni) zərər radiusu
+məhduddur və modelin özü ilə çərçivəyə salınıb:
+
+- hər sorğu `visibilityWhere(viewer)`-dən keçir — başqa sinfin məzmununa
+  çatmırlar (CLAUDE.md §5);
+- `PRIVATE` sahələr onlara da bağlıdır;
+- `deletePost` **soft delete**-dir (`status = DELETED`), sətir qalır.
+
+`UNIVERSITY_ADMIN` isə bir imkana görə ayrılır:
+[`admin-users.service.ts` → `changeSystemRole`](../src/services/admin-users.service.ts)
+istənilən istifadəçini `UNIVERSITY_ADMIN`-ə **yüksəldə bilir**. Yəni bir dəfəlik
+giriş qalıcı nəzarətə çevrilir: sonradan `admin@qu.edu.az`-ın parolunu dəyişsək
+belə, təcavüzkarın özünə açdığı ikinci admin hesabı QALIR. Bu, «demo datası
+korlanar» səviyyəsindən fərqli bir haldır.
+
+**Audit jurnalı bu boşluğu bağlamır.** Hər admin əməliyyatı `AuditLog`-a
+düşür (`recordAudit`, YALNIZ ƏLAVƏ olunur) və moderasiya yolu tam auditlidir —
+amma audit **izlənəbilirlikdir, geri qaytarma DEYİL**. Anonim internet
+ziyarətçisinin `actorId`-sini bilmək heç nə vermir və `undo` yoxdur.
+
+**Bərpa ucuz deyil — ölçülüb.** Canlı baza tək Fly volume-undadır (QD-018:
+`min_machines_running = 1`, ehtiyat nüsxə yoxdur). Seed-i yenidən işlətmək
+**destruktivdir** (25 cədvəldə `deleteMany`) və canlı instansiyada qadağandır.
+Yəni «necə olsa sintetik datadır, bərpa edərik» arqumenti **yanlışdır**:
+praktikada bərpa = volume-u silib sıfırdan deploy.
+
+### Qərar
+
+**Canlı instansiyada YALNIZ `admin@qu.edu.az`-ın parolu dəyişdirilir.**
+Sənəddəki dörd üzv hesabı (`rep` · `moderator` · `coordinator` · `alumni`)
+**toxunulmur** — portfolio nümayişinin dəyəri məhz onlardadır və zərər radiusu
+yuxarıda göstərildiyi kimi modelin özü ilə çərçivələnib.
+
+| | |
+|---|---|
+| Mexanizm | `fly secrets set DEMO_ADMIN_PASSWORD=…` + birdəfəlik rotasiya skripti |
+| Nə vaxt | ilk uğurlu deploy-dan DƏRHAL SONRA, ilk ictimai link paylaşılmadan əvvəl |
+| Lokalda | heç nə dəyişmir — `Test1234!` qalır, 20+ e2e faylı və `seed.ts` toxunulmur |
+| README | üzv hesabları cədvəldə qalır; admin sətri «canlıda parol fərqlidir» qeydi ilə |
+
+### Alternativlər
+
+| Alternativ | Niyə seçilmədi |
+|---|---|
+| **(a) hamısı olduğu kimi qalır**, risk README-də yazılır | Xəbərdarlıq nəzarət deyil. Risk «sintetik data korlanar» kimi qiymətləndirilsəydi qəbul edilə bilərdi, amma `changeSystemRole` onu QALICI hesab ələ keçirməsinə çevirir və bərpa yolu (volume-u silmək) demo günü mövcud deyil |
+| Bütün beş hesabın parolunu dəyişmək | Nümayişi öldürür: ziyarətçi dörd rolu görə bilməz, layihənin əsas iddiası (rol × görünürlük matrisi) yoxlanılmaz qalar. Zərər radiusu isə admin-dəki kimi genişlənmir |
+| Admin hesabını canlıda tamamilə SİLMƏK | `checkSystemRoleChange` sonuncu admini qorumağa qurulub (`adminCount`); admin-siz instansiyada `/admin` səthi — 17 moduldan biri — nümayiş oluna bilməzdi |
+| Canlıda `/admin`-i middleware ilə bağlamaq | Sənədləşdirilmiş funksionallığı gizlətmək qiymətləndirməni ÇƏTİNLƏŞDİRİR; problem səthdə deyil, PAYLAŞILMIŞ PAROLDADIR |
+
+### Nəticə
+
+Bu qərar deploy artefaktlarına toxunmur (QD-018 olduğu kimi qalır) və kodda
+dəyişiklik tələb etmir — icra anı ilk deploy-dur. Token gəlməyənə qədər
+**gözləyən vəziyyətdədir**; `README.md` və bu sənəd onu qabaqcadan bağlayır ki,
+deploy günü unudulmasın.

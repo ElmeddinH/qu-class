@@ -504,6 +504,15 @@ Plan görmək (heç nə dəyişdirmir): `node scripts/deploy.mjs --dry-run`
 **Yenidən deploy** — eyni əmr. `AUTH_SECRET` bir dəfə qoyulur və sonra
 **toxunulmur** (dəyişsə bütün mövcud sessiyalar düşər).
 
+🔴 **İLK deploy-dan sonrakı MƏCBURİ addım — admin parolunun rotasiyası.**
+Seed `admin@qu.edu.az` hesabını sənədləşdirilmiş demo parolu ilə yaradır və o
+parol bu README-dədir. `UNIVERSITY_ADMIN` istənilən hesabı admin-ə yüksəldə
+bilir (`changeSystemRole`), yəni canlı saytda paylaşılmış admin parolu bir
+dəfəlik girişi **qalıcı** nəzarətə çevirər. İlk ictimai link paylaşılmadan
+əvvəl **yalnız admin** parolu dəyişdirilir; dörd üzv hesabı toxunulmur —
+nümayişin dəyəri onlardadır. Ölçülmüş arqument, rədd edilmiş alternativlər və
+mexanizm: [QD-019](docs/DECISIONS.md#qd-019--canlı-instansiyada-demo-admin-parolu-dəyişdirilir-üzv-hesabları-qalır).
+
 ### Mühit dəyişənləri — tam siyahı
 
 | Dəyişən | Haradan gəlir | Məcburi | Nə edir |
@@ -576,7 +585,7 @@ Hamısının şifrəsi: **`Test1234!`**
 
 | E-poçt | Sistem rolu | Cohort rolu | Mərhələ |
 |---|---|---|---|
-| `admin@qu.edu.az` | `UNIVERSITY_ADMIN` | `MEMBER` | STUDENT |
+| `admin@qu.edu.az` ⚠️ | `UNIVERSITY_ADMIN` | `MEMBER` | STUDENT |
 | `moderator@qu.edu.az` | `USER` | `CLASS_MODERATOR` | STUDENT |
 | `rep@qu.edu.az` | `USER` | `CLASS_REPRESENTATIVE` | STUDENT |
 | `coordinator@qu.edu.az` | `USER` | `EVENT_COORDINATOR` | STUDENT |
@@ -586,6 +595,15 @@ Hamısının şifrəsi: **`Test1234!`**
 deterministik olmalıdır), yəni 125 hesabın hash-i eynidir. Qeydiyyat yolu isə
 tamamilə başqa koddur və hər istifadəçi üçün **təsadüfi duz** yaradır
 (`hashSync(password, 10)`). Ətraflı: [`docs/SECURITY.md`](docs/SECURITY.md) §3.
+
+⚠️ **`admin@qu.edu.az` — canlı instansiyada parol FƏRQLİDİR.** Yuxarıdaki cədvəl
+**lokal** seed üçündür. Canlı saytda administrator parolu ilk deploy-dan sonra
+dəyişdirilir; dörd üzv hesabı (`rep` · `moderator` · `coordinator` · `alumni`)
+isə canlıda da eyni parolla işləyir — dörd cohort rolunu görmək üçün onlar
+kifayətdir. Səbəb: `UNIVERSITY_ADMIN` istənilən hesabı admin-ə **yüksəldə
+bilir** (`changeSystemRole`), yəni paylaşılmış admin parolu bir dəfəlik girişi
+qalıcı nəzarətə çevirərdi. Ölçülmüş arqument və rədd edilmiş alternativlər:
+[`docs/DECISIONS.md`](docs/DECISIONS.md) → **QD-019**.
 
 ---
 
@@ -791,11 +809,11 @@ qalır.
 | # | Məhdudiyyət | Səbəb |
 |---|---|---|
 | 6 | **ISR ictimai səhifələrdə yoxdur** | `ConsentGate` → `cookies()` bütün `(public)` route-larını dinamik edir; PPR experimental, stack kilidlidir. Ölçü itki göstərmir |
-| 7 | **`/home` mobil Performance 87** | Yönləndirmə 600 ms alır; hədəf səhifə birbaşa ölçüləndə **91** |
+| 7 | **`/home` mobil Performance 90-dan aşağı** (12C: 87 · 12E: 78 və 86 — iki işlətmə) | Yönləndirmə 600 ms alır; hədəf səhifə birbaşa ölçüləndə **91**. ⚠️ Mobil profil ölçən maşının yükünə həssasdır: eyni build-də TBT 2–3 dəfə tərpənir, FCP/LCP isə demək olar sabit qalır. Desktop profilində eyni səhifə **99** verir — bax `docs/quality-report-12c.md` §9 |
 | 8 | **Yüklənmə vəziyyəti iki mexanizmlə verilir** — 19 səhifədə `loading.tsx`, 20 səhifədə səhifə daxili `<Suspense>`, 12 səhifədə heç biri | Axınla render cavab başlığını — yəni **statusu** — məzmundan əvvəl göndərir, ona görə `notFound()` / `forbidden()` çağıran seqmentə `loading.tsx` qoyula bilmir (404 səssizcə 200 olur). Səhifələr **A/B** bölünüb: **A** = status qapısı yoxdur → seqmentin ƏN DAR yerində `loading.tsx` (üç yerdə route qrupu ilə daraldılıb ki, qonşu dinamik seqmentə düşməsin); **B** = status qapısı var → qapı `await` edilir, YALNIZ ondan sonrakı alt-ağac `<Suspense>`-ə bükülür. Qalan 12 səhifədə ya gözləyəcək sorğu yoxdur (`/kuds`, `/docs`, `/login`), ya səhifə yönləndirir (`/home`, `/me`), ya da yeganə sorğu 404 qərarının ÖZÜDÜR — onu sərhədin arxasına salmaq statusu sındırardı. Bölgü və hər səhifənin səbəbi: [`docs/responsive/report.md`](docs/responsive/report.md) |
 | 9 | **Toxunma hədəfi: WCAG 2.2 AA-nın 24px qapısı iki primitivdə ödənmir**, KUDS-un 44px tövsiyəsi isə 1674 elementdə | ⚠️ Blok 12C bu qapını «ödənilib» kimi yazmışdı, amma ölçmə **10 səhifədə** idi. Blok 12D-də 51 səhifəyə genişlənəndə `Checkbox` (**16×16**, `ui/checkbox.tsx` → `h-4 w-4`) və `Switch` (**36×20**, `ui/switch.tsx` → `h-5 w-9`) qapının altında qaldı — beş səhifədə görünür (`/me/career`, `/admin/moderation`, `/events/[id]/manage`, `/class/[slug]/memories`, `/kuds`). İkisi də shadcn primitividir və `src/components/ui/` CLAUDE.md §1-ə görə toxunulmazdır; çağırış yerində `className` ilə böyütmək bütün sistemdə checkbox/switch ölçüsünü dəyişən **dizayn qərarıdır**, responsive qırığı deyil. Blok 12D-də tapılan ÜÇÜNCÜ pozuntu (`AttendeeTable` çeşidləmə düyməsi 73×21) düzəldildi — o, bizim kodumuzda idi. 44px isə qapı deyil, tövsiyədir |
 | 10 | Profil banneri xarici ünvanda `<img>` qalır | `next/image` hər hostu `remotePatterns`-də tələb edir; hamısını açmaq optimizatoru açıq proksiyə çevirər |
-| 11 | Kuki banneri mobil `/directory`-də CLS 0.035 | Banner `fixed`-dir, şrift `swap` ilə gələndə hündürlüyü dəyişir. «Yaxşı» zolağın içindədir (< 0.1) |
+| 11 | ~~Kuki banneri mobil `/directory`-də CLS 0.035~~ — **12E ölçməsində 0** | Banner `fixed`-dir və axından kənardadır. Blok 12E-nin təkrar ölçməsində desktop və mobil profillərin **hər ikisində, beş səhifənin hamısında CLS = 0**. Sətir tarixi qeyd kimi saxlanılır |
 
 **Miqyas:** SQLite tək yazıcı kilidi ilə işləyir — bu miqyasda (sinif = 14–28
 nəfər) hiss olunmur, amma çox istifadəçili istehsalda birinci məhdudiyyət budur.

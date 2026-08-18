@@ -1116,3 +1116,79 @@ edilib. Sənədləşmə üçün onların `docs/` altına salınması tövsiyə o
 
 Heç bir mənbə faylı redaktə/silinmədi. `npm install`, miqrasiya, seed **işlədilmədi**.
 Müvəqqəti scriptlər yalnız `/tmp` altında saxlanıldı.
+
+---
+
+# 16. 12C-dən sonrakı vəziyyət (Blok 12E · 2026-08-18)
+
+> Bu bölmə auditi **yenidən yazmır** — yuxarıdakı ölçmələr auditin çəkildiyi
+> andakı həqiqətdir və tarixi qeyd kimi qalır. Aşağıda yalnız **hansı
+> meyarların bundan sonra bağlandığı** və hansının hələ açıq olduğu göstərilir.
+
+## 16.1 Bu blokda bağlananlar
+
+### B5 (Sprint 3 & Sprint 4) — Swagger boşluğu **BAĞLANDI**
+
+§5.3-dəki kor nöqtə aradan qaldırıldı:
+
+| | Audit anı | İndi |
+| --- | ---: | ---: |
+| Gəzilən `route.ts` faylı | 6 (yalnız v1-DƏN KƏNAR) | **42** (hamısı) |
+| Sənəddəki əməliyyat | 52 / 53 | **48 sənəddə + 5 ağ siyahıda = 53 / 53** |
+| Elan edilməmiş əməliyyat | **1** (`GET /api/v1/openapi.json`) | **0** |
+
+- `src/lib/api/openapi.test.ts` → gəzici artıq `/api/v1`-i **istisna etmir**;
+  ayrıca test filtrin geri qayıtmasını tutur.
+- `toRoutePath` (`[slug]` → `{slug}`, catch-all toxunulmur) **öz vahid
+  testlərini** aldı — çevirici səhv olsaydı qoruyucu 20+ saxta tapıntı verərdi.
+- `GET /api/v1/openapi.json` `System` taqında sənədləşdirildi; `docs/openapi.json`
+  snapshot-ı `npm run docs:openapi` ilə yeniləndi (drift testi yaşıl).
+- Nəsr qarşılığı: `docs/ARCHITECTURE.md` §8.
+
+### Sprint 3 meyar 4 · Sprint 4 meyar 6 (keyfiyyət tərəfi) — **ÖLÇÜLDÜ**
+
+- axe: 12 səhifə × 2 vəziyyət = **24 skan**, **dörd təsir səviyyəsinin
+  hamısında 0 pozuntu**.
+- Lighthouse desktop: 5/5 səhifə bütün hədəfləri keçir.
+- 🔴 Bu ölçmə **reqressiya tapdı**: Blok 12D-nin `(landing)/loading.tsx`-i
+  açılış səhifəsində **CLS 0.223** (Performance 88) yaradırdı — footer skeleton
+  anında ekranın içində qalıb sonra 5 000 px tullanırdı. Düzəldildi
+  (`WelcomeSkeleton`), yekun **CLS 0 · Performance 99**, qapı
+  `tests/e2e/landing-cls.spec.ts`-dədir. Detal: `docs/quality-report-12c.md` §9.
+
+### Demo hesab riski — **QƏRAR VERİLDİ** (yeni)
+
+Auditdə qeyd olunmayan, deploy ilə birlikdə yaranan risk: README-dəki demo
+parolu canlı saytda `UNIVERSITY_ADMIN` üçün də keçərli olurdu. `changeSystemRole`
+istənilən hesabı admin-ə yüksəldə bildiyi üçün bu, bir dəfəlik girişi qalıcı
+nəzarətə çevirərdi. Qərar: **QD-019** — canlıda yalnız admin parolu rotasiya
+olunur, dörd üzv hesabı toxunulmur.
+
+## 16.2 HƏLƏ AÇIQ qalanlar — hamısı eyni tək səbəbdən
+
+`FLY_API_TOKEN` verilmədiyi üçün deploy edilməyib. `https://qu-class.fly.dev/api/v1/health`
+yoxlanıldı → **DNS həll olunmur** (`curl` çıxış kodu 6), yəni app hələ yaradılmayıb.
+
+| Sprint | Meyar | Vəziyyət | Nə çatmır |
+| --- | --- | --- | --- |
+| S3 | 2. Layihə uğurla deploy edilmişdir | ❌ | token |
+| S3 | 3. Frontend/Backend canlı mühitdə işləyir | ❌ | 2-nin nəticəsi |
+| S3 | 7. Lokal **və** deploy mühitində işləyir | ⚠️ yarısı | lokal tərəf ✅ (tsc · lint · build · vitest · e2e təmiz) |
+| S4 | 5. Deploy edilmiş layihə problemsiz işləyir | ❌ | token |
+| S4 | 8. Lokal **və** deploy mühitində build olunur | ⚠️ yarısı | lokal build ✅ |
+| S4 | Z2. Tam E2E funksionallıq | ⚠️ yarısı | lokalda 219 test keçir; **canlı** keçid ölçülməyib |
+
+⚠️ Deploy artefaktları (QD-018) hazırdır və dəyişdirilməyib. Canlı e2e üçün
+`playwright.config.ts` **əvvəlcədən hazırlandı**: `E2E_BASE_URL` verilibsə
+`webServer` bloku tamamilə söndürülür (əks halda dəst lokal serveri qaldırıb
+"canlı" adı altında LOKAL bazanı yoxlayardı — yaşıl nəticə heç nə sübut etməzdi).
+
+**Nəticə:** açıq qalan altı maddənin hamısı **tək** girişdən — `FLY_API_TOKEN` —
+asılıdır. Kod tərəfində bağlanmamış audit tapıntısı qalmayıb.
+
+## 16.3 Auditdə qeyd olunan, HƏLƏ borc olaraq qalanlar (12E-nin əhatəsi deyil)
+
+§11 və §13-dəki funksional borclar toxunulmadı: parol sıfırlama axını (QD-001 —
+qəsdən), CMS-də yaratma, `/admin/stats` kohort filtri, ikinci dərəcəli kohort
+rolu, xəritədə zoom/pan. Bunlar `README.md` §«Bilinən məhdudiyyətlər»də açıq
+sadalanır.

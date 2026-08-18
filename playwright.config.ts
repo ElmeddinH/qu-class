@@ -11,7 +11,18 @@ import { defineConfig, devices } from "@playwright/test";
  * özündən sonra təmizləyir) — seed edilmiş baza tələb olunur.
  */
 const PORT = Number(process.env.E2E_PORT ?? 3100);
-const BASE_URL = `http://127.0.0.1:${PORT}`;
+
+/**
+ * UZAQ (canlı) ünvana qarşı işlətmək üçün: `E2E_BASE_URL=https://… npx playwright test`.
+ *
+ * 🔴 NİYƏ ŞƏRTLİ `webServer`. Bu blok verilmiş qalsaydı Playwright uzaq ünvana
+ * qarşı işləyəndə DƏ lokal `next start` qaldırardı. `reuseExistingServer` isə
+ * 3100-də onsuz da işləyən serveri götürür — nəticədə "canlı" adlanan dəst
+ * səssizcə LOKAL bazanı yoxlayar və yaşıl nəticə heç nə sübut etməz.
+ * Uzaq ünvan verilibsə lokal server ÜMUMİYYƏTLƏ qaldırılmır.
+ */
+const REMOTE_BASE_URL = process.env.E2E_BASE_URL?.trim();
+const BASE_URL = REMOTE_BASE_URL || `http://127.0.0.1:${PORT}`;
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -33,12 +44,17 @@ export default defineConfig({
 
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 
-  webServer: {
-    command: `npx next start --port ${PORT}`,
-    url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    stdout: "pipe",
-    stderr: "pipe",
-  },
+  // Uzaq ünvana qarşı işləyəndə lokal server QALDIRILMIR — yuxarıdaki izah.
+  ...(REMOTE_BASE_URL
+    ? {}
+    : {
+        webServer: {
+          command: `npx next start --port ${PORT}`,
+          url: BASE_URL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120_000,
+          stdout: "pipe" as const,
+          stderr: "pipe" as const,
+        },
+      }),
 });

@@ -617,6 +617,53 @@ path({
   },
 });
 
+// 🔴 SƏNƏDİN ÖZÜ. Bu əməliyyat uzun müddət elan EDİLMƏMİŞ qalmışdı: gəzici test
+// `/api/v1`-i istisna etdiyi üçün (bax `openapi.test.ts` → «bütün route-lar»)
+// heç bir qapı onu tutmurdu. `System` taqının təsviri («Sağlamlıq yoxlaması və
+// SƏNƏD») onu ONSUZ DA vəd edirdi — yəni sənəd öz-özü ilə ziddiyyətdə idi.
+//
+// ⚠️ Cavab v1 ZƏRFİNDƏN KEÇMİR (`{ data }` YOXDUR) — route `NextResponse.json`
+// ilə sənədi BİRBAŞA qaytarır. Buna görə `envelope()` işlədilmir. (Bu, v1-də
+// YEGANƏ belə haldır və qəsdəndir: OpenAPI sənədini zərfə salsaq Swagger UI,
+// `openapi-generator`, `orval` — heç biri onu oxuya bilməzdi.)
+// ⚠️ `commonResponses({ isPublic: true })` İŞLƏDİLİR. Route heç vaxt 401
+// qaytarmır, amma v1-in qaydası budur: 401 vahid xəta zərfinin FORMASI kimi
+// sənədləşdirilir və `PUBLIC_401`-in mətni «praktikada qaytarılmır» deyir —
+// eyni ilə qonşu `/api/v1/health` kimi. İstisna etsək v1 müqaviləsində sənədin
+// özü üçün deşik açılardı.
+// ⚠️ TƏLƏ D: burada sxem QEYDİYYATDAN KEÇMİR (`.openapi("Ad")` YOXDUR) —
+// adlandırılmış komponent `#/components/schemas`-a düşərdi və sənəd özünü
+// təsvir edən sxemlə şişərdi. İnline `passthrough` obyekt kifayətdir.
+path({
+  method: "get",
+  path: "/api/v1/openapi.json",
+  operationId: "getOpenApiDocument",
+  tags: ["System"],
+  summary: "Maşınoxunan OpenAPI sənədi",
+  description:
+    "Swagger UI-ın (`/docs`) oxuduğu EYNİ sənəd. Müştəri generatorları " +
+    "(`openapi-generator`, `orval`) birbaşa bu ünvandan işləyə bilər.\n\n" +
+    "⚠️ Cavab v1 zərfindən (`{ data }`) KEÇMİR — kök obyekt OpenAPI 3.0 " +
+    "sənədinin ÖZÜDÜR.\n\n" +
+    "⚠️ `force-static`: sənəd Zod sxemlərindən build anında qurulur və DB-yə " +
+    "toxunmur. `Cache-Control: public, max-age=60`.\n\n" +
+    "⚠️ Repodakı `docs/openapi.json` bu cavabın SNAPSHOT-ıdır; drift qoruyucusu " +
+    "(`openapi.test.ts`) ikisinin eyniliyini hər testdə yoxlayır.",
+  responses: {
+    200: jsonResponse(
+      "OpenAPI 3.0 sənədi.",
+      z
+        .object({
+          openapi: z.string().openapi({ example: "3.0.0" }),
+          info: z.object({}).passthrough(),
+          paths: z.object({}).passthrough(),
+        })
+        .passthrough(),
+    ),
+    ...commonResponses({ isPublic: true }),
+  },
+});
+
 // ---------------------------------------------------------------------------
 // Public — redaksiya məzmunu
 // ---------------------------------------------------------------------------
