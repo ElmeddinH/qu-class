@@ -16,20 +16,21 @@
 | [QD-002](#qd-002--baza-sqlite-postgresql-deyil) | Baza: SQLite | data |
 | [QD-003](#qd-003--tək-repo-tək-proses--ayrı-backend-yoxdur) | Tək repo, tək proses | arxitektura |
 | [QD-004](#qd-004--kuds-20-nin-pages-qovluğu-features-dir) | `pages/` → `features/` | struktur |
-| [QD-005](#qd-005--bütün-enumlar-string-sütun--zod) | `String` enum + Zod | data |
+| [QD-005](#qd-005--bütün-enum-lar-string-sütun--zod) | `String` enum + Zod | data |
 | [QD-006](#qd-006--məxfilik-filtri-db-də-tətbiq-olunur-js-də-deyil) | Filtr DB-də | məxfilik |
 | [QD-007](#qd-007--timelineentry-denormalizə-edilib) | `TimelineEntry` denormalizə | data |
 | [QD-008](#qd-008--authjs-konfiqi-ikiyə-bölünüb-edge--node) | Auth split config | auth |
 | [QD-009](#qd-009--jwt-sessiya--session-cədvəli-yoxdur) | JWT sessiya | auth |
-| [QD-010](#qd-010--jwt-minimaldır--cohortids-tokendə-saxlanmır) | Minimal token | auth |
+| [QD-010](#qd-010--jwt-minimaldır--cohortids-token-də-saxlanmır) | Minimal token | auth |
 | [QD-011](#qd-011--maaş--bonus-sahəsi-yoxdur) | Maaş sahəsi yoxdur | məxfilik |
 | [QD-012](#qd-012--xəritə-koordinatı-bazadan-gəlmir) | Koordinat yoxdur | məxfilik |
 | [QD-013](#qd-013--k-anonimlik-həddi--3) | k = 3 | məxfilik |
-| [QD-014](#qd-014--aqreqasiya-üçün-ayrı-razılıq-includeinstats) | `includeInStats` | məxfilik |
+| [QD-014](#qd-014--aqreqasiya-üçün-ayri-razılıq-includeinstats) | `includeInStats` | məxfilik |
 | [QD-015](#qd-015--giriş-xətası-hesab-enumerasiyasını-fərqləndirmir) | Enumerasiya bağlıdır | təhlükəsizlik |
 | [QD-016](#qd-016--shadcnui-v2-pinlənib-latest-qadağandır) | shadcn v2 pin | UI |
 | [QD-017](#qd-017--git-əməliyyatları-isomorphic-git-ilə) | `isomorphic-git` | alət |
-| [QD-018](#qd-018--deploy-flyio--volume-postgresə-keçid-yox) | Fly.io + volume, Postgres yox | deploy |
+| [QD-018](#qd-018--deploy-flyio--volume-postgres-ə-keçid-yox) | Fly.io + volume, Postgres yox | deploy |
+| [QD-019](#qd-019--canlı-instansiyada-demo-admin-parolu-dəyişdirilir-üzv-hesabları-qalır) | Canlı demo parolları | təhlükəsizlik |
 
 ---
 
@@ -55,7 +56,7 @@ Səbəblər:
    işləməyən düymədir — mövcud olmayan funksiyadan da pisdir, çünki gözlənti
    yaradır.
 2. **Sxem dəyişikliyi bu mərhələdə risklidir.** Token cədvəli yeni miqrasiya
-   deməkdir; miqrasiya isə seed determinizminə və **1510 testin** oxuduğu
+   deməkdir; miqrasiya isə seed determinizminə və **1833 testin** oxuduğu
    bazaya toxunur. Fayda sıfırdır (bax 1), risk realdır.
 3. **Yarımçıq təhlükəsizlik axını təhlükəlidir.** «Müvəqqəti şifrəni ekranda
    göstər» kimi həllər hesab ələ keçirmə vektorudur. Zəif axın YOXLUQDAN pisdir.
@@ -661,7 +662,7 @@ isə `.js`-i `.ts`-dən əvvəl oxuyur → KUDS konfiqi **səssizcə** nəzərə
 
 | Alternativ | Niyə seçilmədi |
 |---|---|
-| `shadcn@latest` (v3) + Tailwind v4-ə keçid | Bütün KUDS token cədvəli yenidən yazılmalıdır; 51 səhifə və 512 fayl bu tokenlərdən asılıdır. Dizayn standartı universitetindir, «yeniləyək» qərarı bizim deyil |
+| `shadcn@latest` (v3) + Tailwind v4-ə keçid | Bütün KUDS token cədvəli yenidən yazılmalıdır; 51 səhifə və 539 fayl bu tokenlərdən asılıdır. Dizayn standartı universitetindir, «yeniləyək» qərarı bizim deyil |
 | Komponentləri əl ilə yazmaq | shadcn Radix əlçatanlıq davranışını (fokus tələsi, ARIA, klaviatura) gətirir — onu yenidən yazmaq a11y regressiyası deməkdir |
 | v3 komponentlərini v2-yə əl ilə uyğunlaşdırmaq | Hər `add` əmrindən sonra əl işi = qaçılmaz sürüşmə |
 
@@ -734,7 +735,7 @@ Sprint 3 və Sprint 4 auditi (`docs/SPRINT-3-4-AUDIT.md`) hər iki sprinti
 `ls Dockerfile*` → yox · `ls vercel.json` → yox · `ls -a .github` → yox.
 Bu, beş qəbul meyarının qapısıdır (Sprint 3 → 2, 3, 7 · Sprint 4 → 5, 8).
 
-Funksional əhatə isə tam idi: 43/43 route, 17/17 modul, 1759 test.
+Funksional əhatə isə tam idi: 43/43 route, 17/17 modul, 1759 test (o anın ölçüsü — cari rəqəmlər `METRICS.md`-də).
 Yəni bağlanmalı olan boşluq **kod deyil, infrastruktur** idi.
 
 Audit iki yol ölçdü: **A** (Vercel + Postgres + Blob) və **B2** (Docker +
@@ -856,7 +857,7 @@ müqayisə etmək yanlış nəticə verər — məzmunla müqayisə edilməlidir
 
 ---
 
-## QD-019 — Canlı instansiyada demo ADMİN parolu dəyişdirilir, üzv hesabları qalır
+## QD-019 — Canlı instansiyada demo ADMIN parolu dəyişdirilir, üzv hesabları qalır
 
 **Status:** qəbul edilib (Blok 12E, 2026-08-18) · Variant: **(b)** ·
 Tətbiq anı: **ilk deploy** (`FLY_API_TOKEN` gəldiyi an — bax QD-018).

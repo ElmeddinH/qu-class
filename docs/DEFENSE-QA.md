@@ -15,7 +15,7 @@
    QD-011-dədir, açım?» tam qiymətli cavabdır.
 2. **Zəif nöqtəni özün aç.** Komissiya boşluğu səndən əvvəl tapsa mövqe itir;
    sən açsan mövqe güclənir (bax §6).
-3. **Rəqəm deyirsənsə mənbəyini de.** «1510 test» yox — «1510 test,
+3. **Rəqəm deyirsənsə mənbəyini de.** «1833 test» yox — «1833 test,
    `npm run test` ilə ölçülüb».
 
 | Qrup | Suallar |
@@ -25,6 +25,7 @@
 | [3 · Data](#3--data) | S12 – S15 |
 | [4 · Auth](#4--auth) | S16 – S19 |
 | [5 · Test](#5--test) | S20 – S22 |
+| [5b · Yerləşdirmə və istismar](#5b--yerləşdirmə-və-istismar--blok-12a12f-sualları) | S22a – S22e |
 | [6 · Zəif nöqtələr](#6--zəif-nöqtələr--dürüst-cavablar) | S23 – S25 |
 
 ---
@@ -243,14 +244,14 @@ yəni köhnə token adminlik verə bilmir (`docs/SECURITY.md` B1, §6).
 
 ## 5 · Test
 
-### S20. 1510 test nəyi qoruyur? Sadəcə rəqəm deyilmi?
+### S20. 1833 test nəyi qoruyur? Sadəcə rəqəm deyilmi?
 
 Rəqəm deyil, çünki testlərin çəkisi bərabər deyil — 13-ü **real bazaya qarşı**
 işləyən inteqrasiya faylıdır (`tests/integration/`). Onlar «UI-da göstərmirik»
 ilə «sorğu onu gətirmir» arasındakı fərqi yoxlayır, yəni məxfilik iddiasını
 davranış səviyyəsində bərkidir. Qalanları saf funksiyaları (görünürlük məntiqi,
 k-anonimlik, akademik il hesablaması, kontrast dəyərləri) və komponentləri
-örtür. Üstəlik 213 Playwright testi **istehsal build-inə** qarşı işləyir, yəni
+örtür. Üstəlik 220 Playwright testi **istehsal build-inə** qarşı işləyir, yəni
 build-də sınan şeyi tuturlar.
 
 ### S21. Ən kritik beş test hansıdır?
@@ -269,11 +270,128 @@ Beşinci sətir xüsusi vacibdir: o, **sənədin özünü** testə çevirir — 
 ### S22. Niyə iki ayrı E2E dəsti var?
 
 Çünki onlar fərqli serverə baxır və eyni konfiqdə birləşdirilə bilmirlər. Əsas
-dəst (`npm run test:e2e`, 212 test / 20 fayl) **istehsal serverinə** qarşı işləyir
+dəst (`npm run test:e2e`, 220 test / 22 fayl) **istehsal serverinə** qarşı işləyir
 (`next start`, port 3100) — yəni build zamanı yaranan problemləri tutur. İkincisi
 (`npm run test:e2e:dev`, 1 test) **dev serverinə** baxır və bir sualı yoxlayır:
 «F5 basanda işləyirmi?» — `/` açılır, giriş sinif səhifəsinə aparır, `/kuds`
 render olunur və **brauzer konsolunda xəta yoxdur**.
+
+---
+
+## 5b · Yerləşdirmə və istismar — Blok 12A/12F sualları
+
+> Bu beş sual müdafiədə **çox güman ki** veriləcək: dördü deploy blokundan
+> (12A/12E), biri isə 12B-nin ən çətin səhvindəndir. Cavablar `fayl:sətir`
+> göstərir.
+
+### S22a. Niyə SQLite? Bu miqyasda necə davranır, harada sınır?
+
+**Qərar:** [QD-002](DECISIONS.md#qd-002--baza-sqlite-postgresql-deyil).
+
+Vahid **sinifdir**: 14–28 nəfər. Bu layihədə ən böyük cohort **125 üzvdür** və
+bütün seed **6323 sətirdir** ([`METRICS.md`](METRICS.md) §3.1) — yəni data
+həcmi bir Postgres instansiyasını haqq qazandırmır.
+
+**Harada sınır — dürüst hədd:** SQLite **tək yazıcı** kilidi ilə işləyir. Oxu
+paralel gedir, amma yazı serializə olunur. Bu miqyasda hiss olunmur (yazı
+hadisələri: paylaşım, şərh, reaksiya — saniyədə onlarla deyil), lakin **çox
+istifadəçili istehsalda birinci məhdudiyyət budur** və README «Bilinən
+məhdudiyyətlər» → «Miqyas» bəndində açıq yazılıb.
+
+**İddia sınanıb, təxmin deyil:** keçid yolu ölçülüb —
+[`docker-compose.yml`](../docker-compose.yml) + `provider = "postgresql"`
+dəyişikliyi, **tətbiq kodunda sıfır dəyişiklik**. Səbəb: hər sorğu Prisma-dan
+və `src/services/` qatından keçir, xam SQL yoxdur.
+
+### S22b. «Tək maşın məhdudiyyəti» konkret nə deməkdir?
+
+Fly.io konfiqi bunu **qəsdən** bir maşına bağlayır:
+
+| Ayar | Dəyər | Fayl |
+|---|---|---|
+| `min_machines_running` | **1** | [`fly.toml:66`](../fly.toml) |
+| `auto_stop_machines` | `"off"` | [`fly.toml:62`](../fly.toml) |
+| volume `source` / `destination` | `qu_data` → `/data` | [`fly.toml:41-43`](../fly.toml) |
+
+**Səbəb:** Fly volume **bir maşına** bağlanır. İkinci maşın qalxsa öz **BOŞ**
+volume-unu görər — yəni istifadəçi sorğusu hansı maşına düşdüyündən asılı olaraq
+ya dolu, ya boş baza tapar. Bu, «yavaş işləyir» deyil, **məlumatın itməsi kimi
+görünən** pozuntudur. Ona görə CLAUDE.md deploy bölməsi `min_machines_running = 1`-i
+danışılmaz qayda kimi yazır.
+
+**Qiyməti dürüst deyilir:** üfüqi miqyaslanma yoxdur, deploy zamanı qısa fasilə
+var və **ehtiyat nüsxə yoxdur** — bu üçü QD-018-də və QD-019-un «bərpa ucuz
+deyil» bəndində yazılıb.
+
+### S22c. Demo parolu README-də açıqdırsa, sayt təhlükəsizdirmi?
+
+**Qərar:** [QD-019](DECISIONS.md#qd-019--canlı-instansiyada-demo-admin-parolu-dəyişdirilir-üzv-hesabları-qalır).
+
+Sual doğrudur və cavab **«README-də yazmaqla problem yoxdur»** deyil. Qərar
+hesabları **ikiyə bölür**:
+
+| Hesab | Canlı instansiyada | Niyə |
+|---|---|---|
+| `admin@qu.edu.az` (`UNIVERSITY_ADMIN`) | **parol dəyişdirilir** | `changeSystemRole` istənilən istifadəçini admin edə bilir → bir dəfəlik giriş **qalıcı** nəzarətə çevrilir. Sonradan parolu dəyişsək belə, təcavüzkarın açdığı ikinci admin QALIR |
+| dörd üzv hesabı (rep · moderator · coordinator · alumni) | **qalır** | Zərər radiusu modelin özü ilə bağlıdır: hər sorğu `visibilityWhere(viewer)`-dən keçir, `PRIVATE` onlara da bağlıdır, silmə **soft delete**-dir. Qiymətləndirici dörd cohort rolunu görməlidir — bu, layihənin qiymətləndirilmə şərtidir |
+
+🔴 **Ən vacib hissə — audit jurnalı bu boşluğu BAĞLAMIR.** Hər admin əməliyyatı
+`AuditLog`-a düşür və jurnal yalnız-əlavədir, amma **audit izlənəbilirlikdir,
+geri qaytarma deyil**: anonim ziyarətçinin `actorId`-si heç nə vermir və `undo`
+yoxdur. Bunu özümüz yazmışıq, komissiya tapmayıb.
+
+### S22d. Next-in `public/` keş qüsurunu necə tapdın?
+
+**Simptom:** istifadəçi şəkil yükləyir, `MediaAsset` sətri yaranır, feed kartı
+render olunur — **şəkil açılmır**. Amma `npm run dev`-də hər şey işləyir.
+
+**Səbəb — ölçülüb, təxmin edilməyib** ([`src/services/uploads-serve.ts`](../src/services/uploads-serve.ts)
+başlığında tam protokol var): Next istehsal rejimində `public/` siyahısını
+**server başlayanda BİR DƏFƏ** oxuyur və yaddaşda saxlayır
+(`next/dist/server/lib/router-utils/filesystem.js` → `publicFolderItems`;
+`recursiveReadDir` yalnız `!opts.dev` blokunda çağırılır). Sonrakı sorğuda diskə
+baxılmır.
+
+**Necə sübut edildi** — `next start` altında üç ölçmə:
+
+| Fayl | Nəticə |
+|---|---|
+| serverdən **əvvəl** mövcud (`/uploads/boot/boot.svg`) | **200** |
+| serverdən **sonra** yaradılan (`/uploads/runtime/x.svg`) | **404** |
+| eyni fayl `next/image` ilə | **400** |
+
+🔴 **Niyə `dev`-də görünmür:** `if (!matchedItem && opts.dev)` budağı dev-də hər
+sorğuda diskə yenidən baxır. Yəni qüsur **yalnız istehsalda** və **yalnız
+serverin ömrü içində yaradılmış fayllarda** üzə çıxır — deploy olmadan tapıla
+bilməzdi.
+
+**Həll:** `src/app/uploads/[...path]/route.ts` qatı. Statik sürətli yol İTMİR —
+Next `publicFolder`-i `appFile`-dan əvvəl yoxlayır, ona görə bu route-a yalnız
+start-dan sonra yaranmış fayllar düşür.
+
+### S22e. `loading.tsx` 404-ü niyə sındırırdı?
+
+**Simptom:** `loading.tsx` əlavə edilən seqmentdə mövcud olmayan resurs **404
+əvəzinə 200** qaytarırdı.
+
+**Səbəb:** `loading.tsx` seqmenti **axınla render**-ə (streaming) keçirir. Axın
+HTTP cavab **başlığını** — yəni **statusu** — məzmundan ƏVVƏL göndərir. Sonra
+`notFound()` və ya `forbidden()` çağırılsa, status artıq **200 kimi yola
+düşüb**; Next yalnız `<body>` içində 404 UI-nı göstərə bilir. Nəticə:
+istifadəçi 404 səhifəsini görür, **brauzer və axtarış robotu isə 200 alır**.
+
+**Ona görə səhifələr A/B bölünüb** (README «Bilinən məhdudiyyətlər» №8):
+
+| Qrup | Şərt | Həll |
+|---|---|---|
+| **A** | status qapısı **yoxdur** | seqmentin ƏN DAR yerində `loading.tsx` (üç yerdə route qrupu ilə daraldılıb ki, qonşu dinamik seqmentə düşməsin) |
+| **B** | `notFound()` / `forbidden()` **var** | qapı `await` edilir, YALNIZ ondan SONRAKI alt-ağac `<Suspense>`-ə bükülür |
+
+⚠️ `src/app` altında **28 səhifə** status qapısı çağırır — yəni bu, kənar hal
+deyil, səhifələrin yarısıdır. Qalan 12 səhifədə heç bir yüklənmə vəziyyəti
+yoxdur və səbəbi ayrıca yazılıb: ya gözləyəcək sorğu yoxdur (`/kuds`, `/docs`,
+`/login`), ya səhifə yönləndirir (`/home`, `/me`), ya da yeganə sorğu **404
+qərarının ÖZÜDÜR** — onu sərhədin arxasına salmaq statusu sındırardı.
 
 ---
 
@@ -292,7 +410,7 @@ render olunur və **brauzer konsolunda xəta yoxdur**.
 | 3 | **Cohort səviyyəsində təqvim abunəsi (`.ics` lenti) yoxdur** | Tədbir başına ixrac var, abunə lenti yox. Səbəb texniki maneə **deyil**: Blok 9-un tapşırığına salınmamışdı və sonrakı bloklarda geri qayıdılmadı (`GW-COMPARISON.md` §2, #4) |
 | 4 | **Tədbir paylaşma düymələri yoxdur** (FB / X / LinkedIn) | Eyni səbəb — əhatənin daralması. Tədbir URL-i onsuz da paylaşıla biləndir, çünki server-render olunur (`GW-COMPARISON.md` §2, #5) |
 | 5 | **Tədbirlərdə populyarlığa görə sıralama yoxdur** | Tutum göstəricisi («N yer qalıb») var, sıralama yoxdur — `src/services/event.service.ts`-də yeganə `orderBy` `startsAt`-dır (`GW-COMPARISON.md` §2, #7) |
-| 6 | **Toplu moderasiya, `/admin/stats` cohort filtri, CMS-də yaratma** | Blok 12B borcları, `docs/audit-12a.md` §6-da siyahılanıb. Funksional boşluqdur, təhlükəsizlik boşluğu deyil |
+| ~~6~~ | ~~**Toplu moderasiya, `/admin/stats` cohort filtri, CMS-də yaratma, ikinci dərəcəli kohort rolu**~~ | ✅ **ARTIQ BOŞLUQ DEYİL** — dördü də bağlanıb və e2e ilə örtülüb: toplu qərar `moderation.service.ts:698` (`tests/e2e/admin.spec.ts:314,418`) · `/admin/stats` sinif filtri `app/(admin)/admin/stats/page.tsx:35` (`admin.spec.ts:902`) · CMS-də yaratma `admin-content.service.ts:254/398/558` (`admin.spec.ts:732,802`) · ikinci dərəcəli kohort rolu `admin-users.service.ts:410` (`admin.spec.ts:555`). 🔴 Blok 12F-də tapıldı: README və SECURITY.md bunları hələ də «açıq borc» kimi yazırdı |
 
 ### S24. Nə təhlükəsiz deyil? — açıq qalan risklər
 

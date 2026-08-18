@@ -198,6 +198,78 @@ test("zoom hüdudları [1, 8] aşılmır", async ({ page }) => {
 });
 
 // ---------------------------------------------------------------------------
+// 2d. 🔴 TƏLƏ F — ZOOM SUPRESSİYANI AÇMIR
+//
+// Bu, zoom funksiyasının ƏSAS məxfilik riskidir və QD-012-nin birbaşa
+// yoxlanışıdır. Yaxınlaşdırma «daha dəqiq yer» təəssüratı yaratmamalıdır:
+//
+//   · bazada koordinat YOXDUR — pin ŞƏHƏR səbətidir, şəxsin yeri deyil;
+//   · k-anonimlik (`MIN_BUCKET_SIZE = 3`) SERVERDƏ, aqreqasiya vaxtı tətbiq
+//     olunur; zoom isə yalnız SVG `transform`-udur. Yəni 8× miqyasda da eyni
+//     səbətlər, eyni saylar və eyni rol bölgüsü görünməlidir;
+//   · tooltip HEÇ BİR miqyasda koordinat yazmamalıdır.
+//
+// 🔴 TESTİN QURULUŞU: pinlərin `aria-label`-ləri (şəhər · say · rol bölgüsü)
+// zoom-DAN ƏVVƏL və SONRA toplanır və BƏRABƏR olmalıdır. Əgər supressiya
+// miqyasdan asılı olsaydı, yaxınlaşdırmada ya yeni pin yaranardı, ya da
+// gizlədilmiş rol bölgüsü açılardı — hər ikisi siyahını dəyişərdi.
+// ---------------------------------------------------------------------------
+
+/** Bütün pinlərin `aria-label`-i — SIRALANMIŞ (render sırası zəmanətli deyil). */
+async function pinLabelsOf(map: import("@playwright/test").Locator): Promise<string[]> {
+  const labels = await map.locator("g.rsm-marker").evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("aria-label") ?? ""),
+  );
+  return labels.sort();
+}
+
+test("🔴 zoom k-anonimlik supressiyasını AÇMIR (QD-012)", async ({ page }) => {
+  await login(page, ALUMNI_EMAIL);
+  await page.goto(`/class/${slug}/map?tab=azerbaijan`);
+
+  const map = page.getByTestId("azerbaijan-map");
+  await expect(map).toBeVisible();
+  await expect.poll(async () => map.locator("g.rsm-zoomable-group").count()).toBe(1);
+  await expect.poll(async () => map.locator("g.rsm-marker").count()).toBeGreaterThan(0);
+
+  const before = await pinLabelsOf(map);
+  expect(before.length, "pin yoxdur — test mənasızdır").toBeGreaterThan(0);
+
+  // Hər `aria-label`-də açıqlanan rol sayı ≥ 3 olmalıdır: marjinal xanalar
+  // ONSUZ DA serverdə kəsilir. Bu, «əvvəl» vəziyyətinin doğruluğunu təsdiqləyir.
+  const roleCounts = before.flatMap((label) =>
+    [...label.matchAll(/·\s*(\d+)\s+\S/g)].map((match) => Number(match[1])),
+  );
+  for (const count of roleCounts) expect(count).toBeGreaterThanOrEqual(3);
+
+  // Ən yuxarı miqyasa qalxırıq.
+  const zoomIn = page.getByRole("button", { name: "Yaxınlaşdır" });
+  for (let index = 0; index < 8; index += 1) {
+    if (await zoomIn.isDisabled()) break;
+    await zoomIn.click();
+  }
+  await expect(zoomIn).toBeDisabled();
+  expect(await zoomScaleOf(map)).toBeGreaterThan(4);
+
+  // 🔴 ƏSAS İDDİA: səbətlər DƏYİŞMƏDİ — nə yeni pin, nə yeni rol açıldı.
+  const after = await pinLabelsOf(map);
+  expect(after).toEqual(before);
+
+  // 🔴 Tooltip / marker mətnində koordinat YOXDUR (nə onluq, nə dərəcə formatı).
+  for (const label of after) {
+    expect(label, label).not.toMatch(/\d+\.\d{3,}/);
+    expect(label, label).not.toMatch(/[°]|\b[NSEW]\s*\d/);
+    // Forma dəyişməyib: «Şəhər, Ölkə — N nəfər…»
+    expect(label).toMatch(/ — \d+ nəfər/);
+  }
+
+  // Sıfırladıqdan sonra da eynidir — vəziyyət sızmır.
+  await page.getByRole("button", { name: "Sıfırla" }).click();
+  await expect.poll(() => zoomScaleOf(map)).toBe(1);
+  expect(await pinLabelsOf(map)).toEqual(before);
+});
+
+// ---------------------------------------------------------------------------
 // 2c. Donut kontrastı — Blok 12B
 //
 // 🔴 SUAL: bitişik dilimlər YALNIZ rənglə fərqlənirmi? Cavab "xeyr" olmalıdır:

@@ -23,7 +23,7 @@ auditdən keçməyib**. İstehsala çıxarılmadan əvvəl §7-dəki siyahı ba�
 | A4 | **Karyera məlumatı** | Aqreqasiyadan fərd çıxarılır | k-anonimlik (k=3) + çarpaz ölçü uzlaşması + `includeInStats` razılığı | `src/lib/career-stats.test.ts` |
 | A5 | **Hesab siyahısı** | Giriş cavabına görə e-poçt enumerasiyası | Eyni mesaj + **eyni müddət** (real bcrypt işi) | `src/auth.ts` → `equalizeFailureTiming` |
 | A6 | **Parollar** | Baza sızsa açıq mətn oxunur | `bcrypt`, `BCRYPT_ROUNDS = 10`, hər istifadəçi üçün **təsadüfi duz** | `src/services/auth.service.ts:53` |
-| A7 | **Moderasiya səlahiyyəti** | Rolu alınmış şəxs davam edir | Token-də rol saxlanmır; `cohortIds` və `moderatedCohortIds` **hər sorğuda DB-dən** | [QD-010](DECISIONS.md#qd-010--jwt-minimaldır--cohortids-tokendə-saxlanmır) |
+| A7 | **Moderasiya səlahiyyəti** | Rolu alınmış şəxs davam edir | Token-də rol saxlanmır; `cohortIds` və `moderatedCohortIds` **hər sorğuda DB-dən** | [QD-010](DECISIONS.md#qd-010--jwt-minimaldır--cohortids-token-də-saxlanmır) |
 | A8 | **Admin əməliyyatları** | İz qalmadan icra olunur | `AuditLog` **append-only**, əməliyyatla **eyni transaksiyada** | `src/services/audit.service.ts` |
 | A9 | **Fayl yükləmə** | Skript daşıyan fayl `public/` altından verilir | MIME **ağ siyahısı** (fail-closed), **SVG qəsdən yoxdur**, 10 MB limit, `sharp` ilə WebP-yə yenidən kodlaşdırma | `src/services/storage.ts` |
 | A10 | **Brute-force giriş** | Şifrə sınaqla tapılır | 10 dəqiqədə 5 uğursuz cəhd; sayğac **yalnız uğursuzda** artır | `src/lib/api/rate-limit.ts` |
@@ -42,7 +42,7 @@ auditdən keçməyib**. İstehsala çıxarılmadan əvvəl §7-dəki siyahı ba�
 | B5 | **Yüklənmiş fayllar ictimai qovluqdadır** | `public/uploads/` — statik verilir | URL-i bilən **hər kəs** faylı görür. URL təsadüfidir, amma bu «gizlilik obscurity ilə»dir, icazə yoxlaması deyil |
 | B6 | **Şifrələnmiş saxlama yoxdur** | SQLite faylı açıq mətndir | Diskə fiziki giriş = bütün dataya giriş |
 | B7 | **`/register` e-poçt enumerasiyası** | `EMAIL_TAKEN` səbəbi qaytarılır ([QD-015](DECISIONS.md#qd-015--giriş-xətası-hesab-enumerasiyasını-fərqləndirmir)) | Qeydiyyat forması vasitəsilə e-poçtun mövcudluğu yoxlanıla bilir. Bilinən güzəştdir |
-| B8 | **Toplu moderasiya, ikinci dərəcəli kohort rolu, CMS-də yaratma** | Blok 12B borcları | Funksional boşluqdur, təhlükəsizlik boşluğu deyil |
+| ~~B8~~ | ~~**Toplu moderasiya, ikinci dərəcəli kohort rolu, CMS-də yaratma**~~ | ✅ **BAĞLANDI** (12B/12E) — `moderation.service.ts:698` (`BULK_DECISION_LIMIT`), `admin-users.service.ts:410` (`changeCohortRole` açıq `cohortId` alır), `admin-content.service.ts:254/398/558` (`createContentPage` · `createFaq` · `createGuidePlace`). E2E: `tests/e2e/admin.spec.ts:314,555,732,802` | Sətir tarixi qeyd kimi saxlanılır |
 | B9 | **Şəbəkə səviyyəsi (WAF, DDoS, TLS terminasiyası)** | Yerləşdirmə qatının məsuliyyəti | Layihə HTTPS arxasında işlədilməlidir — `AUTH_URL` `https://` olduqda kuka `__Secure-` prefiksi alır |
 
 ---
@@ -58,8 +58,8 @@ const passwordHash = hashSync("Test1234!", SEED_BCRYPT_SALT);
 ```
 
 **Niyə sabitdir:** `bcrypt` hər çağırışda təsadüfi duz yaradır. Seed isə
-**deterministik** olmalıdır — eyni əmr eyni bazanı verməlidir, yoxsa 1510 test
-və 213 E2E ssenarisi təkrar işlədiləndə fərqli nəticə alır.
+**deterministik** olmalıdır — eyni əmr eyni bazanı verməlidir, yoxsa 1833 test
+və 220 E2E ssenarisi təkrar işlədiləndə fərqli nəticə alır.
 
 ### 🔴 Bu duz istehsal yoluna TOXUNMUR
 

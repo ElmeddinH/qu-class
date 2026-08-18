@@ -6,18 +6,19 @@
 >
 > Diaqramlar Mermaid-dir və GitHub-da birbaşa render olunur.
 
-**Ölçülmüş miqyas** (`2026-07-31`):
+**Ölçülmüş miqyas** (`2026-08-18`):
 
 | | |
 |---|---|
 | Prisma modeli | **28** (miqrasiya: 3) |
 | Səhifə (`page.tsx`) | **51** |
 | Xüsusiyyət modulu (`src/features/*`) | **24** |
-| Servis faylı (`src/services/*`) | **23** |
-| REST endpoint (`/api/v1`) | **34** route · **33**-ü OpenAPI-də sənədləşib |
-| Vahid + inteqrasiya testi | **1510** (61 fayl) |
-| E2E testi | **213** (21 fayl) |
-| TypeScript mənbə faylı | **512** (~69 000 sətir, testlərsiz) |
+| Servis faylı (`src/services/*`) | **24** |
+| REST endpoint (`/api/v1`) | **36** route · `docs/openapi.json` → **38 path / 48 əməliyyat** |
+
+> 📊 Qalan bütün rəqəmlər (test, sətir, fayl, commit) **təkrarlanmır** —
+> tək mənbə: [`METRICS.md`](METRICS.md). Bu cədvəldə yalnız arxitektura
+> oxunuşu üçün lazım olanlar qalır.
 
 ---
 
@@ -558,3 +559,58 @@ Təqvim faylı Google Calendar / Outlook kimi xarici alətlərə verilir —
 xarici müqavilədir. Sənəddə cavab `text/calendar` kimi (JSON YOX) elan
 olunub və `Content-Disposition` / `Cache-Control` başlıqları təsvirdə
 izah edilib.
+
+---
+
+## 9. Yerləşdirmə arxitekturası (Blok 12A · [QD-018](DECISIONS.md#qd-018--deploy-flyio--volume-postgres-ə-keçid-yox))
+
+Yerləşdirmə **tək maşın + tək volume**-dur. Bu, məhdudiyyət deyil, seçimdir:
+SQLite fayl bazasıdır və faylı paylaşmaq mümkün deyil.
+
+```mermaid
+flowchart TB
+    U["🌐 İstifadəçi brauzeri"]
+
+    subgraph FLY["Fly.io — bir region, **bir** maşın"]
+        direction TB
+        PROXY["Fly proxy<br/>:443 → :3000"]
+
+        subgraph M["Machine (`min_machines_running = 1`)"]
+            direction TB
+            ENTRY["docker-entrypoint.sh<br/>① migrate deploy ② start"]
+            NEXT["Next.js standalone<br/>render + /api/v1"]
+            SVC["src/services/*<br/>🔒 visibilityWhere(viewer)"]
+            UP["src/app/uploads/[...path]<br/>🔴 Next `public/` keşini keçir"]
+        end
+
+        VOL[("Fly volume `qu_data` → **/data**<br/>qu.db · uploads/")]
+    end
+
+    U -->|HTTPS| PROXY --> NEXT
+    ENTRY -.->|start-da bir dəfə| VOL
+    NEXT --> SVC --> VOL
+    NEXT --> UP --> VOL
+
+    classDef gate fill:#D3E8BF,stroke:#44766C,color:#16423C
+    classDef store fill:#CAEAF1,stroke:#44766C,color:#16423C
+    class SVC,UP gate
+    class VOL store
+```
+
+### Niyə məhz belə — dörd qərar
+
+| # | Qərar | Səbəb |
+|---|---|---|
+| 1 | **`min_machines_running = 1`**, `auto_stop_machines = "off"` (`fly.toml:62,66`) | Volume **bir** maşına bağlanır. İkinci maşın öz **boş** volume-unu görər → sorğu hansı maşına düşdüyündən asılı olaraq dolu və ya boş baza. Bu, «yavaş» deyil, **məlumat itkisi kimi görünən** pozuntudur |
+| 2 | **Baza volume-dadır** (`file:/data/qu.db`), image-də yox | Image hər deploy-da yenidən qurulur; image içindəki baza hər deploy-da **silinərdi** |
+| 3 | **Miqrasiya `entrypoint`-də**, build-də yox (`docker-entrypoint.sh`) | Build zamanı volume **mount olunmayıb** — `/data` hələ yoxdur. Miqrasiya yalnız işə düşən konteynerdə mənalıdır |
+| 4 | **`uploads` üçün ayrıca route** (`src/app/uploads/[...path]/route.ts`) | Next `public/` siyahısını start-da bir dəfə oxuyur → serverdən **sonra** yüklənən şəkil 404 verirdi. Ölçmə protokolu: `src/services/uploads-serve.ts` başlığı (və `DEFENSE-QA.md` → S22d) |
+
+⚠️ **Deploy artefaktları birlikdə dəyişir.** `Dockerfile` base image-i dəyişsə
+`prisma/schema.prisma` → `binaryTargets` də dəyişməlidir (`node:22-slim` →
+`debian-openssl-3.0.x`, `node:22-alpine` → `linux-musl-openssl-3.0.x`).
+
+⚠️ **Qiyməti dürüst yazılır:** üfüqi miqyaslanma yoxdur, deploy zamanı qısa
+fasilə var, **ehtiyat nüsxə yoxdur**. Postgres-ə keçid yolu ölçülüb və
+**tətbiq kodunda sıfır dəyişiklik** tələb edir ([`docker-compose.yml`](../docker-compose.yml)),
+amma bu miqyasda haqq qazandırmır — bax [QD-002](DECISIONS.md#qd-002--baza-sqlite-postgresql-deyil).

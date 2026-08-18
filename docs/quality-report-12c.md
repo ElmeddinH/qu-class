@@ -6,6 +6,13 @@
 
 Tarix: 2026-07-31 · Baza: Blok 12B-nin sonu (29 commit)
 
+> 🔴 **BU SƏNƏD TARİXLİ ÖLÇMƏ PROTOKOLUDUR.** Aşağıdakı test/commit rəqəmləri
+> (`vitest 1510`, `playwright 212`, `29 commit`) **12C anının** dəyərləridir və
+> QƏSDƏN dəyişdirilmir — ölçmə hesabatını sonradan yenidən yazmaq onu ölçmə
+> olmaqdan çıxarardı. **CARİ rəqəmlər üçün → [`METRICS.md`](METRICS.md).**
+> Blok 12F-də əlavə olunan §6 (donut kontrastı) bu qaydadan istisnadır: o,
+> 12F-də ölçülüb və öz tarixini daşıyır.
+
 ---
 
 ## 0. Xülasə
@@ -620,3 +627,112 @@ tapıntı» siyahısında saxlanmır, çünki artıq ölçülmür.
 Lighthouse **KÖHNƏ build-i** ölçdü, «düzəliş işləmir» kimi göründü. Yoxlama
 üsulu: `ps -eo pid,lstart,cmd | grep next-server` — prosesin BAŞLAMA VAXTI
 build-dən sonra olmalıdır.
+
+---
+
+# Blok 12F əlavəsi — DONUT KONTRASTI (ölçülüb: 2026-08-18)
+
+> Bu bölmə 12F-də əlavə olunub. Yuxarıdakı 12C rəqəmlərindən fərqli olaraq
+> buradakı hər dəyər **bu blokda** hesablanıb.
+> Mənbə: `src/features/where-are-we-now/palette.ts` ·
+> ölçən test: `src/features/where-are-we-now/palette.test.ts`.
+
+## 6. Donut dilimlərinin kontrastı
+
+### 6.1 Nə səhv idi
+
+Blok 12B donut üçün ardıcıl `--slice-1…9` şkalası qurdu və qaydanı belə yazdı:
+**«qonşu dilimlər arasında ən azı 2 PİLLƏ fərq»**. Test yaşıl idi, amma qayda
+ödənilmirdi — çünki **pillə sayı kontrastın ölçü vahidi deyil**. 12F-də WCAG
+düsturu ilə ölçüldükdə köhnə sıranın ən pis halı belə çıxdı:
+
+| Dilim sayı | Köhnə pillə sırası | Ən pis qonşu cüt | Kontrast |
+|---|---|---|---|
+| 3 | 1, 9, 5 | `--slice-5` ↔ `--slice-1` | 2.53:1 ❌ |
+| **4** | 1, 6, 4, 9 | `--slice-6` ↔ `--slice-4` | **1.73:1** ❌ |
+| 5 | 1, 7, 3, 9, 5 | `--slice-5` ↔ `--slice-1` | 2.53:1 ❌ |
+| 6 | 1, 6, 3, 7, 4, 9 | `--slice-6` ↔ `--slice-3` | 2.20:1 ❌ |
+
+### 6.2 Şkalanın pillələri — ölçülmüş dəyərlər
+
+Fon `--surface` (`#ffffff`), mətn `text-primary` (`#16423c`):
+
+| Token | Hex | Səthlə | `text-primary` ilə |
+|---|---|---|---|
+| `--slice-1` | `#d3e8bf` | 1.31:1 | 8.55:1 |
+| `--slice-2` | `#bbd3af` | 1.61:1 | 6.95:1 |
+| `--slice-3` | `#a4bf9e` | 2.00:1 | 5.60:1 |
+| `--slice-4` | `#8caa8e` | 2.54:1 | 4.39:1 |
+| `--slice-5` | `#75957e` | 3.30:1 | 3.38:1 |
+| `--slice-6` | `#5d806d` | 4.40:1 | 2.54:1 |
+| `--slice-7` | `#456c5d` | 5.91:1 | 1.89:1 |
+| `--slice-8` | `#2e574c` | 8.13:1 | 1.38:1 |
+| `--slice-9` | `#16423c` | 11.18:1 | 1.00:1 |
+
+### 6.3 Yeni sıralar — brute-force ilə seçilib
+
+Hər dilim sayı üçün 9 pillədən BÜTÜN yerləşdirmələr yoxlanıldı və **qapalı
+halqada** (son dilim ilk dilimin qonşusudur) ən pis qonşu cütü MAKSİMUM edən
+variant götürüldü:
+
+| Dilim | Yeni pillə halqası | Ən pis qonşu cüt | ≥ 3:1 |
+|---|---|---|---|
+| 2 | 1, 9 | **8.55:1** | ✅ |
+| 3 | 1, 6, 9 | **2.54:1** | ❌ (riyazi hədd — §6.4) |
+| **4** | 1, 8, 2, 9 | **5.05:1** | ✅ |
+| 5 | 1, 6, 9, 2, 7 | **2.54:1** | ❌ (riyazi hədd — §6.4) |
+| **6** | 1, 7, 2, 8, 3, 9 | **3.67:1** | ✅ |
+| 7 | 1, 6, 9, 2, 7, 3, 8 | 2.54:1 | ❌ |
+| 8 | 1, 6, 2, 7, 3, 8, 4, 9 | 2.73:1 | ❌ |
+| 9 | 1, 5, 9, 4, 8, 3, 7, 2, 6 | 2.53:1 | ❌ |
+
+**Nəticə: 4 dilimdə 1.73:1 → 5.05:1, 6 dilimdə 2.20:1 → 3.67:1.**
+
+### 6.4 🔴 TƏK saylı dilimdə 3:1 RİYAZİ OLARAQ MÜMKÜN DEYİL
+
+Bu, palitranın deyil, **həndəsənin** nəticəsidir və müdafiədə soruşula bilər:
+
+1. İki rəngin kontrastı onların ağ ilə kontrastlarının **nisbətidir**
+   (`contrast(a,b) = R_b / R_a`, `R` = ağ ilə kontrast).
+2. Şkalanın diapazonu: `11.18 / 1.31 = **8.53**`.
+3. «Bir-birinə qarşı 3:1» olan **üç** ton üçün ən uc iki ton arasında
+   `3 × 3 = 9` lazımdır. **8.53 < 9** → belə üçlük YOXDUR.
+4. Deməli «≥3:1» qonşuluq qrafi **ikihissəlidir** (bipartite), ikihissəli
+   qrafda isə **tək uzunluqlu dövr yoxdur**. Donut qapalı halqadır → tək
+   saylı dilimdə ən azı bir qonşu cüt qaydanı poza-poza qalır.
+
+**Bunu «yeni rəng uydurmaqla» həll etmək CLAUDE.md §2-ni pozardı** (hardcode
+hex / KUDS-dan kənar ton). Ona görə iki kompensasiya tətbiq olunur:
+
+- **Dilim sayı 6 ilə məhdudlaşdırılır** (`MAX_DONUT_SLICES`) — 7+ dilim heç bir
+  sıra ilə 3:1 vermir, ona görə artıq kateqoriyalar «Digər»ə yığılır
+  (`donut-slices.ts`). Cədvəl alternativi YIĞILMIR — tam bölgü orada qalır.
+- **Sərhəd rəngdən asılı deyil**: `paddingAngle={2}` + `--map-stroke` rəngli
+  2px kontur. 3 və 5 dilim halında dilimləri ayıran məhz bu sərhəddir.
+
+### 6.5 Rəng TƏK ayırıcı deyil — dörd kanal
+
+| Kanal | Harada | Rəngsiz oxunurmu |
+|---|---|---|
+| Faiz etiketi | hər dilimin üzərində | ✅ |
+| Leqenda (ad + say + faiz) | qrafikin yanında | ✅ |
+| `<table>` alternativi | «Cədvəl kimi göstər» | ✅ |
+| Kontur + sönükləşmə | hover **və** fokusda | ✅ |
+
+⚠️ **Tint fonlarda ağ mətn HEÇ VAXT** (CLAUDE.md KUDS qaydası) — ölçülüb:
+
+| Fon | Hex | `text-primary` | Ağ mətn |
+|---|---|---|---|
+| `ku-soft` | `#d3e8bf` | 8.55:1 ✅ | 1.31:1 ❌ |
+| `ku-blue` | `#caeaf1` | 8.81:1 ✅ | 1.27:1 ❌ |
+| `ku-cream` | `#f0f3bf` | 9.73:1 ✅ | 1.15:1 ❌ |
+
+Bu qayda `src/lib/kuds-contrast.test.ts` ilə bütün `.tsx` mənbəyində skan olunur.
+
+### 6.6 Seed datasında faktiki hal
+
+`maliyye-2022` sinfində açıqlanan sənaye sayı **3**-dür (Maliyyə 5 · Texnologiya
+5 · Enerji 4; k-anonimlik 19 respondentdən qalanını gizlədir). Yəni istehsalda
+görünən hal məhz §6.4-dəki **tək saylı** haldır: kontrast 2.54:1, ayırdedilmə
+kontur + etiket + leqenda + cədvəl ilə verilir. Bu, gizlədilmir — ölçülüb və
+burada yazılıb.

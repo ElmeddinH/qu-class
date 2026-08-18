@@ -2001,3 +2001,170 @@ token gələndə tətbiq olunacaq — bu blokda yalnız qeyd edilib.
 
 Kod tərəfində bağlanmamış audit tapıntısı qalmayıb. Açıq qalan altı sprint
 meyarının hamısı **tək** girişdən asılıdır: `FLY_API_TOKEN`.
+
+---
+
+## Sprint 3/4 — Blok 12F — bitdi (müdafiə və təhvil: rəqəm drifti · demo GIF · donut kontrastı)
+
+**Yeni funksiya YOXDUR** (bir istisna: donut yığımı — aşağı). Blok sənədlərin
+DOĞRULUĞUNU, demo materialını və iki qalıq borcu bağladı.
+
+### 1. Rəqəm drifti — bu blokun ən vacib hissəsi
+
+Bloklar 12A–12E test/route/commit saylarını dəyişmişdi, sənədlər isə köhnə
+rəqəmi daşıyırdı. **HƏR rəqəm yenidən ölçüldü** (təxmin yoxdur):
+
+| Ölçü | Sənəddə idi | ÖLÇÜLDÜ |
+|---|---:|---:|
+| Vitest | 1759 / 65 fayl | **1833 / 67 fayl** |
+| Playwright | 212 / 20 (bəzi yerdə 213 / 21) | **220 / 22** |
+| Build route | 94 (92 dinamik) | **97** (3 statik + 94 dinamik) |
+| Commit | 27 / 41 | **50** |
+| `docs/openapi.json` | «53 əməliyyat» | **38 path / 48 əməliyyat** |
+| Repo faylı | 704 | **952** |
+| `src/` TS faylı / sətir | 512 / 78 363 | **539 / 82 749** |
+| Servis faylı | 23 | **24** |
+| Sxem sətri | 818 | **832** |
+| Seed sətri | 6323 | **6323** ✅ (dəyişməyib — determinizm təsdiqləndi) |
+
+🔴 **TƏLƏ A (eyni rəqəm 6 sənəddə) belə bağlandı:** `docs/METRICS.md` **tək
+mənbə** elan olundu; README, `ARCHITECTURE.md`, `DEMO.md`, `DEFENSE-QA.md`,
+`SECURITY.md`, `DECISIONS.md` rəqəmi təkrarlamaq əvəzinə ona istinad edir.
+README-də yalnız 5 əsas rəqəm qaldı.
+
+🔴 **Tarixli sənədlər YENİDƏN YAZILMADI.** `quality-report-12c.md` və
+`SPRINT-3-4-AUDIT.md` ölçmə/audit protokoludur — onların rəqəmlərini sonrakı
+işlə «düzəltmək» onları protokol olmaqdan çıxarardı. Əvəzinə hər ikisinə
+**köhnəlmə bannerı** + «sonradan nə bağlandı» cədvəli əlavə olundu.
+
+🔴 **Tapılan ƏSL səhv — `53` əməliyyat rəqəmi.** Sadə grep `51` verir, çünki
+`src/app/api/auth/[...nextauth]/route.ts` handler-ləri **destrukturlaşdırma**
+ilə ixrac edir (`export const { GET, POST } = handlers`). Doğru cəm 51 + 2 = 53
+və ağ siyahı ilə 48 + 5 = 53 tam oturur. `METRICS.md` §4-də tələ yazıldı.
+
+### 2. Demo GIF — `docs/media/demo.gif`
+
+`which ffmpeg` → **var**, ona görə Playwright `recordVideo` → ffmpeg yolu
+seçildi (sharp ilə kadr-kadr ehtiyat yoluna ehtiyac olmadı).
+
+- **7.15 MB · 31.4 san · 1024px · 7 fps · 80 rəng** (hədəf ≤ 8 MB ✅)
+- Determinizm: server saatı `scripts/freeze-clock.cjs` (`npm run shots:serve`),
+  brauzer saatı `context.clock.setFixedTime` — **iki qapı birlikdə**.
+- `palettegen` / `paletteuse` olmadan eyni video **20.10 MB** çıxırdı.
+- Ölçü hədəfi `LADDER` ilə avtomatik tutulur; en 1024-dən aşağı **son çarədir**.
+- 🔴 TƏLƏ E yoxlandı: `docs/media/demo.gif` `.gitignore`-a **düşmür**
+  (`docs/responsive/*.png` düşür, `docs/screenshots/` və `docs/openapi.json` yox).
+- Yeni əmr: `npm run demo:gif`.
+
+### 3. Xəritə zoom/pan — artıq var idi, **sübutu yox idi**
+
+`MapZoom.tsx` (`ZoomableGroup` + `+`/`−`/«Sıfırla» düymələri) 12B/12E-də
+yazılıb. Çatışmayan hissə **TƏLƏ F-in ölçüsü** idi:
+
+> `tests/e2e/map.spec.ts` → **«🔴 zoom k-anonimlik supressiyasını AÇMIR (QD-012)»**
+
+Test pinlərin `aria-label`-lərini (şəhər · say · rol bölgüsü) zoom-dan ƏVVƏL
+toplayır, 8×-ə qalxır, SONRA yenidən toplayır və **bərabərliyi** tələb edir:
+supressiya miqyasdan asılı olsaydı ya yeni pin, ya yeni rol açılardı. Üstəlik
+hər etiketdə açıqlanan rol sayının **≥ 3** olduğu və heç bir miqyasda
+**koordinat** görünmədiyi yoxlanılır. Sıfırladıqdan sonra da eyni.
+
+### 4. Donut kontrastı — 🔴 ƏSL QÜSUR TAPILDI
+
+Blok 12B qaydanı «qonşu dilimlər arasında ən azı **2 PİLLƏ** fərq» kimi yazmışdı
+və test **yaşıl** idi. Amma pillə sayı kontrastın ölçü vahidi deyil — WCAG
+düsturu ilə ölçdükdə:
+
+| Dilim | Köhnə ən pis cüt | YENİ |
+|---|---:|---:|
+| 3 | 2.53:1 | 2.54:1 |
+| **4** | **1.73:1** ❌ | **5.05:1** ✅ |
+| 5 | 2.53:1 | 2.54:1 |
+| **6** | 2.20:1 ❌ | **3.67:1** ✅ |
+
+Pillə sıraları **brute-force** ilə yenidən seçildi (qapalı halqada ən pis qonşu
+cütü maksimum edən variant). Test artıq PİLLƏ deyil, **hexləri `globals.css`-dən
+oxuyub WCAG kontrastı** ölçür.
+
+🔴 **TƏK saylı dilimdə 3:1 RİYAZİ OLARAQ MÜMKÜN DEYİL** və bu gizlədilmir:
+şkalanın diapazonu 11.18/1.31 = **8.53 < 9**, yəni bir-birinə qarşı 3:1 olan ÜÇ
+ton yoxdur → qonşuluq qrafi ikihissəlidir → qapalı halqada tək dövr qurulmur.
+Ona görə:
+- dilim sayı **6** ilə kəsilir (`MAX_DONUT_SLICES`, `donut-slices.ts`) — qalanı
+  «Digər»ə yığılır, **cədvəl alternativi YIĞILMIR** (tam bölgü orada qalır);
+- 3 və 5 dilim halında sərhədi `paddingAngle` + səth rəngli kontur verir —
+  rəng kontrastından ASILI DEYİL.
+
+⚠️ Seed datasında faktiki hal **3 dilimdir** (Maliyyə 5 · Texnologiya 5 ·
+Enerji 4), yəni istehsalda görünən məhz tək saylı haldır — README «Bilinən
+məhdudiyyətlər» №12-də açıq yazıldı.
+
+### 5. Sıfırdan qurulma sübutu — README-nin «dörd əmr» vədi
+
+HEAD commit-inin **ağacı** (işçi qovluq yox) təmiz qovluğa açıldı → **665 fayl**.
+Təsdiqləndi ki, `prisma/dev.db`, `public/swagger/`, `public/uploads/`, `.env`
+**yoxdur** (qəsdən), `docs/openapi.json` isə **var** (qəsdən).
+
+`npm ci` → `.env` (`AUTH_SECRET` doldurulub) → `npx prisma migrate deploy` →
+`npm run db:seed` → `npm run build` (**97 route**) → `npm start`:
+
+| Yol | Nəticə |
+|---|---|
+| `/` | **200** |
+| `/docs` | **200** |
+| `/swagger/swagger-ui.css` | **200** (prebuild yaratdı) |
+| `/api/v1/health` | **200** |
+
+**Sınaq KEÇDİ.** README-də iki səhv tapıldı və düzəldildi:
+1. başlıq **«Dörd əmr»** deyirdi, blokda **altı** əmr var idi;
+2. istehsal ardıcıllığı (`migrate deploy` → `build` → `start`) ümumiyyətlə
+   yazılmamışdı — `prebuild`-in niyə buraxıla bilməyəcəyi ilə birlikdə əlavə olundu.
+
+Müvəqqəti qovluq və server sonda **tam təmizləndi**.
+
+### 6. Ölü link yoxlaması — proqramla
+
+Markdown linkləri çıxarılıb fayl + anker mövcudluğu yoxlandı (GitHub slug
+alqoritmi ilə): **10 ölü → 0**. Tapılanlar:
+- `DECISIONS.md`-də 5 QD ankeri səhv idi (`enumlar` ↔ `enum-lar`, `ayrı` ↔ `ayri`,
+  `postgresə` ↔ `postgres-ə`, `tokendə` ↔ `token-də`);
+- **QD-019 mündəricatda ÜMUMİYYƏTLƏ yox idi** (cədvəl QD-018-də bitirdi);
+- README-də `src/app/(app)/…` linki **mötərizəyə görə sınırdı** → `%28`/`%29`.
+
+⚠️ QD-019 başlığındakı `ADMİN` → `ADMIN` edildi: nöqtəli `İ` hərfinin kiçildilməsi
+birləşən diakritik verir və anker alətdən alətə fərqlənə bilər.
+
+### 7. Sənəd uyğunluğu
+
+- `ARCHITECTURE.md` — **§9 «Yerləşdirmə arxitekturası»** əlavə olundu: mermaid
+  diaqram (Fly proxy → maşın → volume), `uploads` keçidi, dörd qərarın səbəbi.
+- `DEFENSE-QA.md` — **§5b, beş yeni sual** (S22a–S22e), hamısı `fayl:sətir` ilə:
+  niyə SQLite/miqyas · tək maşın məhdudiyyəti · demo parolu (QD-019) ·
+  Next `public/` keş qüsuru (12A) · `loading.tsx` niyə 404-ü sındırırdı (12B).
+- `GW-COMPARISON.md` — yoxlandı, son vəziyyəti əks etdirir (dəyişiklik lazım deyil).
+
+### Toxunulmayanlar
+
+`src/components/ui/` · `prisma/schema.prisma` · `prisma/migrations/` ·
+`src/services/storage.ts` · deploy artefaktları (`Dockerfile`, `fly.toml`,
+`docker-entrypoint.sh`, `scripts/deploy.mjs`) · `prisma/seed.ts`.
+**Yeni asılılıq əlavə edilmədi** (ffmpeg sistem binarıdır, paket deyil).
+
+Qəsdən buraxılmış funksiyalara (parol sıfırlama, maaş sahəsi) **toxunulmadı** —
+onlar sənəddə səbəbi ilə qalır.
+
+🔴 **TƏLƏ C — gözlənilməz tapıntı.** Qadağan siyahısındakı DÖRD «borc» əslində
+artıq YAZILMIŞDI (12B/12E), sənədlər isə onları hələ də «açıq» kimi göstərirdi:
+toplu moderasiya (`moderation.service.ts:698`), CMS-də yaratma
+(`admin-content.service.ts:254/398/558`), `/admin/stats` sinif filtri
+(`admin/stats/page.tsx:35`), ikinci dərəcəli kohort rolu
+(`admin-users.service.ts:410`) — hamısı e2e ilə örtülüdür
+(`tests/e2e/admin.spec.ts:314,555,732,902`). Yəni bunlar YAZILMADI, əksinə —
+**yanlış məhdudiyyət sətirləri silindi**: README №3 çıxarıldı (cədvəl yenidən
+nömrələndi), `SECURITY.md` B8 və `DEFENSE-QA.md` S23 №6 «bağlandı» kimi
+işarələndi.
+
+### Dayanma nöqtəsi
+
+Kod və sənəd tərəfində bağlanmamış tapıntı yoxdur. Açıq qalan yeganə şey
+əvvəlki kimidir: **`FLY_API_TOKEN`** — canlı URL yalnız ondan asılıdır.

@@ -90,10 +90,41 @@ export function categoryFill(index: number): string {
 // təkrarlayır və hamısı EYNİ çaların pillələri olduğu üçün rəng korluğunda
 // ayırdedilmə YALNIZ parlaqlığa qalır — bu, ən etibarlı kanaldır.
 //
-// 🔴 ŞƏRT: yan-yana duran iki dilim arasında ƏN AZI 2 pillə fərq.
-// Ona görə pillələr sıra ilə paylanmır: sıralanmış mövqelər iki yarıya bölünüb
-// NÖVBƏLƏŞDİRİLİR (aşağı yarıdan bir, yuxarı yarıdan bir). Dairə qapalıdır,
-// yəni SON dilim İLK dilimin qonşusudur — test hər iki cütü yoxlayır.
+// 🔴 ŞƏRT (Blok 12F-də DÜZƏLDİLDİ): yan-yana duran iki dilim arasında ƏN AZI
+// **3:1 KONTRAST**. Əvvəlki qayda «ən azı 2 PİLLƏ fərq» idi və bu, SƏHV ölçü
+// vahidi seçmişdi: pillə sayı kontrast demək deyil. Ölçdük —
+//
+//   köhnə növbələşdirmə (4 dilim, pillələr 1·6·4·9):
+//     `--slice-6` ↔ `--slice-4` = **1.73:1** ❌ (2 pillə fərq VAR, kontrast YOX)
+//   yeni sıra (4 dilim, pillələr 1·8·2·9):
+//     ən pis qonşu cüt = **5.05:1** ✅
+//
+// Yəni köhnə test yaşıl idi, amma qayda pozulurdu. İndi test PİLLƏ deyil,
+// WCAG nisbi parlaqlıq düsturu ilə hesablanmış KONTRAST ölçür və hexləri
+// `globals.css`-dən oxuyur (token dəyişsə test qırmızıya düşür).
+//
+// 🔴 SIRALAR BRUTE-FORCE İLƏ SEÇİLİB: hər `count` üçün 9 pillədən bütün
+// yerləşdirmələr yoxlanıldı və QAPALI halqada ən pis qonşu cütü MAKSİMUM edən
+// variant götürüldü. Nəticələr `docs/quality-report-12c.md` §6-dadır.
+//
+// 🔴 TƏK SAYDA DİLİM ÜÇÜN 3:1 RİYAZİ OLARAQ MÜMKÜN DEYİL — və bu, palitranın
+// deyil, HƏNDƏSƏNİN nəticəsidir. İki rəngin kontrastı onların ağ ilə
+// kontrastlarının nisbətidir; şkalanın diapazonu 11.18/1.31 = **8.53** < 9,
+// yəni «bir-birinə qarşı 3:1» olan ÜÇ ton yoxdur (üçü olsaydı ən uc iki ton
+// arasında ≥ 3×3 = 9 lazım gələrdi). Qonşuluq qrafi bu səbəbdən İKİHİSSƏLİDİR
+// (bipartite) və ikihissəli qrafda TƏK uzunluqlu dövr yoxdur. Ona görə:
+//
+//   2 dilim → 8.55:1 ✅   ·   3 dilim → 2.54:1 ❌ (mümkün olan ən yaxşısı)
+//   4 dilim → 5.05:1 ✅   ·   5 dilim → 2.54:1 ❌
+//   6 dilim → 3.67:1 ✅   ·   7+ dilim → ≤ 2.73:1 ❌
+//
+// ⚠️ ONA GÖRƏ DİLİM SAYI 6-YA MƏHDUDLAŞDIRILIR (`MAX_DONUT_SLICES`) və qalan
+// kateqoriyalar «Digər»ə yığılır — bax `IndustriesChart.tsx`. Cüt saylarda
+// (2·4·6) qayda ödənilir; 3 və 5 dilim halında ödənilmir və bu, sənəddə
+// AÇIQ yazılır. Həmin iki halda ayırdedilmə dilimlər arasındakı `paddingAngle`
+// boşluğu + səth rəngli konturla (`--map-stroke`, 2px) verilir: sərhəd rəng
+// kontrastından ASILI DEYİL. Rəng onsuz da heç vaxt yeganə kanal deyil
+// (faiz etiketi + leqenda + `<table>`).
 //
 // ⚠️ Rənglər `app/globals.css`-dədir (`--slice-1…9`); burada yalnız istinad var
 // (CLAUDE.md §2 — hardcode hex yoxdur).
@@ -108,34 +139,55 @@ export const SLICE_RAMP = Array.from(
 ) as readonly string[];
 
 /**
- * `index`-ci dilim üçün şkala PİLLƏSİ (0 = ən açıq, 8 = ən tünd).
+ * Donut-da göstərilən ƏN ÇOX dilim sayı. Bundan artıq kateqoriya varsa ən
+ * kiçikləri «Digər»ə yığılır (`IndustriesChart.tsx`).
  *
- * Alqoritm:
- *   1. `count` dilim şkalaya BƏRABƏR paylanır (uclar daxil).
- *   2. Alınan mövqelər iki yarıya bölünür və növbələşdirilir —
- *      L0, H0, L1, H1, … Beləliklə hər qonşu cüt fərqli yarıdandır.
+ * 🔴 6 rəqəmi ESTETİK DEYİL, ÖLÇÜLMÜŞ HÜDUDDUR: 6 dilimdə ən pis qonşu cüt
+ * 3.67:1-dir (✅), 7 dilimdə isə 2.54:1-ə düşür (❌) və şkalanın diapazonu
+ * bunu düzəltməyə imkan vermir (bax fayl başlığı).
+ */
+export const MAX_DONUT_SLICES = 6;
+
+/**
+ * QAPALI HALQADA ən pis qonşu kontrastı MAKSİMUM edən pillə sıraları.
+ * İndeks = dilim sayı, dəyər = `--slice-N` pillələri (0 bazalı).
+ *
+ * Brute-force ilə seçilib (bütün yerləşdirmələr yoxlanılıb); yanındakı rəqəm
+ * həmin sıranın ən pis qonşu cütüdür. Cədvəl SABİTDİR — filtr dilim sayını
+ * dəyişəndə rənglər yenidən paylanır, amma EYNİ `count` üçün nəticə həmişə
+ * eynidir (təsadüfilik yoxdur).
+ */
+const SLICE_RINGS: readonly (readonly number[])[] = [
+  [], //                        0 dilim — boş
+  [8], //                       1 → ən tünd ton
+  [0, 8], //                    2 → 8.55:1 ✅
+  [0, 5, 8], //                 3 → 2.54:1 (mümkün olan ən yaxşısı)
+  [0, 7, 1, 8], //              4 → 5.05:1 ✅
+  [0, 5, 8, 1, 6], //           5 → 2.54:1 (mümkün olan ən yaxşısı)
+  [0, 6, 1, 7, 2, 8], //        6 → 3.67:1 ✅
+  [0, 5, 8, 1, 6, 2, 7], //     7 → 2.54:1  ⚠️ `MAX_DONUT_SLICES`-dən yuxarı
+  [0, 5, 1, 6, 2, 7, 3, 8], //  8 → 2.73:1  ⚠️ yalnız ehtiyat
+  [0, 4, 8, 3, 7, 2, 6, 1, 5], // 9 → 2.53:1 ⚠️ yalnız ehtiyat
+];
+
+/**
+ * `index`-ci dilim üçün şkala PİLLƏSİ (0 = ən açıq, 8 = ən tünd).
  *
  * Tək dilim halında şkalanın ƏN TÜND ucu verilir: tək pay «az» kimi
  * oxunmamalıdır (ən açıq ton məhz onu deyərdi).
+ *
+ * ⚠️ `count` şkaladan böyük olsa (praktikada baş vermir — çağıran tərəf
+ * `MAX_DONUT_SLICES` ilə kəsir) sıra dövr edir: nəticə yenə DETERMİNİKDİR,
+ * sadəcə qonşu kontrastı zəmanətli deyil.
  */
 export function sliceRampIndex(index: number, count: number): number {
   if (count <= 1) return SLICE_RAMP_SIZE - 1;
 
-  const spread = Array.from({ length: count }, (_, position) =>
-    Math.round((position * (SLICE_RAMP_SIZE - 1)) / (count - 1)),
-  );
+  const ring = SLICE_RINGS[count];
+  if (ring) return ring[index % count];
 
-  const half = Math.ceil(count / 2);
-  const lower = spread.slice(0, half);
-  const upper = spread.slice(half);
-
-  const interleaved: number[] = [];
-  for (let position = 0; position < half; position += 1) {
-    interleaved.push(lower[position]);
-    if (position < upper.length) interleaved.push(upper[position]);
-  }
-
-  return interleaved[index % count];
+  // Ehtiyat yol — şkaladan çox dilim: pillələr sadəcə dövr edir.
+  return index % SLICE_RAMP_SIZE;
 }
 
 /** `index`-ci dilimin rəngi — `sliceRampIndex()`-in token qarşılığı. */

@@ -18,7 +18,7 @@ o rəqəmi göstərməlidir. Geridə qalsan §7-dəki «kəsilə bilən» siyah�
 | **3:30–5:00** | **🔒 ZİRVƏ 2 — «İndi haradayıq?»** | k-anonimlik · razılığın geri alınması |
 | 5:00–5:45 | `/timeline` + `/yearbook` | Üç mərhələnin nəticəsi |
 | 5:45–6:35 | `/admin` + `/admin/audit` | Moderasiya və dəyişdirilə bilməyən iz |
-| 6:35–7:20 | `/docs` + terminal | Swagger · 1510 test |
+| 6:35–7:20 | `/docs` + terminal | Swagger · 1833 test |
 | 7:20–8:00 | Bağlanış | Bilinən məhdudiyyətlər — dürüst |
 
 ---
@@ -347,7 +347,7 @@ demo üçün seed sıfırlamağa ehtiyac qalmır.
 **Hərəkət:** B pəncərəsi, tab 5 — `/docs` (Swagger UI).
 
 > «Ayrı backend serveri **yoxdur**. Next.js həm render, həm API qatıdır. Amma
-> xarici inteqrasiya üçün 34 endpoint-lik REST səthi var və sənədi buradadır —
+> xarici inteqrasiya üçün 36 endpoint-lik REST səthi var və sənədi buradadır —
 > **oflayn**, CDN olmadan.
 >
 > Sənəd əl ilə yazılmayıb: Zod sxemlərindən **törəyir**. Yəni köhnələ bilmir.
@@ -356,14 +356,14 @@ demo üçün seed sıfırlamağa ehtiyac qalmır.
 
 **Hərəkət:** terminala keç, hazır duran əmrə **Enter**: `npm run test`.
 
-> «Test işləyərkən deyim: **1510 vahid və inteqrasiya testi, 61 faylda.**
-> Üstəgəl 213 Playwright testi — onlar istehsal build-inə qarşı işləyir.
+> «Test işləyərkən deyim: **1833 vahid və inteqrasiya testi, 67 faylda.**
+> Üstəgəl 220 Playwright testi — onlar istehsal build-inə qarşı işləyir.
 >
 > Ən kritik olanı `tests/integration/visibility.db.test.ts`-dir: **real bazaya
 > qarşı** yoxlayır ki, sətirlər həqiqətən gəlmir. Çünki «UI-da göstərmirik»
 > ilə «sorğu onu gətirmir» eyni şey deyil.»
 
-**Hərəkət:** testlər bitəndə yaşıl nəticəni göstər (≈40 saniyə).
+**Hərəkət:** testlər bitəndə yaşıl nəticəni göstər (≈80 saniyə).
 
 > «Bir də: Lighthouse desktop **100/100/100/100** — beş səhifədə. WCAG 2.2 AA
 > qapısı bağlıdır, `axe` ilə 12 səhifə × 2 vəziyyət yoxlanılıb.»
@@ -387,7 +387,7 @@ demo üçün seed sıfırlamağa ehtiyac qalmır.
 > sosial paylaşma düymələri. Səbəb texniki maneə deyil — həmin blokun
 > tapşırığına salınmamışdı.
 >
-> Yekun: 17 modul, 51 səhifə, 28 data modeli, 34 endpoint, 1510 test.
+> Yekun: 17 modul, 51 səhifə, 28 data modeli, 36 endpoint, 1833 test.
 > Amma layihənin nüvəsi say deyil. Nüvə budur: **insanlar öz həyatlarını
 > yalnız kimin görəcəyini dəqiq bildikdə paylaşırlar.** Ona görə görünürlük
 > burada sonradan əlavə olunmuş filtr deyil — **hər sorğunun keçdiyi qapıdır**.

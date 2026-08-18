@@ -31,7 +31,8 @@
     "audit:queries": "tsx scripts/query-profile.ts",
     "audit:responsive": "tsx scripts/responsive-shots.ts",
     "shots:serve": "NODE_OPTIONS=\"--require ./scripts/freeze-clock.cjs\" next start -p 3100",
-    "shots": "tsx scripts/screenshots.ts"
+    "shots": "tsx scripts/screenshots.ts",
+    "demo:gif": "tsx scripts/demo-gif.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

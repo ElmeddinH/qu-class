@@ -2,16 +2,16 @@
 
 `npm run git:audit` (`scripts/git-audit.mjs`) tərəfindən yaradılır. Şəbəkəsiz, yalnız oxu. Tapılan hər dəyər **maskalanır** (ilk 4 simvol + `****`) — hesabatın özü sızma mənbəyinə çevrilməməlidir.
 
-Son işlədilmə: `2026-08-18T15:19:55.832Z`
+Son işlədilmə: `2026-08-18T18:19:43.556Z`
 
 ## Xülasə
 
 | Ölçü | Dəyər |
 | --- | --- |
-| Gəzilən commit | 49 (HEAD-dən kökə, `depth: Infinity`) |
-| Tarixçədəki unikal yol | 669 |
-| Tarixçədəki unikal blob | 1018 |
-| İndeksdə izlənən fayl | 663 |
+| Gəzilən commit | 50 (HEAD-dən kökə, `depth: Infinity`) |
+| Tarixçədəki unikal yol | 671 |
+| Tarixçədəki unikal blob | 1036 |
+| İndeksdə izlənən fayl | 665 |
 | 🔴 Bloklayan tapıntı | 0 |
 | ⚠️ Xəbərdarlıq | 0 |
 
@@ -30,11 +30,11 @@ GitHub həddləri: **50 MB** xəbərdarlıq · **100 MB** hard blok.
 | 3 | 422.1 KB | `package-lock.json` |
 | 4 | 421.8 KB | `package-lock.json` |
 | 5 | 419.7 KB | `package-lock.json` |
-| 6 | 304.9 KB | `docs/openapi.json` |
-| 7 | 297.1 KB | `docs/openapi.json` |
-| 8 | 263.8 KB | `docs/screenshots/11-events.png` |
-| 9 | 221.8 KB | `docs/openapi.json` |
-| 10 | 177.6 KB | `docs/screenshots/07-class-story.png` |
+| 6 | 308.9 KB | `docs/openapi.json` |
+| 7 | 304.9 KB | `docs/openapi.json` |
+| 8 | 297.1 KB | `docs/openapi.json` |
+| 9 | 263.8 KB | `docs/screenshots/11-events.png` |
+| 10 | 221.8 KB | `docs/openapi.json` |
 
 ## `.gitignore` uyğunluğu
 
@@ -49,8 +49,8 @@ Tərsinə təsdiq (bunlar İZLƏNMƏLİDİR):
 
 | Rol | Ad | E-poçt | Commit sayı |
 | --- | --- | --- | --- |
-| author | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 49 |
-| committer | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 49 |
+| author | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 50 |
+| committer | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 50 |
 
 ⚠️ **T33** — GitHub commit-i töhfə qrafikinə yalnız e-poçt hesaba bağlı olduqda yazır. Uyğunsuzluq push-DAN ƏVVƏL düzəldilməlidir: sonrakı düzəliş bütün commit SHA-larını dəyişir.
 

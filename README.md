@@ -26,18 +26,23 @@ layihədə sonradan əlavə olunan filtr deyil, **hər sorğunun keçdiyi qapıd
 4 səviyyə, sahə-səviyyə nəzarət, aqreqasiya üçün ayrıca razılıq.
 
 **NƏTİCƏ.** 17 modulun hamısı işlək · 51 səhifə · 28 data modeli ·
-36 REST endpoint · **1759 vahid/inteqrasiya + 213 E2E testi keçir** ·
+36 REST endpoint · **1833 vahid/inteqrasiya + 220 E2E testi keçir** ·
 Lighthouse desktop **100/100/100/100** (5 səhifə) · WCAG 2.2 AA qapısı bağlıdır.
+
+> 📊 Bütün rəqəmlərin ölçmə əmri ilə birlikdə tam siyahısı:
+> [`docs/METRICS.md`](docs/METRICS.md). Bu README-də yalnız yuxarıdakı bir neçə
+> rəqəm təkrarlanır — qalanı orada tək mənbədən saxlanılır.
 
 ---
 
 ## Demo
 
-<!-- 📌 13B: demo GIF-i bura → docs/media/demo.gif (≤ 8 MB, 1280×720, ~40 s)
-     Ssenari: açılış → giriş → sinif lenti → məxfilik seçicisi → «İndi haradayıq?» -->
+![QU CLASS demosu — açılış, giriş, sinif lenti, məxfilik seçicisi və «İndi haradayıq?» xəritəsi](docs/media/demo.gif)
 
-> **[ Demo GIF buraya əlavə olunacaq ]**
-> `docs/media/demo.gif` — Blok 13B
+*Açılış → giriş → sinif lenti → məxfilik seçicisi → «İndi haradayıq?» (31 san).*
+Determinist çəkilib: server saatı `scripts/freeze-clock.cjs` ilə donmuş,
+brauzer saatı `context.clock` ilə bağlı — `npm run demo:gif` hər dəfə eyni
+kadrları verir.
 
 🎬 **Canlı demo ssenarisi** (8 dəqiqə, dəqiqə-dəqiqə): [`docs/DEMO.md`](docs/DEMO.md)
 
@@ -280,13 +285,13 @@ yalnız `Post` və `Memory` üçün. `Achievement` (`VERIFIED|FEATURED`) və `Ev
 Görünürlük səviyyəsi statistikaya girmək üçün **kifayət deyil**. «İndi
 haradayıq?» paneli yalnız `includeInStats = true` olan istifadəçiləri sayır.
 Səbəb: «sinif yoldaşım görsün» ilə «rəqəm kimi sayılım» fərqli məqsədlərdir —
-[QD-014](docs/DECISIONS.md#qd-014--aqreqasiya-üçün-ayrı-razılıq-includeinstats).
+[QD-014](docs/DECISIONS.md#qd-014--aqreqasiya-üçün-ayri-razılıq-includeinstats).
 
 ---
 
 ### 🔒 «İndi haradayıq?» — üç məxfilik qərarı
 
-Karyera xəritəsi ([`/class/[slug]/map`](src/app/(app)/class/%5Bslug%5D/map/page.tsx))
+Karyera xəritəsi ([`/class/[slug]/map`](src/app/%28app%29/class/%5Bslug%5D/map/page.tsx))
 sinfin ən həssas səthidir. Üç qərar sənədləşdirilir, çünki müdafiədə soruşulur:
 
 **1. ƏMƏK HAQQI QƏSDƏN YOXDUR.** Nə sxemdə sütun, nə servisdə hesablama, nə
@@ -345,7 +350,7 @@ Təhdid modeli, nəyi qorumadığımız və istehsal öncəsi siyahı:
 - Layihə qovluğu: `qu-class` — **VS Code-da məhz bu qovluğu aç**, `holberton`-u yox.
   `.vscode/` konfiqləri layihə kökündədir; bir səviyyə yuxarıdan açsan F5 işləmir.
 
-### 2. Dörd əmr
+### 2. Sıfırdan işə salma — altı əmr
 
 ```bash
 git clone <repo-url> && cd qu-class
@@ -355,6 +360,31 @@ npx prisma migrate dev        # dev.db yaradır / miqrasiyaları tətbiq edir
 npm run db:seed               # demo datası (deterministik — hər dəfə eyni nəticə)
 npm run dev                   # http://localhost:3000
 ```
+
+İstehsal rejimini yoxlamaq üçün son əmr əvəzinə:
+
+```bash
+npx prisma migrate deploy     # mövcud bazaya yalnız miqrasiyaları tətbiq edir
+npm run build                 # `prebuild` Swagger aktivlərini + openapi.json yaradır
+npm start                     # http://localhost:3000
+```
+
+✅ **Bu ardıcıllıq ölçülüb, təxmin deyil.** Blok 12F-də HEAD commit-inin ağacı
+təmiz qovluğa açıldı (**665 fayl**) və yuxarıdakı addımlar sıfırdan işlədildi:
+`npm ci` → `.env` → `migrate deploy` → `db:seed` → `build` (**97 route**) →
+`npm start` → `/` **200**, `/docs` **200**, `/api/v1/health` **200**.
+
+🔴 **`prebuild` addımı buraxıla bilməz.** `public/swagger/` **qəsdən**
+izlənmir (Swagger UI paketindən köçürülən törəmə fayldır) — təmiz nüsxədə
+YOXDUR və `/docs` stil-siz açılardı. `npm run build` (və `npm run dev` →
+`predev`) `npm run docs:assets` ilə onu avtomatik yaradır.
+
+⚠️ `docs/openapi.json` isə **əksinə, commit olunur** — bütün məqsədi layihəni
+qaldırmadan oxuna bilməkdir (`editor.swagger.io`-da açılır). `prebuild` onu
+yenidən generasiya edir və `src/lib/api/openapi.test.ts`-dəki drift testi
+sənəd köhnələndə qırmızıya düşür.
+
+🔴 `prisma/dev.db` də izlənmir: **seed işlədilməsə baza boşdur.**
 
 ### 3. `.env`
 
@@ -435,7 +465,7 @@ Səhv gedərsə bilməli olduğun iki şey:
 ## Deploy — canlı versiya
 
 **Platforma:** Fly.io · **Baza:** SQLite, davamlı volume-da · **Image:** Docker (multi-stage)
-**Qərar sənədi:** [QD-018](docs/DECISIONS.md#qd-018--deploy-flyio--volume-postgresə-keçid-yox)
+**Qərar sənədi:** [QD-018](docs/DECISIONS.md#qd-018--deploy-flyio--volume-postgres-ə-keçid-yox)
 
 | | |
 |---|---|
@@ -699,8 +729,8 @@ npm run free-port     # 3000-i tutan köhnə dev serveri dayandır
 npm run build         # istehsal build-i
 npm start             # istehsal serveri (build tələb edir)
 npm run lint          # ESLint
-npm run test          # Vitest — 1759 test / 65 fayl
-npm run test:e2e      # Playwright — 212 test / 20 fayl (build tələb edir)
+npm run test          # Vitest — 1833 test / 67 fayl
+npm run test:e2e      # Playwright — 220 test / 22 fayl (build tələb edir)
 npm run test:e2e:dev  # Playwright — dev smoke ("F5 işləyirmi?")
 npm run db:seed       # prisma db seed
 npm run db:studio     # Prisma Studio
@@ -716,7 +746,14 @@ npm run audit:lighthouse   # Lighthouse · 5 səhifə (auth kukisi ilə) → doc
 npm run audit:responsive   # 5 breakpoint × 51 səhifə → docs/responsive/
 npm run audit:queries      # N+1 sorğu profili
 npm run git:audit          # push öncəsi sızma auditi → docs/git-audit-report.md
+npm run shots              # README qalereyası → docs/screenshots/ (donmuş saat)
+npm run demo:gif           # README demo GIF-i → docs/media/demo.gif (ffmpeg tələb edir)
 ```
+
+⚠️ `npm run shots` və `npm run demo:gif` **ayrı terminalda** `npm run shots:serve`
+tələb edir — saatı donduran istehsal serveri (`scripts/freeze-clock.cjs`).
+Bunsuz nisbi tarixlər («2 gün əvvəl») hər çəkilişdə dəyişir və çıxış determinist
+olmur.
 
 Hər blokun sonunda üçü də təmiz olmalıdır:
 `npx tsc --noEmit && npm run lint && npm run build`
@@ -727,8 +764,8 @@ Hər blokun sonunda üçü də təmiz olmalıdır:
 
 | Dəst | Say | Əmr |
 |---|---|---|
-| Vahid + inteqrasiya (Vitest) | **1759 test / 65 fayl** | `npm run test` |
-| E2E (Playwright, istehsal build-i) | **212 test / 20 fayl** | `npm run build && npm run test:e2e` |
+| Vahid + inteqrasiya (Vitest) | **1833 test / 67 fayl** | `npm run test` |
+| E2E (Playwright, istehsal build-i) | **220 test / 22 fayl** | `npm run build && npm run test:e2e` |
 | E2E dev smoke («F5 işləyirmi?») | **1 test** | `npm run test:e2e:dev` |
 
 İki E2E dəsti ayrıdır, çünki biri **istehsal** serverinə (`next start`, port 3100),
@@ -786,9 +823,10 @@ qalır.
 | Lighthouse **desktop** — `/` `/home` `/directory` `/map` `/admin` | **100 / 100 / 100 / 100** (Perf · A11y · BP · SEO) | `docs/quality-report-12c.md` §2.1 |
 | Lighthouse **mobil** (yavaş 4G + 4× CPU) | 87–94 Performance | §2.2 |
 | WCAG 2.2 AA — axe, 12 səhifə × 2 vəziyyət | pozuntu yoxdur | `tests/e2e/a11y.spec.ts` |
-| Toxunma hədəfi — 24px qapısı (SC 2.5.8) | sıfır tapıntı | §3.2 |
-| Üfüqi sürüşmə — 5 breakpoint × 10 səhifə | sıfır | §3.1 |
-| Git tarixçəsi — sızma auditi (33 commit, 871 blob) | 0 bloklayan, 0 xəbərdarlıq | `docs/git-audit-report.md` |
+| Toxunma hədəfi — 24px qapısı (SC 2.5.8) | iki shadcn primitivi istisna — bax №9 | §3.2 |
+| Üfüqi sürüşmə — **51 səhifə × 5 breakpoint = 255 yoxlama** | sıfır | `tests/e2e/responsive.spec.ts` |
+| Donut — bitişik dilim kontrastı | 2·4·6 dilimdə **≥ 3:1**; tək sayda riyazi hədd | `docs/quality-report-12c.md` §6 |
+| Git tarixçəsi — sızma auditi (50 commit, 1036 blob) | 0 bloklayan, 0 xəbərdarlıq | `docs/git-audit-report.md` |
 
 ---
 
@@ -800,20 +838,20 @@ qalır.
 |---|---|---|
 | 1 | **Parol sıfırlama axını yoxdur** | E-poçt xidməti yoxdur — [QD-001](docs/DECISIONS.md#qd-001--parol-sıfırlama-axını-qəsdən-yazılmayıb). SIS ilə idxal edilmiş hesab administrasiyadan asılıdır |
 | 2 | **Əmək haqqı göstəricisi yoxdur** | Qəsdən — [QD-011](docs/DECISIONS.md#qd-011--maaş--bonus-sahəsi-yoxdur). Məhsul qərarıdır, texniki boşluq deyil |
-| 3 | Toplu moderasiya, `/admin/stats` kohort filtri, CMS-də yaratma, ikinci dərəcəli kohort rolu | Blok 12B borcları (`docs/audit-12a.md` §6) |
-| 4 | Sessiya serverdən dərhal ləğv edilə bilmir | JWT strategiyası — [QD-009](docs/DECISIONS.md#qd-009--jwt-sessiya--session-cədvəli-yoxdur) |
-| 5 | Rate-limit prosesdaxili yaddaşdadır | Redis yoxdur; çox instansiyalı yerləşdirmədə instansiya başına işləyir |
+| 3 | Sessiya serverdən dərhal ləğv edilə bilmir | JWT strategiyası — [QD-009](docs/DECISIONS.md#qd-009--jwt-sessiya--session-cədvəli-yoxdur) |
+| 4 | Rate-limit prosesdaxili yaddaşdadır | Redis yoxdur; çox instansiyalı yerləşdirmədə instansiya başına işləyir |
 
 **Keyfiyyət** (`docs/quality-report-12c.md` §5-dən):
 
 | # | Məhdudiyyət | Səbəb |
 |---|---|---|
-| 6 | **ISR ictimai səhifələrdə yoxdur** | `ConsentGate` → `cookies()` bütün `(public)` route-larını dinamik edir; PPR experimental, stack kilidlidir. Ölçü itki göstərmir |
-| 7 | **`/home` mobil Performance 90-dan aşağı** (12C: 87 · 12E: 78 və 86 — iki işlətmə) | Yönləndirmə 600 ms alır; hədəf səhifə birbaşa ölçüləndə **91**. ⚠️ Mobil profil ölçən maşının yükünə həssasdır: eyni build-də TBT 2–3 dəfə tərpənir, FCP/LCP isə demək olar sabit qalır. Desktop profilində eyni səhifə **99** verir — bax `docs/quality-report-12c.md` §9 |
-| 8 | **Yüklənmə vəziyyəti iki mexanizmlə verilir** — 19 səhifədə `loading.tsx`, 20 səhifədə səhifə daxili `<Suspense>`, 12 səhifədə heç biri | Axınla render cavab başlığını — yəni **statusu** — məzmundan əvvəl göndərir, ona görə `notFound()` / `forbidden()` çağıran seqmentə `loading.tsx` qoyula bilmir (404 səssizcə 200 olur). Səhifələr **A/B** bölünüb: **A** = status qapısı yoxdur → seqmentin ƏN DAR yerində `loading.tsx` (üç yerdə route qrupu ilə daraldılıb ki, qonşu dinamik seqmentə düşməsin); **B** = status qapısı var → qapı `await` edilir, YALNIZ ondan sonrakı alt-ağac `<Suspense>`-ə bükülür. Qalan 12 səhifədə ya gözləyəcək sorğu yoxdur (`/kuds`, `/docs`, `/login`), ya səhifə yönləndirir (`/home`, `/me`), ya da yeganə sorğu 404 qərarının ÖZÜDÜR — onu sərhədin arxasına salmaq statusu sındırardı. Bölgü və hər səhifənin səbəbi: [`docs/responsive/report.md`](docs/responsive/report.md) |
-| 9 | **Toxunma hədəfi: WCAG 2.2 AA-nın 24px qapısı iki primitivdə ödənmir**, KUDS-un 44px tövsiyəsi isə 1674 elementdə | ⚠️ Blok 12C bu qapını «ödənilib» kimi yazmışdı, amma ölçmə **10 səhifədə** idi. Blok 12D-də 51 səhifəyə genişlənəndə `Checkbox` (**16×16**, `ui/checkbox.tsx` → `h-4 w-4`) və `Switch` (**36×20**, `ui/switch.tsx` → `h-5 w-9`) qapının altında qaldı — beş səhifədə görünür (`/me/career`, `/admin/moderation`, `/events/[id]/manage`, `/class/[slug]/memories`, `/kuds`). İkisi də shadcn primitividir və `src/components/ui/` CLAUDE.md §1-ə görə toxunulmazdır; çağırış yerində `className` ilə böyütmək bütün sistemdə checkbox/switch ölçüsünü dəyişən **dizayn qərarıdır**, responsive qırığı deyil. Blok 12D-də tapılan ÜÇÜNCÜ pozuntu (`AttendeeTable` çeşidləmə düyməsi 73×21) düzəldildi — o, bizim kodumuzda idi. 44px isə qapı deyil, tövsiyədir |
-| 10 | Profil banneri xarici ünvanda `<img>` qalır | `next/image` hər hostu `remotePatterns`-də tələb edir; hamısını açmaq optimizatoru açıq proksiyə çevirər |
-| 11 | ~~Kuki banneri mobil `/directory`-də CLS 0.035~~ — **12E ölçməsində 0** | Banner `fixed`-dir və axından kənardadır. Blok 12E-nin təkrar ölçməsində desktop və mobil profillərin **hər ikisində, beş səhifənin hamısında CLS = 0**. Sətir tarixi qeyd kimi saxlanılır |
+| 5 | **ISR ictimai səhifələrdə yoxdur** | `ConsentGate` → `cookies()` bütün `(public)` route-larını dinamik edir; PPR experimental, stack kilidlidir. Ölçü itki göstərmir |
+| 6 | **`/home` mobil Performance 90-dan aşağı** (12C: 87 · 12E: 78 və 86 — iki işlətmə) | Yönləndirmə 600 ms alır; hədəf səhifə birbaşa ölçüləndə **91**. ⚠️ Mobil profil ölçən maşının yükünə həssasdır: eyni build-də TBT 2–3 dəfə tərpənir, FCP/LCP isə demək olar sabit qalır. Desktop profilində eyni səhifə **99** verir — bax `docs/quality-report-12c.md` §9 |
+| 7 | **Yüklənmə vəziyyəti iki mexanizmlə verilir** — 19 səhifədə `loading.tsx`, 20 səhifədə səhifə daxili `<Suspense>`, 12 səhifədə heç biri | Axınla render cavab başlığını — yəni **statusu** — məzmundan əvvəl göndərir, ona görə `notFound()` / `forbidden()` çağıran seqmentə `loading.tsx` qoyula bilmir (404 səssizcə 200 olur). Səhifələr **A/B** bölünüb: **A** = status qapısı yoxdur → seqmentin ƏN DAR yerində `loading.tsx` (üç yerdə route qrupu ilə daraldılıb ki, qonşu dinamik seqmentə düşməsin); **B** = status qapısı var → qapı `await` edilir, YALNIZ ondan sonrakı alt-ağac `<Suspense>`-ə bükülür. Qalan 12 səhifədə ya gözləyəcək sorğu yoxdur (`/kuds`, `/docs`, `/login`), ya səhifə yönləndirir (`/home`, `/me`), ya da yeganə sorğu 404 qərarının ÖZÜDÜR — onu sərhədin arxasına salmaq statusu sındırardı. Bölgü və hər səhifənin səbəbi: [`docs/responsive/report.md`](docs/responsive/report.md) |
+| 8 | **Toxunma hədəfi: WCAG 2.2 AA-nın 24px qapısı iki primitivdə ödənmir**, KUDS-un 44px tövsiyəsi isə 1674 elementdə | ⚠️ Blok 12C bu qapını «ödənilib» kimi yazmışdı, amma ölçmə **10 səhifədə** idi. Blok 12D-də 51 səhifəyə genişlənəndə `Checkbox` (**16×16**, `ui/checkbox.tsx` → `h-4 w-4`) və `Switch` (**36×20**, `ui/switch.tsx` → `h-5 w-9`) qapının altında qaldı — beş səhifədə görünür (`/me/career`, `/admin/moderation`, `/events/[id]/manage`, `/class/[slug]/memories`, `/kuds`). İkisi də shadcn primitividir və `src/components/ui/` CLAUDE.md §1-ə görə toxunulmazdır; çağırış yerində `className` ilə böyütmək bütün sistemdə checkbox/switch ölçüsünü dəyişən **dizayn qərarıdır**, responsive qırığı deyil. Blok 12D-də tapılan ÜÇÜNCÜ pozuntu (`AttendeeTable` çeşidləmə düyməsi 73×21) düzəldildi — o, bizim kodumuzda idi. 44px isə qapı deyil, tövsiyədir |
+| 9 | Profil banneri xarici ünvanda `<img>` qalır | `next/image` hər hostu `remotePatterns`-də tələb edir; hamısını açmaq optimizatoru açıq proksiyə çevirər |
+| 10 | ~~Kuki banneri mobil `/directory`-də CLS 0.035~~ — **12E ölçməsində 0** | Banner `fixed`-dir və axından kənardadır. Blok 12E-nin təkrar ölçməsində desktop və mobil profillərin **hər ikisində, beş səhifənin hamısında CLS = 0**. Sətir tarixi qeyd kimi saxlanılır |
+| 11 | **Donut: TƏK saylı dilimdə bitişik kontrast 3:1-ə çatmır** (2.54:1) | Riyazi hədd, palitra qüsuru deyil: `--slice-*` şkalasının diapazonu **8.53** < 9, ona görə «bir-birinə qarşı 3:1» olan üç ton yoxdur → qonşuluq qrafi ikihissəlidir → qapalı halqada tək sayda dövr qurulmur. Sübut və bütün ölçülər: [`quality-report-12c.md` §6.4](docs/quality-report-12c.md). Yeni rəng uydurmaq CLAUDE.md §2-ni pozardı; əvəzinə dilim sayı **6** ilə kəsilir və sərhəd rəngdən asılı olmayan konturla verilir. Rəng heç vaxt tək kanal deyil (faiz etiketi + leqenda + cədvəl) |
 
 **Miqyas:** SQLite tək yazıcı kilidi ilə işləyir — bu miqyasda (sinif = 14–28
 nəfər) hiss olunmur, amma çox istifadəçili istehsalda birinci məhdudiyyət budur.
@@ -836,7 +874,7 @@ rm -rf prisma/migrations && npx prisma migrate dev --name init && npm run db:see
 ```
 
 Tətbiq kodunda dəyişiklik **yoxdur** — bütün enum-lar onsuz da `String` sütun +
-Zod-dur ([QD-005](docs/DECISIONS.md#qd-005--bütün-enumlar-string-sütun--zod)),
+Zod-dur ([QD-005](docs/DECISIONS.md#qd-005--bütün-enum-lar-string-sütun--zod)),
 yəni Postgres native enum-una köçürmə tələb olunmur.
 
 Digər gələcək addımlar `docs/SECURITY.md` §7-dədir (istehsala çıxmadan əvvəl

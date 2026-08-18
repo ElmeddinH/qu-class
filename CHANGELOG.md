@@ -13,6 +13,54 @@ versiyalama [SemVer](https://semver.org/)-dir.
 
 ---
 
+## Sprint 3 / 4 — 2026-08-18
+
+Yerləşdirmə, keyfiyyət və **təhvil**. Yeni məhsul funksiyası demək olar yoxdur —
+bloklar mövcud işi ölçdü, sübut etdi və sənədləşdirdi.
+
+| Ölçü | Dəyər |
+|---|---|
+| Build route | **97** (3 statik + 94 dinamik) |
+| Vitest | **1833 keçdi** (67 fayl, əvvəl 1759 / 65) |
+| Playwright | **220 keçdi** (22 fayl, əvvəl 212 / 20) |
+| `docs/openapi.json` | **38 path / 48 əməliyyat** |
+| Commit | **50** |
+
+🔴 Bütün rəqəmlərin ölçmə əmri ilə birlikdə tək mənbəyi: [`docs/METRICS.md`](docs/METRICS.md).
+
+### Blok 12A — Fly.io + volume (QD-018)
+`Dockerfile`, `fly.toml`, `docker-entrypoint.sh`, `npm run deploy`. Miqrasiya
+build-də deyil, **entrypoint**-də işləyir (volume yalnız orada mount olunur).
+Next-in `public/` keşi qüsuru ölçüldü və `src/app/uploads/[...path]` ilə bağlandı.
+
+### Blok 12D — yüklənmə vəziyyəti + responsive matrisi
+`loading.tsx` axınla render-in statusu məzmundan əvvəl göndərdiyini üzə çıxardı
+(404 → 200). Səhifələr **A/B** bölündü. Responsive: **51 × 5 = 255** yoxlama.
+
+### Blok 12E — OpenAPI kor nöqtəsi + keyfiyyətin təkrar ölçməsi
+Drift testi `/api/v1`-i skan etmirdi; filtr götürüldü, `GET /api/v1/openapi.json`
+sənədləşdi → **48 sənəddə + 5 ağ siyahıda = 53/53**.
+
+### Blok 12F — müdafiə və təhvil
+- **Rəqəm drifti**: 11 ölçü yenidən ölçülüb düzəldildi; `METRICS.md` tək mənbə
+  elan olundu. Tarixli protokollar (`quality-report-12c.md`,
+  `SPRINT-3-4-AUDIT.md`) **yenidən yazılmadı** — köhnəlmə bannerı aldı.
+- **Demo GIF**: `docs/media/demo.gif` — 7.15 MB · 31.4 san · 1024px
+  (`npm run demo:gif`, determinist: donmuş server + brauzer saatı).
+- **Donut kontrastı**: 12B-nin «2 pillə» qaydası SƏHV ölçü vahidi idi —
+  4 dilimdə kontrast cəmi **1.73:1** çıxırdı. Pillə sıraları brute-force ilə
+  yenidən seçildi (**5.05:1**), dilim sayı 6 ilə kəsildi. Tək saylı dilimdə
+  3:1-in **riyazi olaraq mümkünsüz** olduğu sübut edildi və yazıldı.
+- **Xəritə zoom**: k-anonimliyin zoom-dan ASILI OLMADIĞI testlə sübut edildi.
+- **Sıfırdan qurulma**: HEAD ağacı (665 fayl) təmiz qovluqda `npm ci` → seed →
+  build → start ilə yoxlandı, `/` **200**. README-də iki səhv düzəldildi.
+- **Ölü link**: 10 → **0** (proqramla yoxlanır).
+- 🔴 **TƏLƏ C**: dörd «açıq borc» (toplu moderasiya, CMS-də yaratma,
+  `/admin/stats` filtri, ikinci dərəcəli kohort rolu) əslində artıq
+  yazılmışdı — yanlış məhdudiyyət sətirləri silindi.
+
+---
+
 ## Sprint 2 — 2026-08-05
 
 `/api/v1` OXUYAN bir səth olmaqdan çıxıb — paylaşım, xatirə və tədbir üçün

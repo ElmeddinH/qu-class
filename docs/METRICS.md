@@ -4,9 +4,14 @@
 > Təxmin, yuvarlaqlaşdırma və «təxminən» yoxdur — uyğunsuzluq görsən əmri işlət
 > və sənədi düzəlt.
 >
-> **Ölçmə tarixi:** `2026-08-05` · **commit:** `test(api): cover mutation error
-> mapping and privacy regressions` (Sprint 2, Blok 14B/14C) · **mühit:** Node
-> `v24.18.0`, Linux.
+> **Ölçmə tarixi:** `2026-08-18` · **blok:** 12F (müdafiə və təhvil) ·
+> **mühit:** Node `v24.18.0`, Linux.
+>
+> 🔴 **BU FAYL RƏQƏMLƏRİN MƏRKƏZİDİR.** Digər sənədlər rəqəmi TƏKRARLAMAQ
+> əvəzinə buraya istinad edir. Səbəb 12F-də üzə çıxdı: eyni rəqəm altı sənəddə
+> yazılmışdı, blok 12A–12C onların bir hissəsini dəyişdi və sənədlər
+> bir-birini təkzib etməyə başladı. İndi tək mənbə budur — README-də yalnız
+> bir neçə əsas rəqəm qalır, qalanı burada.
 >
 > Bağlı sənədlər: [`DEMO.md`](DEMO.md) · [`DEFENSE-QA.md`](DEFENSE-QA.md) ·
 > [`ARCHITECTURE.md`](ARCHITECTURE.md)
@@ -17,19 +22,20 @@
 
 | Ölçü | Rəqəm |
 |---|---|
-| Repo faylı (asılılıqlar və build çıxışı xaric) | **704** |
-| TypeScript mənbə faylı (`src/`) | **512** |
-| TypeScript sətri (`src/`) | **78 363** |
-| — testlərsiz | **69 086** |
+| Repo faylı (asılılıqlar və build çıxışı xaric) | **952** |
+| TypeScript mənbə faylı (`src/`) | **539** |
+| TypeScript sətri (`src/`) | **82 749** |
+| — testlərsiz | **72 414** |
 | Prisma modeli | **28** |
 | Səhifə (`page.tsx`) | **51** |
 | REST endpoint (`/api/v1`) | **36** |
+| Build çıxışındakı route | **97** (3 statik + 94 dinamik) |
 | React komponenti (`src/components/`) | **42** |
 | Xüsusiyyət modulu (`src/features/*`) | **24** |
-| Servis faylı (`src/services/*`) | **23** |
-| Vahid + inteqrasiya testi | **1759** (65 fayl) |
-| E2E testi | **213** (21 fayl) |
-| Commit | **41** |
+| Servis faylı (`src/services/*`) | **24** |
+| Vahid + inteqrasiya testi | **1833** (67 fayl) |
+| E2E testi | **220** (22 fayl) |
+| Commit | **50** |
 | Seed sətri (28 cədvəl) | **6323** |
 
 ---
@@ -44,7 +50,7 @@ find . -type f \
   -not -path "./.next/*" -not -path "./test-results/*" | wc -l
 ```
 
-**Nəticə: 704.**
+**Nəticə: 952.**
 
 ⚠️ `node_modules`, `.git`, `.next` və `test-results` **qəsdən çıxarılıb** —
 onlar yazılmış kod deyil (asılılıqlar, tarixçə obyektləri, build çıxışı, test
@@ -62,19 +68,21 @@ find . -type f \
 
 | Uzantı | Fayl | Nədir |
 |---|---|---|
-| `.tsx` | 292 | React komponentləri və səhifələr |
-| `.ts` | 269 | Servis, lib, tip, konfiq, test, seed |
+| `.tsx` | 307 | React komponentləri və səhifələr |
+| `.ts` | 288 | Servis, lib, tip, konfiq, test, seed |
 | `.png` | 272 | Ekran görüntüləri (`docs/screenshots/` 17 · `docs/responsive/` 255) |
-| `.md` | 20 | Sənədlər |
-| `.json` | 16 | Konfiq + Lighthouse hesabatları |
+| `.md` | 21 | Sənədlər |
+| `.json` | 17 | Konfiq + Lighthouse hesabatları + `docs/openapi.json` |
 | `.html` | 10 | Lighthouse HTML hesabatları |
-| `.mjs` | 7 | Skriptlər (`scripts/`) |
+| `.mjs` | 8 | Skriptlər (`scripts/`) |
 | `.svg` | 5 | İkon və loqo aktivləri |
 | `.sql` | 3 | Prisma miqrasiyaları |
 | `.js` | 3 | PostCSS konfiqi + Swagger aktivləri |
-| `.css` | 2 | Qlobal stil |
-| `.yml` `.tsbuildinfo` `.toml` `.prisma` `.ico` `.cjs` | 1 + 1 + 1 + 1 + 1 + 1 | `docker-compose.yml` · TS build keşi · Lighthouse konfiqi · **sxem** · favicon · saat dondurucusu |
-| `.gitignore` `.example` `.env` `.db` | 1 + 1 + 1 + 1 | ⚠️ `.env` və `dev.db` commit **olunmur** — repo qovluğunda var, tarixçədə yox |
+| `.toml` | 2 | `fly.toml` · Lighthouse konfiqi |
+| `.css` | 2 | Qlobal stil + Swagger UI aktivi |
+| `.gif` | 1 | **`docs/media/demo.gif`** — README demosu (Blok 12F) |
+| `.sh` `.yml` `.tsbuildinfo` `.prisma` `.ico` `.cjs` | 1 hər biri | `docker-entrypoint.sh` · `docker-compose.yml` · TS build keşi · **sxem** · favicon · saat dondurucusu |
+| `.gitignore` `.example` `.env` `.local` `.db` | 1 hər biri | ⚠️ `.env`, `.env.local` və `dev.db` commit **olunmur** — repo qovluğunda var, tarixçədə yox |
 
 ---
 
@@ -94,9 +102,9 @@ find src \( -name '*.ts' -o -name '*.tsx' \) ! -name '*.test.ts' ! -name '*.test
 
 | | Fayl | Sətir |
 |---|---|---|
-| `src/` — hamısı | **512** | **78 363** |
-| `src/` — testlərsiz | **464** | **69 086** |
-| `src/` — yalnız testlər | **48** | **9 277** |
+| `src/` — hamısı | **539** | **82 749** |
+| `src/` — testlərsiz | **488** | **72 414** |
+| `src/` — yalnız testlər | **51** | **10 335** |
 
 🔴 **Mötərizə MƏCBURİDİR.** `find src -name '*.ts' -o -name '*.tsx' -exec cat {} +`
 yazsan `-exec` yalnız **ikinci** şərtə bağlanır və nəticə səhv çıxır
@@ -114,8 +122,8 @@ done
 
 | | Fayl | Sətir |
 |---|---|---|
-| `.tsx` (UI) | 290 | 34 647 |
-| `.ts` (servis, lib, tip) | 174 | 34 439 |
+| `.tsx` (UI) | 305 | 35 445 |
+| `.ts` (servis, lib, tip) | 183 | 36 969 |
 
 **Oxunuş:** UI və məntiq qatı sətir baxımından demək olar bərabərdir — bu,
 məxfilik mühərrikinin, servis qatının və enum sisteminin nə qədər yer tutduğunu
@@ -144,14 +152,14 @@ find scripts -type f -exec cat {} + | wc -l
 
 | Dil / sahə | Fayl | Sətir |
 |---|---|---|
-| TypeScript — `src/` (testlərsiz) | 464 | **69 086** |
-| TypeScript — testlər (`src/` + `tests/`) | 82 | **24 478** |
-| TypeScript — `tests/` qovluğu | 36 | 15 331 |
+| TypeScript — `src/` (testlərsiz) | 488 | **72 414** |
+| TypeScript — testlər (`src/` + `tests/`) | 90 | **28 015** |
+| TypeScript — `tests/` qovluğu | 41 | 17 810 |
 | TypeScript — `prisma/` (seed + seed datası) | 2 | **2 980** |
-| Node skriptləri (`scripts/`) | 12 | **3 373** |
-| Prisma sxemi | 1 | **818** |
-| CSS | 2 | **270** |
-| Markdown (sənədlər) | 20 | **8 299** |
+| Node skriptləri (`scripts/`) | 15 | **4 328** |
+| Prisma sxemi | 1 | **832** |
+| CSS (`src/`) | 1 | **270** |
+| Markdown (sənədlər) | 21 | **10 713** |
 
 ⚠️ Markdown rəqəmi **bu faylı da sayır** — sənəd yazıldıqca dəyişir. Yuxarıdakı
 əmr həmişə cari dəyəri verir.
@@ -162,7 +170,7 @@ find scripts -type f -exec cat {} + | wc -l
 
 ```bash
 grep -c '^model ' prisma/schema.prisma        # → 28
-wc -l prisma/schema.prisma                    # → 818
+wc -l prisma/schema.prisma                    # → 832
 ls prisma/migrations | grep -v migration_lock | wc -l   # → 3
 grep -c '^export const [A-Z_]*_VALUES' src/lib/enums.ts # → 37
 ```
@@ -170,7 +178,7 @@ grep -c '^export const [A-Z_]*_VALUES' src/lib/enums.ts # → 37
 | Ölçü | Rəqəm |
 |---|---|
 | Prisma modeli | **28** |
-| Sxem sətri | **818** |
+| Sxem sətri | **832** |
 | Miqrasiya | **3** |
 | Enum ailəsi (`*_VALUES`) | **37** |
 
@@ -222,28 +230,54 @@ mühərrikinin data ayağı budur.
 
 ```bash
 find src/app -name 'page.tsx' | wc -l                    # → 51
-find src/app -name 'route.ts' | wc -l                    # → 42
+find src/app -name 'route.ts' | wc -l                    # → 43
 find src/app/api/v1 -name 'route.ts' | wc -l             # → 36
 grep -rhoE "export (async )?(function|const) (GET|POST|PATCH|PUT|DELETE)" \
   src/app/api/v1 --include=route.ts | awk '{print $NF}' | sort | uniq -c
-grep -c 'method:' src/lib/api/openapi.ts                 # → 47
+grep -c 'method:' src/lib/api/openapi.ts                 # → 48
+npm run docs:openapi                                     # → 38 path / 48 operation
 find src/components -name '*.tsx' ! -name '*.test.tsx' | wc -l   # → 42
 ls -d src/features/*/ | wc -l                            # → 24
-ls src/services/*.ts | grep -v '\.test\.' | wc -l        # → 23
+ls src/services/*.ts | grep -v '\.test\.' | wc -l        # → 24
 grep -rl '"use server"' src/features | wc -l             # → 14
 ```
 
 | Ölçü | Rəqəm | Qeyd |
 |---|---|---|
 | Səhifə (`page.tsx`) | **51** | `(public)` + `(app)` + `(admin)` |
-| Route handler — hamısı | **42** | `/api/v1` (36) + köhnə `/api/*` (6) |
+| Route handler — hamısı | **43** | `/api/v1` (36) + `/api/*` və auth (7) |
 | REST endpoint — `/api/v1` | **36** | route.ts fayl sayı (sənədin özü daxil) |
-| REST əməliyyat (metod) — `/api/v1` | **44** | 30 `GET` + 9 `POST` + 3 `PATCH` + 3 `DELETE` — bax method bölgüsü yuxarıda |
-| OpenAPI-də sənədləşən əməliyyat — CƏMİ | **47** | 44 (v1) + 3 (v1-dən kənar: `uploadMedia` × GET/POST + `downloadEventIcs`); `openapi.json`-un özü sxemdə sadalanmır |
+| REST əməliyyat (metod) — `/api/v1` | **45** | 30 `GET` + 9 `POST` + 3 `PATCH` + 3 `DELETE` |
+| Kod səviyyəsində HTTP əməliyyat — `src/app/api` | **53** | 51 birbaşa ixrac + **2 destrukturlaşdırılmış** (aşağı) |
+| `docs/openapi.json` — path / əməliyyat | **38 / 48** | `npm run docs:openapi` çıxışı |
+| Build çıxışındakı route | **97** | 3 statik (○) + 94 dinamik (ƒ) |
 | Server Action faylı | **14** | `"use server"` daşıyan modul |
 | Komponent (`src/components/`) | **42** | bölgü aşağıda |
 | Xüsusiyyət modulu (`src/features/*`) | **24** | KUDS §20-nin `pages/` qatı |
-| Servis faylı (`src/services/*`) | **23** | **yeganə** Prisma girişi |
+| Servis faylı (`src/services/*`) | **24** | **yeganə** Prisma girişi |
+
+⚠️ **Üç fərqli «endpoint sayı» var və qarışdırılmamalıdır** — 12F-də sənədlərdə
+məhz bu üçü bir-birinə qarışmışdı:
+> · **53** = `src/app/api` altında kodda mövcud HTTP əməliyyat
+> · **48** = `docs/openapi.json`-da sənədləşən əməliyyat (+ 5 ağ siyahıda = 53)
+> · **97** = Next build çıxışındakı route sətri (səhifələr də daxil)
+
+🔴 **GREP TƏLƏSİ — bu rəqəmi əl ilə saymağa çalışan hər kəs 51 alır.**
+`src/app/api/auth/[...nextauth]/route.ts` handler-ləri **destrukturlaşdırma** ilə
+ixrac edir:
+
+```ts
+export const { GET, POST } = handlers;   // ← `export const GET` DEYİL
+```
+
+Yəni `grep -E 'export (async function|function|const) (GET|POST|…)'` bu iki
+əməliyyatı **görmür**. Doğru cəm **51 + 2 = 53**-dür və `src/lib/api/openapi.test.ts`
+ağ siyahısı da məhz 5 əməliyyat sayır (`/api/feed`, `/api/search`,
+`/api/session/expired`, `/api/auth/[...nextauth]` × GET + POST).
+
+⚠️ `src/app/uploads/[...path]/route.ts` bu saya **daxil deyil** — `src/app/api`
+ağacından kənardadır və API müqaviləsi deyil (volume-dakı şəkilləri verən
+statik fayl xidməti, QD-018).
 
 ⚠️ **Sprint 2 (Blok 14B/14C)** paylaşım/xatirə/tədbirə yazma səthi əlavə etdi:
 `POST /cohorts/{slug}/{posts,memories,events}` + `GET/PATCH/DELETE
@@ -274,8 +308,8 @@ altındadır (290 `.tsx` faylının böyük hissəsi).
 ## 5. Testlər
 
 ```bash
-npm run test                       # Vitest — 1773 test / 66 fayl (≈47 san)
-npx playwright test --list | tail -1                                   # → 216 / 22
+npm run test                       # Vitest — 1833 test / 67 fayl (≈81 san)
+npx playwright test --list | tail -1                                   # → 220 / 22
 npx playwright test --config playwright.dev.config.ts --list | tail -1 # → 1 / 1
 find src tests \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) | wc -l
 ls tests/integration/*.ts | wc -l  # → 16
@@ -283,15 +317,19 @@ ls tests/integration/*.ts | wc -l  # → 16
 
 | Dəst | Test | Fayl | Əmr |
 |---|---|---|---|
-| Vahid + inteqrasiya (Vitest) | **1773** | **66** | `npm run test` |
-| E2E — istehsal build-i (Playwright) | **216** | **22** | `npm run build && npm run test:e2e` |
+| Vahid + inteqrasiya (Vitest) | **1833** | **67** | `npm run test` |
+| E2E — istehsal build-i (Playwright) | **220** | **22** | `npm run build && npm run test:e2e` |
 | E2E — dev smoke («F5 işləyirmi?») | **1** | **1** | `npm run test:e2e:dev` |
-| **E2E cəmi** | **213** | **21** | |
-| Test faylı — hamısı | | **86** | |
+| Test faylı — hamısı | | **90** | |
 | Real bazaya qarşı işləyən inteqrasiya faylı | | **16** | `tests/integration/` |
 
-**Ölçülmüş icra müddəti:** `npm run test` → **46.1 saniyə** (65 fayl, 1759 test,
-hamısı keçir).
+⚠️ **«E2E cəmi» sətri SİLİNDİ.** Əvvəl orada 213 / 21 yazılırdı, halbuki
+yuxarıdakı iki sətrin cəmi 217 / 23 edirdi — sətir nə cəm, nə də ayrıca ölçmə
+idi. Dev smoke AYRI konfiqdədir (`playwright.dev.config.ts`) və əsas dəstlə
+birlikdə işlədilmir; ona görə iki rəqəm ayrı saxlanılır.
+
+**Ölçülmüş icra müddəti:** `npm run test` → **81.0 saniyə** (67 fayl, 1833 test,
+hamısı keçir) · `npm run test:e2e` → **8.2 dəqiqə** (220 test, `workers: 1`).
 
 ⚠️ **Sprint 2:** `tests/integration/posts-crud.db.test.ts` (Blok 14B — paylaşım
 mutasiya xəta xəritələməsi və məxfilik reqressiyaları) yeni əlavə olundu.
@@ -314,7 +352,7 @@ done
 | `src/lib/visibility.test.ts` | 50 |
 | `src/features/feed/fanout.test.ts` | 40 |
 | `src/lib/career-stats.test.ts` | 30 |
-| `src/lib/api/openapi.test.ts` | 25 |
+| `src/lib/api/openapi.test.ts` | 55 |
 | `tests/integration/visibility.db.test.ts` | 25 |
 | `tests/integration/profile.db.test.ts` | 20 |
 
@@ -327,7 +365,7 @@ npm run git:log            # son sətir: "N commit."
 npm run git:log | tail -1
 ```
 
-**Nəticə: 41 commit.**
+**Nəticə: 50 commit.**
 
 ⚠️ Layihə mühitində **`git` binarı yoxdur** — commit-lər `isomorphic-git` ilə
 yazılır (`scripts/git.mjs`), amma nəticə standart `.git` qovluğudur və
@@ -338,14 +376,23 @@ quraşdırılmış maşında eyni rəqəm belə alınır:
 git rev-list --count HEAD
 ```
 
-**Sızma auditi** (`npm run git:audit`, son icra `2026-07-31`):
+**Sızma auditi** (`npm run git:audit`, son icra `2026-08-18`):
 
 | Ölçü | Rəqəm |
 |---|---|
-| Gəzilən commit | 33 |
-| Unikal blob | 871 |
+| Gəzilən commit | 50 |
+| Unikal yol | 671 |
+| Unikal blob | 1036 |
+| İndeksdə izlənən fayl | 665 |
 | Bloklayan tapıntı | **0** |
 | Xəbərdarlıq | **0** |
+
+⚠️ **Bu cədvəl auditin İŞLƏDİLDİYİ ANI göstərir** — yəni Blok 12F-in öz
+commit-lərindən ƏVVƏLKİ vəziyyəti. Audit hər dəfə `docs/git-audit-report.md`-i
+yenidən yazır, ona görə **canlı rəqəm həmişə həmin hesabatdadır**; buradakı
+sətir onun surətidir və hər commit-dən sonra bir addım geridə qalır. Cari dəyər
+üçün `npm run git:audit` işlət — sənədi «düzəltmək» üçün sonsuz təqib lazım
+deyil, mənbə hesabatdır.
 
 Hesabat: [`git-audit-report.md`](git-audit-report.md).
 
@@ -363,10 +410,11 @@ npx tsc --noEmit && npm run lint && npm run build
 | Ölçü | Nəticə | Mənbə |
 |---|---|---|
 | Lighthouse **desktop** — 5 səhifə | **100 / 100 / 100 / 100** | `docs/quality-report-12c.md` §2.1 |
+| Donut — bitişik dilim kontrastı (2·4·6 dilim) | **≥ 3:1** | `docs/quality-report-12c.md` §6 |
 | Lighthouse **mobil** (yavaş 4G + 4× CPU) | 87–94 Performance | §2.2 |
 | WCAG 2.2 AA — axe, 12 səhifə × 2 vəziyyət | pozuntu yoxdur | `tests/e2e/a11y.spec.ts` |
 | Toxunma hədəfi — 24px qapısı (SC 2.5.8) | sıfır tapıntı | §3.2 |
-| Üfüqi sürüşmə — 5 breakpoint × 10 səhifə | sıfır | §3.1 |
+| Üfüqi sürüşmə — **51 səhifə × 5 breakpoint = 255 yoxlama** | sıfır | `tests/e2e/responsive.spec.ts` |
 | Tip yoxlaması · lint · build | üçü də təmiz | `npx tsc --noEmit && npm run lint && npm run build` |
 
 ---
@@ -389,9 +437,14 @@ echo "komponent:       $(find src/components -name '*.tsx' ! -name '*.test.tsx' 
 echo "feature modulu:  $(ls -d src/features/*/ | wc -l)"
 echo "servis:          $(ls src/services/*.ts | grep -v '\.test\.' | wc -l)"
 echo "test faylı:      $(find src tests \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) | wc -l)"
+echo "route.ts:        $(find src/app -name 'route.ts' | wc -l)"
+# ⚠️ bu grep 51 verir — `[...nextauth]` destrukturlaşdırmasını GÖRMÜR (+2 = 53)
+echo "kod HTTP op:     $(grep -rhoE 'export (async function|function|const) (GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)\b' src/app/api --include=route.ts | wc -l)"
+npm run docs:openapi | tail -1          # → "38 path / 48 operation"
 npm run git:log | tail -1
 npm run test 2>&1 | grep -E 'Test Files|Tests'
 npx playwright test --list 2>&1 | tail -1
+npm run build 2>&1 | grep -cE '^[├└│]?[[:space:]]*[○ƒ●][[:space:]]'   # → build route sayı
 ```
 
 ---

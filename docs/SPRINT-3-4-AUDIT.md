@@ -6,6 +6,23 @@
 >
 > ⚠️ **Sənədin məqsədi layihəni yaxşı göstərmək DEYİL.** Rəqəmlərin bir hissəsi
 > yüksəkdir, bir hissəsi aşağı — ikisi də olduğu kimi verilib.
+>
+> 🔴 **BU AUDİT `d132a3e` ANININ ŞƏKLİDİR VƏ SONRADAN YENİDƏN YAZILMIR.**
+> Auditin nəticələrini sonrakı işlə «düzəltmək» onu audit olmaqdan çıxarardı.
+> Ondan sonra bloklar 12A–12F işlədi və auditin bir neçə tapıntısı BAĞLANDI:
+>
+> | Auditdəki tapıntı | Sonrakı vəziyyət |
+> |---|---|
+> | Deploy başlanmayıb (Sprint 3-ün rədd səbəbi) | `Dockerfile` + `fly.toml` + `docker-entrypoint.sh` + `npm run deploy` — **QD-018** (blok 12A) |
+> | Responsive yalnız **11/51** səhifədə ölçülüb (§10) | **51 × 5 = 255** yoxlama, `tests/e2e/responsive.spec.ts` |
+> | Swagger **52/53** — `GET /api/v1/openapi.json` elan edilməyib (B5) | Bağlandı: **48 sənəddə + 5 ağ siyahıda = 53/53** |
+> | Xəritədə zoom/pan yoxdur (B1) | `MapZoom.tsx` — klaviatura idarəsi ilə (blok 12F) |
+> | Donut kontrastı ölçülməyib | `quality-report-12c.md` §6 (blok 12F) |
+> | B1: toplu moderasiya · CMS-də yaratma · `/admin/stats` filtri · ikinci dərəcəli kohort rolu | Dördü də bağlanıb — `moderation.service.ts:698` · `admin-content.service.ts:254/398/558` · `admin/stats/page.tsx:35` · `admin-users.service.ts:410` (e2e: `admin.spec.ts:314,555,732,902`) |
+> | README-də deploy bölməsi yoxdur | README → «Deploy — canlı versiya» |
+>
+> **Buradakı test/route/commit rəqəmləri həmin anındır. CARİ rəqəmlər üçün →
+> [`METRICS.md`](METRICS.md).**
 
 ---
 

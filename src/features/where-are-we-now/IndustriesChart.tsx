@@ -13,10 +13,14 @@
 // ============================================================================
 // Dörd kanal birlikdə işləyir və heç biri digərini əvəz etmir:
 //
-//   1. RƏNG — `palette.ts` → `sliceFill()`. Ardıcıl ku-green şkalası; pillələr
-//      növbələşdirilir, yəni yan-yana duran hər iki dilim arasında ƏN AZI 2
-//      pillə parlaqlıq fərqi var (`palette.test.ts` ölçür, dairə qapalı
-//      sayılır: son dilim ilkin qonşusudur).
+//   1. RƏNG — `palette.ts` → `sliceFill()`. Ardıcıl ku-green şkalası; pillə
+//      sırası QAPALI halqada ən pis qonşu kontrastını maksimum edəcək şəkildə
+//      seçilib (`palette.test.ts` WCAG düsturu ilə ÖLÇÜR — pillə sayı ilə yox).
+//      Dilim sayı `MAX_DONUT_SLICES` = 6 ilə kəsilir, çünki 3:1 hüdudu yalnız
+//      oraya qədər tutur; qalanı «Digər»ə yığılır (`donut-slices.ts`).
+//      ⚠️ 3 və 5 dilim halında 3:1 RİYAZİ olaraq mümkün deyil (şkalanın
+//      diapazonu 8.53 < 9) — orada sərhədi `paddingAngle` + səth rəngli kontur
+//      verir, yəni ayırdedilmə rəng kontrastından asılı qalmır.
 //   2. FAİZ ETİKETİ — hər dilimin üzərində. Rəngsiz oxunur.
 //   3. LEQENDA — ad + say + faiz. Rəngdən TAM asılı olmayan kanal.
 //   4. VURĞU — hover VƏ fokus. Leqenda sətirləri əsl `<button>`-dur: SVG
@@ -42,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { ChartFrame } from "./ChartFrame";
 import { StatsTable } from "./StatsTable";
 import { MAP_TAB_META } from "./catalog";
+import { toDonutSlices } from "./donut-slices";
 import { sliceFill } from "./palette";
 
 export function IndustriesChart({ cell }: { cell: StatsCell<StatsBucket> }) {
@@ -54,11 +59,9 @@ export function IndustriesChart({ cell }: { cell: StatsCell<StatsBucket> }) {
 
   const activeKey = hoverKey ?? pinnedKey;
 
-  const data = cell.visible.map((bucket) => ({
-    key: bucket.key,
-    label: industryLabel(bucket.key),
-    count: bucket.count,
-  }));
+  // ⚠️ Donut ƏN ÇOX `MAX_DONUT_SLICES` dilim göstərir (kontrast hüdudu —
+  // `palette.ts`); qalan kateqoriyalar «Digər»ə yığılır. CƏDVƏL yığılmır.
+  const data = toDonutSlices(cell.visible, industryLabel);
 
   const disclosedTotal = data.reduce((sum, item) => sum + item.count, 0);
 
@@ -79,7 +82,12 @@ export function IndustriesChart({ cell }: { cell: StatsCell<StatsBucket> }) {
         <StatsTable
           caption="Fəaliyyət sahələri üzrə məzun sayı"
           columnLabel="Sahə"
-          rows={data.map((item) => ({ label: item.label, count: item.count }))}
+          // 🔴 `data` DEYİL, `cell.visible` — cədvəl əlçatan alternativdir və
+          // donut-un rəng hüdudu ona görə məlumat gizlətməməlidir.
+          rows={cell.visible.map((bucket) => ({
+            label: industryLabel(bucket.key),
+            count: bucket.count,
+          }))}
           undisclosedCount={undisclosedTotal(cell)}
           total={cellTotal(cell)}
         />
@@ -174,6 +182,14 @@ export function IndustriesChart({ cell }: { cell: StatsCell<StatsBucket> }) {
                   />
                   <span className="min-w-0 flex-1 truncate text-text-primary">
                     {item.label}
+                    {/* Yığılmış xana GİZLƏTMİR — neçə sahədən ibarət olduğunu
+                        yazır. Tam bölgü aşağıdakı cədvəldədir. */}
+                    {item.mergedCount > 1 ? (
+                      <span className="text-text-secondary">
+                        {" "}
+                        ({item.mergedCount} sahə)
+                      </span>
+                    ) : null}
                   </span>
                   <span className="tabular-nums text-text-secondary">
                     {item.count} · {percentOf(item.count)}%
