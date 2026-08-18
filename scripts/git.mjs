@@ -72,6 +72,61 @@ function parseFlags(argv) {
   return { flags, positional };
 }
 
+/**
+ * Tokeni tapır: `GITHUB_TOKEN` → `GH_TOKEN` → `.env.local`.
+ *
+ * 🔴 `.env.local` `.gitignore`-dakı `.env*` qaydası ilə örtülür (`!.env.example`
+ * istisnadır) — yəni token repoya düşmür. Fayl YALNIZ oxunur, ora heç nə yazılmır.
+ */
+async function loadToken() {
+  const fromEnv = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  if (fromEnv) return fromEnv.trim();
+
+  const content = await fsp
+    .readFile(path.join(REPO_ROOT, ".env.local"), "utf8")
+    .catch((error) => {
+      if (error.code === "ENOENT") return "";
+      throw error;
+    });
+
+  for (const line of content.split("\n")) {
+    const match = /^\s*(?:export\s+)?(GITHUB_TOKEN|GH_TOKEN)\s*=\s*(.*)$/.exec(line);
+    if (!match) continue;
+
+    // Dırnaqlar və sətir sonu şərhi təmizlənir.
+    const value = match[2].trim().replace(/^(['"])(.*)\1$/, "$2").trim();
+    if (value) return value;
+  }
+
+  return "";
+}
+
+/** `.env.local`-dan (və ya mühitdən) remote ünvanı — token URL-ə HEÇ VAXT qoşulmur. */
+async function loadRemoteUrlFromEnv() {
+  if (process.env.GIT_REMOTE_URL) return process.env.GIT_REMOTE_URL.trim();
+
+  const content = await fsp
+    .readFile(path.join(REPO_ROOT, ".env.local"), "utf8")
+    .catch(() => "");
+
+  const match = /^\s*(?:export\s+)?GIT_REMOTE_URL\s*=\s*(.*)$/m.exec(content);
+  if (!match) return "";
+
+  return match[1].trim().replace(/^(['"])(.*)\1$/, "$2").trim();
+}
+
+/**
+ * 🔴 TƏLƏ A — token log-a düşməməlidir.
+ *
+ * isomorphic-git xətaları BƏZƏN tam URL-i qaytarır və `https://tok@host` forması
+ * tokeni ekrana çıxarardı. İki qat təmizlik: (1) URL-dəki etimadnamə hissəsi,
+ * (2) tokenin özü — çünki o, URL-dən kənarda da (məs. başlıqda) görünə bilər.
+ */
+function redact(message, token) {
+  const value = String(message ?? "").replace(/(https:\/\/)[^@\s/]+@/g, "$1***@");
+  return token ? value.split(token).join("***") : value;
+}
+
 /** `.gitignore`-i oxuyub `ignore()` matcher qurur. `.git`-in özü HƏMİŞƏ xaric. */
 async function loadIgnoreMatcher() {
   const matcher = ignoreLib();
@@ -245,29 +300,40 @@ async function cmdLog() {
  * Əsl push üçün `npm run git:push` (`scripts/git-push.mjs`) işlət.
  */
 async function cmdPush(flags) {
-  const token = process.env.GITHUB_TOKEN;
+  const token = await loadToken();
   if (!token) {
-    // ⚠️ Nümunədə token ƏMR SƏTRİNƏ yazılmır: `VAR=dəyər əmr` forması bash
-    // tarixçəsinə düşür. `read -rs` isə tokeni ekrana da, tarixçəyə də vermir.
+    // 🔴 Uydurma yoxdur: token yoxdursa BİR sətir göstəriş verilir və dayanılır.
     throw new Error(
-      "GITHUB_TOKEN mühit dəyişəni boşdur. İstifadə:\n" +
-        '  read -rsp "PAT: " GITHUB_TOKEN && export GITHUB_TOKEN\n' +
-        "  node scripts/git.mjs push --url https://github.com/user/repo.git",
+      "GITHUB_TOKEN=... və GIT_REMOTE_URL=https://github.com/<user>/<repo>.git " +
+        "dəyərlərini .env.local-a əlavə edin, sonra `node scripts/git.mjs push`",
     );
   }
 
   const remotes = await git.listRemotes({ fs, dir: REPO_ROOT });
   const existing = remotes.find((r) => r.remote === "origin");
 
-  let url = flags.url ?? existing?.url;
-  if (!url) throw new Error("Remote ünvanı yoxdur — `--url https://github.com/user/repo.git` ver.");
+  let url = flags.url ?? existing?.url ?? (await loadRemoteUrlFromEnv());
+  if (!url) {
+    throw new Error(
+      "GITHUB_TOKEN=... və GIT_REMOTE_URL=https://github.com/<user>/<repo>.git " +
+        "dəyərlərini .env.local-a əlavə edin, sonra `node scripts/git.mjs push`",
+    );
+  }
+
+  // 🔴 TƏLƏ B — `.git/config` gitignore-da DEYİL, yəni ora yazılan token repoya
+  // düşərdi. Remote ünvanı həmişə etimadnaməsiz saxlanılır; token yalnız
+  // runtime-da `onAuth` ilə verilir.
+  const sanitized = url.replace(/^(https:\/\/)[^@\s/]+@/, "$1");
+  if (sanitized !== url) {
+    console.warn("⚠️  Remote URL-dəki etimadnamə çıxarıldı — `.git/config`-ə tokensiz yazılır.");
+    url = sanitized;
+  }
 
   if (!existing) {
     await git.addRemote({ fs, dir: REPO_ROOT, remote: "origin", url });
-  } else if (flags.url && flags.url !== existing.url) {
+  } else if (url !== existing.url) {
     await git.deleteRemote({ fs, dir: REPO_ROOT, remote: "origin" });
-    await git.addRemote({ fs, dir: REPO_ROOT, remote: "origin", url: flags.url });
-    url = flags.url;
+    await git.addRemote({ fs, dir: REPO_ROOT, remote: "origin", url });
   }
 
   // Şəbəkə hissəsi yalnız BURADA yüklənir (bax faylın başlığı).
@@ -281,23 +347,59 @@ async function cmdPush(flags) {
 
   console.log(`→ ${url}  (${branch}, ${commits.length} commit)`);
 
-  const result = await git.push({
-    fs,
-    http,
-    dir: REPO_ROOT,
-    remote: "origin",
-    ref: branch,
-    force: Boolean(flags.force),
-    // GitHub PAT: istifadəçi adı kimi token kifayətdir, parol boş qalır.
-    onAuth: () => ({ username: token }),
-    onMessage: (message) => process.stdout.write(`  ${message}`),
-  });
+  // GitHub PAT üçün iki qəbul olunan Basic-auth forması. Sıra ilə sınanır:
+  // birincisi 401 versə, ikincisi ilə TƏKRAR cəhd olunur.
+  const authVariants = [
+    { label: "x-access-token", onAuth: () => ({ username: "x-access-token", password: token }) },
+    { label: "token:x-oauth-basic", onAuth: () => ({ username: token, password: "x-oauth-basic" }) },
+  ];
 
-  if (result.ok === false || result.error) {
-    throw new Error(`push rədd edildi: ${result.error ?? "naməlum səbəb"}`);
+  let result;
+  let lastError;
+
+  for (const variant of authVariants) {
+    try {
+      result = await git.push({
+        fs,
+        http,
+        dir: REPO_ROOT,
+        remote: "origin",
+        ref: branch,
+        // 🔴 force HEÇ VAXT avtomatik deyil — yalnız açıq `--force` bayrağı ilə.
+        force: Boolean(flags.force),
+        ...variant,
+        // ⚠️ `onAuthFailure` OLMADAN isomorphic-git eyni etimadnamə ilə sonsuz
+        // təkrar edir — 401-də dərhal dayandırılır ki, növbəti varianta keçək.
+        onAuthFailure: () => ({ cancel: true }),
+        onMessage: (message) => process.stdout.write(`  ${redact(message, token)}`),
+      });
+      lastError = undefined;
+      break;
+    } catch (error) {
+      lastError = error;
+      console.warn(`  ⚠️  auth forması «${variant.label}» alınmadı, növbəti sınanır.`);
+    }
   }
 
-  console.log(`✓ göndərildi → ${url.replace(/\.git$/, "")}`);
+  if (lastError) {
+    throw new Error(`autentifikasiya alınmadı: ${redact(lastError.message, token)}`);
+  }
+
+  // ⚠️ Rədd edilmiş push-da HTTP statusu 200 OLUR — səbəb `result.refs`
+  // altındadır. Yalnız üst səviyyəyə baxsaq, uğursuz push «uğurlu» görünərdi.
+  const rejected = Object.entries(result.refs ?? {}).filter(([, info]) => info?.ok === false);
+
+  if (result.ok === false || result.error || rejected.length > 0) {
+    const reason =
+      result.error ?? rejected.map(([ref, info]) => `${ref}: ${info.error}`).join("; ");
+    // 🔴 force ETMİRİK — səbəb yazılır, qərar istifadəçinindir.
+    throw new Error(
+      `push rədd edildi: ${redact(reason || "naməlum səbəb", token)}\n` +
+        "  (force push edilmədi — tarixçə qorunur)",
+    );
+  }
+
+  console.log(`✓ göndərildi → ${redact(url.replace(/\.git$/, ""), token)}  (${branch})`);
 }
 
 async function main() {
@@ -324,6 +426,8 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`✗ ${error.message}`);
+  // 🔴 TƏLƏ A — son müdafiə xətti: buraya çatan İSTƏNİLƏN mesaj (stack izi
+  // daxil) tokendən və URL etimadnaməsindən təmizlənir.
+  console.error(`✗ ${redact(error.message, process.env.GITHUB_TOKEN || process.env.GH_TOKEN)}`);
   process.exitCode = 1;
 });
