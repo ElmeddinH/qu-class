@@ -18,7 +18,7 @@ o rəqəmi göstərməlidir. Geridə qalsan §7-dəki «kəsilə bilən» siyah�
 | **3:30–5:00** | **🔒 ZİRVƏ 2 — «İndi haradayıq?»** | k-anonimlik · razılığın geri alınması |
 | 5:00–5:45 | `/timeline` + `/yearbook` | Üç mərhələnin nəticəsi |
 | 5:45–6:35 | `/admin` + `/admin/audit` | Moderasiya və dəyişdirilə bilməyən iz |
-| 6:35–7:20 | `/docs` + terminal | Swagger · 1833 test |
+| 6:35–7:20 | `/docs` + terminal | Swagger · 1844 test |
 | 7:20–8:00 | Bağlanış | Bilinən məhdudiyyətlər — dürüst |
 
 ---
@@ -356,7 +356,7 @@ demo üçün seed sıfırlamağa ehtiyac qalmır.
 
 **Hərəkət:** terminala keç, hazır duran əmrə **Enter**: `npm run test`.
 
-> «Test işləyərkən deyim: **1833 vahid və inteqrasiya testi, 67 faylda.**
+> «Test işləyərkən deyim: **1844 vahid və inteqrasiya testi, 68 faylda.**
 > Üstəgəl 220 Playwright testi — onlar istehsal build-inə qarşı işləyir.
 >
 > Ən kritik olanı `tests/integration/visibility.db.test.ts`-dir: **real bazaya
@@ -387,7 +387,7 @@ demo üçün seed sıfırlamağa ehtiyac qalmır.
 > sosial paylaşma düymələri. Səbəb texniki maneə deyil — həmin blokun
 > tapşırığına salınmamışdı.
 >
-> Yekun: 17 modul, 51 səhifə, 28 data modeli, 36 endpoint, 1833 test.
+> Yekun: 17 modul, 51 səhifə, 28 data modeli, 36 endpoint, 1844 test.
 > Amma layihənin nüvəsi say deyil. Nüvə budur: **insanlar öz həyatlarını
 > yalnız kimin görəcəyini dəqiq bildikdə paylaşırlar.** Ona görə görünürlük
 > burada sonradan əlavə olunmuş filtr deyil — **hər sorğunun keçdiyi qapıdır**.

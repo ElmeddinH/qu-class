@@ -58,7 +58,7 @@ const passwordHash = hashSync("Test1234!", SEED_BCRYPT_SALT);
 ```
 
 **Niyə sabitdir:** `bcrypt` hər çağırışda təsadüfi duz yaradır. Seed isə
-**deterministik** olmalıdır — eyni əmr eyni bazanı verməlidir, yoxsa 1833 test
+**deterministik** olmalıdır — eyni əmr eyni bazanı verməlidir, yoxsa 1844 test
 və 220 E2E ssenarisi təkrar işlədiləndə fərqli nəticə alır.
 
 ### 🔴 Bu duz istehsal yoluna TOXUNMUR

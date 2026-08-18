@@ -113,7 +113,7 @@
 | F2. Sprint Review UI/UX problemləri aradan qaldırılmalı | ➖ aid deyil | Review qeydləri yoxdur | Qeydlərin özü | — |
 | F3. Responsive dizayn bütün səhifələrdə yoxlanılmalı və yekunlaşdırılmalı | ✅ tam *(Blok 12D)* | 51/51 səhifə × 5 breakpoint = 255 ölçmə; reqressiya qapısı `tests/e2e/responsive.spec.ts` | — | — |
 | F4. Dizayn ardıcıllığı (Design System consistency) tam təmin edilməli | ✅ tam | KUDS kontrast qaydalarının mənbə skanı: `src/lib/kuds-contrast.test.ts` · canlı bələdçi `/kuds` (`src/app/(app)/kuds/page.tsx`) · `src/components/ui/` toxunulmazdır | — | — |
-| F5. İstifadəçi təcrübəsi son dəfə optimallaşdırılmalı | ⚠️ qismən | axe 0 `serious`; Lighthouse mobil ən aşağı 87 (`docs/lighthouse/mobile/home.report.json`) | Loading state boşluğu (§8) birbaşa UX borcudur | (F4/Sprint3 ilə eyni) |
+| F5. İstifadəçi təcrübəsi son dəfə optimallaşdırılmalı | ⚠️ qismən | axe 0 `serious`; Lighthouse mobil ən aşağı **85** (`/admin`) — mənbə `docs/lighthouse/mobile/README.md` (git-də **izlənən** xülasə; `*.report.json` artefaktları `.gitignore:67-68` ilə istisna olunur) | Loading state boşluğu (§8) birbaşa UX borcudur | (F4/Sprint3 ilə eyni) |
 
 ### 3.3 Finalization Deliverables
 
@@ -132,7 +132,7 @@
 | 1. Layihə 100% tamamlanmışdır | ⚠️ qismən | PLAN.md miqyasında 100%, lakin STATE.md-də açıq borclar var (§11) |
 | 2. Əvvəlki Sprint Review problemləri aradan qaldırılmışdır | ➖ aid deyil | Problem siyahısı repoda yoxdur |
 | 3. Bütün funksionallıqlar tam işlək vəziyyətdədir | ⚠️ qismən | Lokalda 1759 vitest + 212 e2e; şifrə bərpası kimi axınlar yoxdur |
-| 4. Frontend və Backend tam inteqrasiya olunmuşdur | ✅ tam | Vahid Next.js App Router monolit (`docs/DECISIONS.md` QD-004, sətir 148-161); CORS/ayrı deploy problemi yoxdur |
+| 4. Frontend və Backend tam inteqrasiya olunmuşdur | ✅ tam | Vahid Next.js App Router monolit (`docs/DECISIONS.md` QD-003 «Tək repo, tək proses — ayrı backend YOXDUR»); CORS/ayrı deploy problemi yoxdur |
 | 5. Deploy edilmiş layihə problemsiz işləyir | ❌ yox | Deploy yoxdur |
 | 6. Swagger və layihə sənədləşməsi tam yenilənmişdir | ⚠️ qismən | Swagger 52/53; README-də deploy bölməsi yoxdur |
 | 7. Responsive dizayn bütün səhifələrdə düzgün işləyir | ✅ tam *(Blok 12D)* | 51/51 səhifə × 5 breakpoint = 255 ölçmə (F3) |

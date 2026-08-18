@@ -56,7 +56,7 @@ Səbəblər:
    işləməyən düymədir — mövcud olmayan funksiyadan da pisdir, çünki gözlənti
    yaradır.
 2. **Sxem dəyişikliyi bu mərhələdə risklidir.** Token cədvəli yeni miqrasiya
-   deməkdir; miqrasiya isə seed determinizminə və **1833 testin** oxuduğu
+   deməkdir; miqrasiya isə seed determinizminə və **1844 testin** oxuduğu
    bazaya toxunur. Fayda sıfırdır (bax 1), risk realdır.
 3. **Yarımçıq təhlükəsizlik axını təhlükəlidir.** «Müvəqqəti şifrəni ekranda
    göstər» kimi həllər hesab ələ keçirmə vektorudur. Zəif axın YOXLUQDAN pisdir.

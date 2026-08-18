@@ -2168,3 +2168,73 @@ işarələndi.
 
 Kod və sənəd tərəfində bağlanmamış tapıntı yoxdur. Açıq qalan yeganə şey
 əvvəlki kimidir: **`FLY_API_TOKEN`** — canlı URL yalnız ondan asılıdır.
+
+---
+
+## Sprint 3/4 — Blok 14 — QİSMƏN (deploy icra EDİLMƏDİ: token verilmədi)
+
+**Blokun məqsədi** beş meyarı (S3-2, S3-3, S3-7, S4-5, S4-8) deploy ilə
+bağlamaq idi. **Bağlanmadı** — ADDIM 1-in şərti (`FLY_API_TOKEN` mühitdə)
+ödənmədi. Deploy-dan asılı olmayan hissələr (ADDIM 5, 7) **tam icra olundu**.
+
+### 1. 🔴 Deploy — dayanma nöqtəsi (ADDIM 1–4)
+
+`FLY_API_TOKEN` heç bir yerdə yoxdur: mühit dəyişəni · `.env` · `.env.local` ·
+`~/.fly/config.yml` (yalnız `auto_update:`). `flyctl auth whoami` →
+`no access token available`. Ölçmə: `getent hosts qu-class.fly.dev` → qeyd
+yoxdur; `curl https://fly.io` → **200** (nəzarət — şəbəkə işləkdir).
+`npm run deploy:plan` → exit 0, `app=qu-class region=fra volume=qu_data`.
+
+Tapşırıq «yoxdursa DAYAN, heç nə uydurma» deyirdi — dayanıldı. **ADDIM 2, 3, 4
+icra edilmədi və nəticələri uydurulmadı.** TƏLƏ A–F (app adı toqquşması,
+kredit kartı, volume regionu, ilk deploy log-u, `__Secure-` kukisi, 429) heç
+biri yaşanmadı, çünki deploy başlamadı.
+
+### 2. Üç yanlış sənəd iddiası düzəldildi (ADDIM 5) — üstəlik 4-cü tapıldı
+
+| Fayl | Düzəliş |
+|---|---|
+| `docs/SPRINT-3-4-AUDIT.md` | QD-004 → **QD-003**; kövrək «sətir 148-161» silindi |
+| `docs/SPRINT-3-4-AUDIT.md` | mobil minimum 87 → **85** (`/admin`), mənbə izlənən README |
+| `docs/quality-report-12c.md` | §0 sətri 87 → **85** + ¹ qeyd; §2.2-yə «tarixi qaçış» göstəricisi |
+| `docs/METRICS.md` **(auditdə YOX idi)** | §7 «87–94» → **«85–91»**, mənbə `§2.2` → izlənən README |
+
+🔴 **Rəqəm artefaktdan hesablandı, sənəddən köçürülmədi:**
+`categories.performance.score × 100` → `/admin` **85** · `/home` 86 ·
+`/directory` 88 · `/` 91 · `/map` 91.
+
+⚠️ **Dəqiqləşdirmə.** Audit bunu «daxili ziddiyyət» adlandırmışdı; əslində
+`quality-report-12c.md` §2.2 **12C dövrünün qaçışıdır** (orada minimum həqiqətən
+87 idi), artefaktlar isə müdafiə blokunda yenidən ölçülüb. Ona görə §2.2
+geriyə dönük **yazılmadı** — tarixi qeyd kimi saxlanıb, üzərinə göstərici
+qoyulub.
+
+### 3. 🔴 TƏLƏ G — drift sinfi qapıya bağlandı
+
+Yeni: `src/lib/docs-metrics.test.ts` (**11 test**). Sənəddəki rəqəm **oxunur**,
+koddan **hesablanır**, tutuşdurulur: Prisma modeli · miqrasiya · səhifə ·
+`/api/v1` endpoint · komponent · feature · servis · `CONTROLLED_PROFILE_FIELDS`
+(**22**) · `FieldVisibility` 125×22=2750 · Lighthouse mobil diapazonu.
+
+**Mutasiya ilə yoxlandı:** sənəddə 3 rəqəm pozuldu → **4 test qırıldı**,
+o cümlədən `expected 85 to be 87` — yəni qoruyucu **məhz auditin tapdığı
+səhvi** təkrar tutur. Mutasiyalar geri qaytarıldı.
+
+⚠️ Test sayı / commit sayı / sətir sayı **qəsdən** yoxlanmır — dairəvidir.
+
+### Toxunulmayanlar
+
+`prisma/schema.prisma` · `prisma/migrations/` · `src/services/storage.ts` ·
+`src/components/ui/` · deploy artefaktları. **Yeni asılılıq YOX.** Kod məntiqi
+dəyişmədi — yalnız sənəd mətnləri + bir yeni test faylı.
+
+`docs/DECISIONS.md` QD-018-ə sətir **əlavə edilmədi**: app adı və konfiq
+dəyişmədi (deploy başlamadı). `README.md`-dəki canlı ünvan sətri
+(`README.md:472`) **olduğu kimi saxlanıldı** — o, artıq dürüstdür («deploy əmri
+işlədildikdən sonra aktivləşir»), uydurma URL yazmaq olmazdı.
+
+### Dayanma nöqtəsi
+
+Əvvəlki kimi: **`FLY_API_TOKEN`**. Kod və sənəd tərəfində bağlanmamış tapıntı
+yoxdur; hər iki sprintin hökmü **QƏBUL OLUNMUR** olaraq qalır, çünki mərkəzi
+meyar deploy tələb edir. Bax `docs/HANDOVER-AUDIT.md` §12.

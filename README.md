@@ -26,7 +26,7 @@ layihədə sonradan əlavə olunan filtr deyil, **hər sorğunun keçdiyi qapıd
 4 səviyyə, sahə-səviyyə nəzarət, aqreqasiya üçün ayrıca razılıq.
 
 **NƏTİCƏ.** 17 modulun hamısı işlək · 51 səhifə · 28 data modeli ·
-36 REST endpoint · **1833 vahid/inteqrasiya + 220 E2E testi keçir** ·
+36 REST endpoint · **1844 vahid/inteqrasiya + 220 E2E testi keçir** ·
 Lighthouse desktop **100/100/100/100** (5 səhifə) · WCAG 2.2 AA qapısı bağlıdır.
 
 > 📊 Bütün rəqəmlərin ölçmə əmri ilə birlikdə tam siyahısı:
@@ -729,7 +729,7 @@ npm run free-port     # 3000-i tutan köhnə dev serveri dayandır
 npm run build         # istehsal build-i
 npm start             # istehsal serveri (build tələb edir)
 npm run lint          # ESLint
-npm run test          # Vitest — 1833 test / 67 fayl
+npm run test          # Vitest — 1844 test / 68 fayl
 npm run test:e2e      # Playwright — 220 test / 22 fayl (build tələb edir)
 npm run test:e2e:dev  # Playwright — dev smoke ("F5 işləyirmi?")
 npm run db:seed       # prisma db seed
@@ -764,7 +764,7 @@ Hər blokun sonunda üçü də təmiz olmalıdır:
 
 | Dəst | Say | Əmr |
 |---|---|---|
-| Vahid + inteqrasiya (Vitest) | **1833 test / 67 fayl** | `npm run test` |
+| Vahid + inteqrasiya (Vitest) | **1844 test / 68 fayl** | `npm run test` |
 | E2E (Playwright, istehsal build-i) | **220 test / 22 fayl** | `npm run build && npm run test:e2e` |
 | E2E dev smoke («F5 işləyirmi?») | **1 test** | `npm run test:e2e:dev` |
 

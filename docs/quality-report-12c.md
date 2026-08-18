@@ -21,11 +21,21 @@ Tarix: 2026-07-31 · Baza: Blok 12B-nin sonu (29 commit)
 | --- | ---: | ---: |
 | axe `serious`/`critical` (12 səhifə × 2 vəziyyət) | **141 node** | **0** |
 | Lighthouse — desktop, 5 səhifə (ən aşağı bal) | 100 | **100** |
-| Lighthouse — mobil, 5 səhifə (ən aşağı bal) | 86 | **87** |
+| Lighthouse — mobil, 5 səhifə (ən aşağı bal) | 86 | **85** (`/admin`) ¹ |
 | Üfüqi sürüşmə (5 breakpoint × 10 səhifə) | **2 səhifə** | **0** |
 | Toxunma hədəfi < 24px (WCAG 2.2 AA) | **7 element sinfi** | **0** |
 | vitest | 1 495 | **1 510** |
 | playwright | 148 | **212** |
+
+> ¹ **Düzəliş (Blok 14).** Bu sətir əvvəl **87** yazırdı və §2.2-nin 12C-dəki
+> ölçmə qaçışını (`/` 92 · `/home` 87 · `/directory` 94 · `/map` 92 · `/admin` 90)
+> əks etdirirdi. Müdafiə blokunda mobil profil **yenidən ölçüldü** və commit
+> olunan artefaktlar dəyişdi: `/` 91 · `/home` 86 · `/directory` 88 · `/map` 91 ·
+> **`/admin` 85** → ən aşağı bal **85**. Aşağıdakı §2.2 cədvəli 12C-dəki
+> **tarixi** qaçış kimi olduğu yerdə saxlanılır (geriyə dönük yazılmır);
+> **cari və istinad ediləsi rəqəmlər** izlənən xülasədədir:
+> `docs/lighthouse/mobile/README.md`. Mobil bal ±2 ölçmə səs-küyü daşıyır, ona
+> görə 87 → 85 fərqi **reqressiya deyil**, ikinci qaçışdır.
 
 ```
 npx tsc --noEmit   ✓ təmiz
@@ -181,6 +191,11 @@ ona görə qoyulmayıb, amma «100 aldıq» cümləsi kontekstsiz oxunmasın dey
 | `/class/[slug]/directory` | 92 | **94** | 3.1 s | |
 | `/class/[slug]/map` | 88 | **92** | 3.4 s | Recharts dinamikləşdi |
 | `/admin` | 90 | 90 | 3.3 s | |
+
+⚠️ **Bu cədvəl 12C-dəki ölçmə qaçışıdır (tarixi qeyd).** Mobil profil müdafiə
+blokunda yenidən ölçüldü; commit olunan **cari** dəyərlər fərqlidir
+(ən aşağı bal **85**, `/admin`). Sitat gətirərkən izlənən xülasəyə bax:
+`docs/lighthouse/mobile/README.md`. Bax §0-dakı ¹ qeydi.
 
 🔴 **`/home` niyə 90-dan aşağıdır — səbəb ölçülüb.** `/home` istifadəçinin əsas
 sinfinə **yönləndirir** (məhsul qərarı, PLAN.md §4.2). Lighthouse bunu

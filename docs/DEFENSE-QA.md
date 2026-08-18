@@ -15,7 +15,7 @@
    QD-011-dədir, açım?» tam qiymətli cavabdır.
 2. **Zəif nöqtəni özün aç.** Komissiya boşluğu səndən əvvəl tapsa mövqe itir;
    sən açsan mövqe güclənir (bax §6).
-3. **Rəqəm deyirsənsə mənbəyini de.** «1833 test» yox — «1833 test,
+3. **Rəqəm deyirsənsə mənbəyini de.** «1844 test» yox — «1844 test,
    `npm run test` ilə ölçülüb».
 
 | Qrup | Suallar |
@@ -244,7 +244,7 @@ yəni köhnə token adminlik verə bilmir (`docs/SECURITY.md` B1, §6).
 
 ## 5 · Test
 
-### S20. 1833 test nəyi qoruyur? Sadəcə rəqəm deyilmi?
+### S20. 1844 test nəyi qoruyur? Sadəcə rəqəm deyilmi?
 
 Rəqəm deyil, çünki testlərin çəkisi bərabər deyil — 13-ü **real bazaya qarşı**
 işləyən inteqrasiya faylıdır (`tests/integration/`). Onlar «UI-da göstərmirik»

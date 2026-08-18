@@ -33,7 +33,7 @@
 | React komponenti (`src/components/`) | **42** |
 | Xüsusiyyət modulu (`src/features/*`) | **24** |
 | Servis faylı (`src/services/*`) | **24** |
-| Vahid + inteqrasiya testi | **1833** (67 fayl) |
+| Vahid + inteqrasiya testi | **1844** (68 fayl) |
 | E2E testi | **220** (22 fayl) |
 | Commit | **51** |
 | Seed sətri (28 cədvəl) | **6323** |
@@ -308,7 +308,7 @@ altındadır (290 `.tsx` faylının böyük hissəsi).
 ## 5. Testlər
 
 ```bash
-npm run test                       # Vitest — 1833 test / 67 fayl (≈81 san)
+npm run test                       # Vitest — 1844 test / 68 fayl (≈48 san)
 npx playwright test --list | tail -1                                   # → 220 / 22
 npx playwright test --config playwright.dev.config.ts --list | tail -1 # → 1 / 1
 find src tests \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) | wc -l
@@ -317,7 +317,7 @@ ls tests/integration/*.ts | wc -l  # → 16
 
 | Dəst | Test | Fayl | Əmr |
 |---|---|---|---|
-| Vahid + inteqrasiya (Vitest) | **1833** | **67** | `npm run test` |
+| Vahid + inteqrasiya (Vitest) | **1844** | **68** | `npm run test` |
 | E2E — istehsal build-i (Playwright) | **220** | **22** | `npm run build && npm run test:e2e` |
 | E2E — dev smoke («F5 işləyirmi?») | **1** | **1** | `npm run test:e2e:dev` |
 | Test faylı — hamısı | | **90** | |
@@ -328,7 +328,7 @@ yuxarıdakı iki sətrin cəmi 217 / 23 edirdi — sətir nə cəm, nə də ayr�
 idi. Dev smoke AYRI konfiqdədir (`playwright.dev.config.ts`) və əsas dəstlə
 birlikdə işlədilmir; ona görə iki rəqəm ayrı saxlanılır.
 
-**Ölçülmüş icra müddəti:** `npm run test` → **81.0 saniyə** (67 fayl, 1833 test,
+**Ölçülmüş icra müddəti:** `npm run test` → **48.4 saniyə** (68 fayl, 1844 test,
 hamısı keçir) · `npm run test:e2e` → **8.2 dəqiqə** (220 test, `workers: 1`).
 
 ⚠️ **Sprint 2:** `tests/integration/posts-crud.db.test.ts` (Blok 14B — paylaşım
@@ -412,7 +412,7 @@ npx tsc --noEmit && npm run lint && npm run build
 |---|---|---|
 | Lighthouse **desktop** — 5 səhifə | **100 / 100 / 100 / 100** | `docs/quality-report-12c.md` §2.1 |
 | Donut — bitişik dilim kontrastı (2·4·6 dilim) | **≥ 3:1** | `docs/quality-report-12c.md` §6 |
-| Lighthouse **mobil** (yavaş 4G + 4× CPU) | 87–94 Performance | §2.2 |
+| Lighthouse **mobil** (yavaş 4G + 4× CPU) | **85–91** Performance (ən aşağı: `/admin`) | `docs/lighthouse/mobile/README.md` |
 | WCAG 2.2 AA — axe, 12 səhifə × 2 vəziyyət | pozuntu yoxdur | `tests/e2e/a11y.spec.ts` |
 | Toxunma hədəfi — 24px qapısı (SC 2.5.8) | sıfır tapıntı | §3.2 |
 | Üfüqi sürüşmə — **51 səhifə × 5 breakpoint = 255 yoxlama** | sıfır | `tests/e2e/responsive.spec.ts` |
