@@ -383,7 +383,25 @@ dayandırır. Portu başqa proqram tutubsa toxunmur, xəbərdarlıq yazır.
 
 Əl ilə: `npm run free-port`.
 
-### 5. VS Code-da F5
+### 5. Docker ilə (deploy ilə EYNİ image)
+
+Lokal `docker` quraşdırılıbsa canlı mühitin dəqiq kopyasını qaldırmaq olar —
+`npm install` da, Node versiyası da lazım deyil:
+
+```bash
+docker build -t qu-class .
+docker volume create qu-data
+docker run --rm -p 3000:3000 \
+  -v qu-data:/data \
+  -e AUTH_SECRET="$(openssl rand -base64 32)" \
+  -e AUTH_TRUST_HOST=true \
+  qu-class
+```
+
+Baza (`/data/qu.db`), demo datası və `uploads/` qovluğu `qu-data` volume-unda
+qalır — konteyneri silsən də itmir. Ətraflı: [Deploy](#deploy--canlı-versiya).
+
+### 6. VS Code-da F5
 
 **F5 → dev server qalxır → brauzer avtomatik açılır.** Başqa heç nə lazım deyil.
 
@@ -407,6 +425,144 @@ Səhv gedərsə bilməli olduğun iki şey:
 > gözləyir** — F5 basılır, heç nə olmur, xəta da görünmür. `serverReadyAction`
 > bu asılılığı tamamilə aradan qaldırır və Shift+F5 serveri də öldürür
 > (portda "zombi" `next-server` qalmır).
+
+---
+
+## Deploy — canlı versiya
+
+**Platforma:** Fly.io · **Baza:** SQLite, davamlı volume-da · **Image:** Docker (multi-stage)
+**Qərar sənədi:** [QD-018](docs/DECISIONS.md#qd-018--deploy-flyio--volume-postgresə-keçid-yox)
+
+| | |
+|---|---|
+| **Canlı ünvan** | `https://qu-class.fly.dev` — deploy əmri işlədildikdən sonra aktivləşir (aşağı) |
+| **Sağlamlıq** | `GET /api/v1/health` → `{"status":"ok"}` |
+| **API sənədi** | `/docs` (Swagger UI, oflayn aktivlərlə) · `/api/v1/openapi.json` |
+
+### Arxitektura
+
+```
+                    ┌──────────────────────────────────────┐
+   HTTPS (Fly edge) │  qu-class maşını · fra · TƏK instans  │
+   force_https ─────▶                                      │
+                    │  node server.js  (Next standalone)   │
+                    │        │                             │
+                    │        ├── SQLite  ──▶ /data/qu.db   │
+                    │        └── uploads ──▶ /data/uploads │◀── simvolik keçid
+                    └──────────────────┬───────────────────┘    public/uploads-dan
+                                       │
+                                 Fly volume «qu_data» (1 GB)
+                                 deploy-lar arasında YAŞAYIR
+```
+
+**Üç fayl bu quruluşu daşıyır:**
+
+| Fayl | Rolu |
+|---|---|
+| [`Dockerfile`](Dockerfile) | `deps → builder → migrator → runner`. Builder-də `prisma generate`, `npm run build` (→ `prebuild` Swagger aktivlərini yığır) və **demo bazasının şablonu** hazırlanır |
+| [`docker-entrypoint.sh`](docker-entrypoint.sh) | Start ardıcıllığı: uploads keçidi → `prisma migrate deploy` → **şərti** seed → `node server.js` |
+| [`fly.toml`](fly.toml) | `internal_port 3000`, `force_https`, `/data` mount, **`min_machines_running = 1`** |
+
+### 🔴 Tək maşın — dəyişdirilməməli
+
+Fly volume-u **tək maşına** bağlıdır, paylaşılan disk deyil. İkinci maşın açılsa
+öz ayrıca volume-unu (öz **boş** bazasını) görər — iki istifadəçi eyni saytda iki
+fərqli baza ilə işləyər və heç bir xəta çıxmaz. Buna görə `fly.toml`-da:
+
+```toml
+auto_stop_machines   = "off"
+min_machines_running = 1
+primary_region       = "fra"   # TƏK region
+```
+
+`fly scale count 2` və ya ikinci region **əlavə etmə**.
+
+### Deploy əmri
+
+```bash
+# 1) Token: https://fly.io/user/personal_access_tokens
+# 2) Tokeni ƏMR SƏTRİNƏ argument kimi vermə — mühit dəyişəni kimi ver
+#    (`ps` çıxışı maşındakı hər prosesə görünür — bax docs/SECURITY.md §5)
+read -rsp "FLY_API_TOKEN: " FLY_API_TOKEN && export FLY_API_TOKEN \
+  && node scripts/deploy.mjs; unset FLY_API_TOKEN
+```
+
+`scripts/deploy.mjs` **idempotentdir** — hər addım əvvəlcə mövcudluğu yoxlayır:
+
+1. `flyctl` yoxdursa `~/.fly`-a quraşdırır (**`sudo` lazım deyil**)
+2. app yaradır (varsa keçir)
+3. `qu_data` volume yaradır, 1 GB (varsa keçir)
+4. sirrləri **stdin üzərindən** qoyur (`fly secrets import`, argv-dən yox)
+5. `fly deploy --remote-only` — image Fly-ın builder-ində qurulur, **lokal Docker tələb olunmur**
+
+Plan görmək (heç nə dəyişdirmir): `node scripts/deploy.mjs --dry-run`
+
+**Yenidən deploy** — eyni əmr. `AUTH_SECRET` bir dəfə qoyulur və sonra
+**toxunulmur** (dəyişsə bütün mövcud sessiyalar düşər).
+
+### Mühit dəyişənləri — tam siyahı
+
+| Dəyişən | Haradan gəlir | Məcburi | Nə edir |
+|---|---|---|---|
+| `DATABASE_URL` | `fly secrets` (skript qoyur) | ✅ | `file:/data/qu.db` — **volume-un içində**. Image-dəki yol olsaydı hər deploy-da sıfırlanardı |
+| `AUTH_SECRET` | `fly secrets` (skript **yaradır**) | ✅ | JWT imzası. 32 bayt təsadüfi |
+| `AUTH_URL` | `fly secrets` (skript qoyur) | ✅ | `https://<app>.fly.dev`. `https://` prefiksi kukini `__Secure-` + `secure` edir (`src/auth.config.ts:27`) |
+| `AUTH_TRUST_HOST` | `fly.toml` → `[env]` | ✅ | Auth.js v5-in proxy arxasındaki host yoxlaması. **`NEXTAUTH_URL` v5-də İŞLƏMİR** — o, v4 adıdır |
+| `PORT` · `DATA_DIR` | `fly.toml` → `[env]` | ✅ | `3000` · `/data` |
+| `LH_*` · `SHOTS_*` · `E2E_PORT` | — | ❌ | Yalnız audit alətləri (`npm run audit:*`), deploy-da işlədilmir |
+| `GITHUB_TOKEN` · `GIT_REMOTE_URL` | yalnız lokal mühit | ❌ | `node scripts/git.mjs push`. Serverdə **yeri yoxdur** |
+| `FLY_API_TOKEN` | yalnız lokal mühit | ❌ | `scripts/deploy.mjs`. Serverə **göndərilmir** |
+
+🔴 `fly.toml` repoya girir — ora **sirr yazılmır**. Sirrlər yalnız
+`fly secrets`-dədir və `fly secrets list` dəyəri yox, adı göstərir.
+
+### Demo datası nə vaxt yüklənir
+
+`docker-entrypoint.sh` `User` cədvəlini **sayır**:
+
+- **0 sətir** → build anında hazırlanmış demo şablonu yerinə qoyulur
+- **0-dan çox** → seed **atlanır**, istifadəçi datası toxunulmur
+
+Yoxlama fayl mövcudluğu ilə **deyil**: `/data/qu.db` `migrate deploy`-dan sonra
+həmişə mövcuddur, yəni fayl testi ilk deploy-dan sonra heç vaxt işləməzdi.
+Şablon `prisma/seed.ts`-in özündən doğur və seed deterministikdir (sabit `NOW`,
+sabit bcrypt duzu), yəni nəticə runtime-da seed etməklə eynidir.
+
+Bazanı **qəsdən** sıfırlamaq üçün:
+
+```bash
+flyctl ssh console --app qu-class -C "rm -f /data/qu.db"
+flyctl apps restart qu-class
+```
+
+### Yüklənmiş şəkillər deploy-dan sağ çıxır
+
+`public/uploads` **image-in içindədir** və hər deploy-da yeni image ilə
+sıfırlanır. Entrypoint onu silib `/data/uploads`-a **simvolik keçid** qoyur —
+`src/services/storage.ts` **dəyişmir**, kod yenə `public/uploads`-a yazır,
+sadəcə yolun arxasındakı disk volume-dur.
+
+⚠️ Buna əlavə olaraq [`src/app/uploads/[...path]/route.ts`](src/app/uploads/%5B...path%5D/route.ts)
+lazım oldu: Next.js istehsalda `public/` siyahısını **server başlayanda bir dəfə**
+oxuyur, yəni start-dan sonra yüklənən fayl serveri yenidən başlatmayana qədər
+404 verir. Səbəb və ölçmə: [`src/services/uploads-serve.ts`](src/services/uploads-serve.ts) başlığı.
+
+### Diaqnostika
+
+```bash
+flyctl logs --app qu-class                    # entrypoint addımları burada görünür
+flyctl status --app qu-class
+flyctl ssh console --app qu-class -C "ls -la /data /data/uploads"
+flyctl ssh console --app qu-class -C "ls -la /app/public/uploads"   # → simvolik keçid
+```
+
+| Simptom | Səbəb |
+|---|---|
+| Səhifə açılır, **CSS yoxdur** | `Dockerfile`-da `.next/static` və/və ya `public` kopyalanmayıb — standalone onları avtomatik gətirmir |
+| `Query engine ... not found` | `schema.prisma` → `binaryTargets` base image ilə uyğun deyil (`node:22-slim` → `debian-openssl-3.0.x`) |
+| Girişdən sonra **döngə** | `AUTH_URL` `https://` ilə başlamır, ya da `AUTH_TRUST_HOST` yoxdur |
+| `/docs` **ağ** açılır | Swagger aktivləri yığılmayıb — `prebuild` hook-u (`npm run docs:assets`) işləməyib |
+| Deploy-dan sonra **data itir** | Volume mount olunmayıb, ya `DATABASE_URL` `/data`-dan kənardır |
 
 ---
 

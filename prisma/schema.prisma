@@ -20,6 +20,20 @@
 
 generator client {
   provider = "prisma-client-js"
+
+  // 🔴 Query engine binar faylı HOST OS-ə görə yığılır. Konteynerin OS-i
+  // fərqlidirsə runtime-da «Query engine library ... not found» verir və
+  // tətbiq İLK DB sorğusunda çökür — build isə təmiz keçir, yəni səhv yalnız
+  // canlıda görünür.
+  //
+  // `debian-openssl-3.0.x` = `node:22-slim` (Debian bookworm, OpenSSL 3.0) —
+  // `Dockerfile`-dakı base image. `native` lokal inkişaf üçün saxlanılır.
+  // Base image dəyişsə bu sətir də dəyişməlidir:
+  //   node:22-alpine (musl) → "linux-musl-openssl-3.0.x"
+  //
+  // ⚠️ Bu, `datasource`-a TOXUNMUR: provider yenə `sqlite`, model dəyişikliyi
+  // yoxdur → YENİ MİQRASİYA TƏLƏB OLUNMUR (`prisma generate` kifayətdir).
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {

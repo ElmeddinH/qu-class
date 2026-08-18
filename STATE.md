@@ -1104,11 +1104,15 @@ bayt-bayt eynidir.
 
 ### Qalan borc
 
-- «Seçimlər» düyməsi ayrıca kateqoriya ekranı AÇMIR — məxfilik bildirişinə
-  aparır. Hazırda yalnız iki kateqoriya var (zəruri / analitika) və analitika
-  ÜMUMİYYƏTLƏ quraşdırılmayıb; saxta «parametrlər» modalı açmaqdansa sənədə
-  aparmaq dürüstdür. Analitika əlavə olunanda ekran da lazım olacaq
-  (`allowsAnalytics()` qapısı hazırdır).
+- ~~«Seçimlər» düyməsi ayrıca kateqoriya ekranı AÇMIR — məxfilik bildirişinə
+  aparır.~~ ✅ **BAĞLANDI — bu qeyd YANLIŞ İDİ.** Düymə həqiqi dialoq açır:
+  `src/features/consent/CookieBanner.tsx:156-158` → `data-testid="cookie-preferences"`,
+  başlıq «Kuki seçimləri». `tests/e2e/public.spec.ts:512` («Seçimlər» kateqoriya
+  ekranı açılır və zəruri kuki söndürülə bilmir) məhz həmin ekranı ölçür:
+  dialoq görünür, «Zəruri kukilər» açarı AÇIQ + PASSİV, və ekranda **başqa açar
+  yoxdur**. Uydurma «Analitika» açarının olmaması qəsdlidir (analitika
+  quraşdırılmayıb) — ekranın YOXLUĞU deyil. Borc siyahısı kodun arxasında
+  qalmışdı.
 - Xankəndi xəritəsində zoom/pan yoxdur (10B-nin eyni borcu).
 - `/faculties/[slug]` sinif səhifəsinin ÖZÜNƏ link vermir — `/class/[slug]`
   auth arxasındadır və anonim ziyarətçini `/login`-ə atardı.

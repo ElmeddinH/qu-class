@@ -29,6 +29,7 @@
 | [QD-015](#qd-015--giriş-xətası-hesab-enumerasiyasını-fərqləndirmir) | Enumerasiya bağlıdır | təhlükəsizlik |
 | [QD-016](#qd-016--shadcnui-v2-pinlənib-latest-qadağandır) | shadcn v2 pin | UI |
 | [QD-017](#qd-017--git-əməliyyatları-isomorphic-git-ilə) | `isomorphic-git` | alət |
+| [QD-018](#qd-018--deploy-flyio--volume-postgresə-keçid-yox) | Fly.io + volume, Postgres yox | deploy |
 
 ---
 
@@ -718,3 +719,137 @@ yalnız yaratma vasitəsi fərqlidir.
   `init`/`commit`/`log` şəbəkəyə çıxmır.
 - ➖ Rebase, cherry-pick, interaktiv əməliyyatlar yoxdur. Bu iş axını üçün
   lazım olmadı.
+
+---
+
+## QD-018 — Deploy: Fly.io + volume, Postgres-ə keçid YOX
+
+**Status:** qəbul edilib (Sprint 3/4 auditindən sonra, 2026-08-18) ·
+Audit variantı: **B2** (`docs/SPRINT-3-4-AUDIT.md` §10.4).
+
+### Kontekst
+
+Sprint 3 və Sprint 4 auditi (`docs/SPRINT-3-4-AUDIT.md`) hər iki sprinti
+**QƏBUL OLUNMUR** qiymətləndirdi və səbəb tək idi: **deploy yoxdur**.
+`ls Dockerfile*` → yox · `ls vercel.json` → yox · `ls -a .github` → yox.
+Bu, beş qəbul meyarının qapısıdır (Sprint 3 → 2, 3, 7 · Sprint 4 → 5, 8).
+
+Funksional əhatə isə tam idi: 43/43 route, 17/17 modul, 1759 test.
+Yəni bağlanmalı olan boşluq **kod deyil, infrastruktur** idi.
+
+Audit iki yol ölçdü: **A** (Vercel + Postgres + Blob) və **B2** (Docker +
+persistent volume). Qərar deployden ƏVVƏL verilməli idi — §10.3-də göstərildiyi
+kimi, provider dəyişikliyi `prisma/migrations/` qovluğunun **silinməsini** tələb
+edir (`migration_lock.toml` → `provider = "sqlite"`, uyğunsuzluq P3019 verir) və
+istehsal datası yarandıqdan sonra bu keçid mümkün olmur.
+
+### Qərar
+
+**Fly.io · Docker image · `/data` volume · SQLite qalır.**
+
+| Artefakt | Rolu |
+|---|---|
+| [`Dockerfile`](../Dockerfile) | `deps → builder → migrator → runner`, `node:22-slim` |
+| [`docker-entrypoint.sh`](../docker-entrypoint.sh) | uploads keçidi → `migrate deploy` → şərti seed → `node server.js` |
+| [`fly.toml`](../fly.toml) | `internal_port 3000`, `force_https`, `/data` mount, `min_machines_running = 1` |
+| [`scripts/deploy.mjs`](../scripts/deploy.mjs) | idempotent: flyctl → app → volume → secrets → `fly deploy` |
+| `next.config.ts` | `+output: "standalone"` — **tək sətir** |
+| `prisma/schema.prisma` | `+binaryTargets` — `generator` blokunda, `datasource`-a toxunmadan |
+
+**Toxunulmayanlar:** `prisma/migrations/` (3 miqrasiya olduğu kimi qalır) ·
+`datasource.provider` · `src/services/storage.ts` · `src/components/ui/`.
+
+### Alternativlər
+
+| Alternativ | Niyə seçilmədi |
+|---|---|
+| **A — Vercel + Postgres + Blob** | Üç müstəqil risk eyni anda: (1) `prisma/migrations/` silinir və sıfırdan yaradılır (§10.3); (2) `storage.ts` `@vercel/blob`-a keçir və `MediaAsset.url` formatı dəyişir — mövcud seed məzmunu ilə uyğunluq ayrıca yoxlanmalıdır; (3) SQLite qərarı ([QD-002](#qd-002--baza-sqlite-postgresql-deyil)) və onun «oflayn demo» arqumenti müdafiə mətnindən çıxarılmalı olur. Audit qiyməti: 6–10 saat, risk **orta-yüksək** |
+| **B1 — Turso / libSQL** | `driverAdapters` **preview** rejimindədir; `prisma migrate` Turso üçün ayrı CLI axını tələb edir; üstəlik Turso yalnız bazadır — `storage.ts` problemi **yenə həll olunmur**. Audit: risk **yüksək**, tövsiyə edilmir |
+| **Render** | Pulsuz planda **disk YOXDUR** (volume-suz bu variantın mənası qalmır) və xidmət **15 dəqiqə passivlikdən sonra yatır** — müdafiə otağında ilk sorğu soyuq start deməkdir |
+| **Railway** | Pulsuz plan $5 kreditlə məhdudlaşdırılıb — demo müddəti proqnozlaşdırıla bilmir |
+| **`next start` + `pm2`, öz VPS-də** | HTTPS, sertifikat yeniləmə və reverse proxy əl ilə qurulmalıdır; Fly bunları `force_https` ilə verir |
+
+### Nəticə
+
+- ➕ **İki mənbə faylı dəyişdi** (`next.config.ts` + `schema.prisma`-nın
+  `generator` bloku), qalanı yeni infrastruktur artefaktıdır.
+- ➕ Miqrasiya tarixçəsi **sıfırlanmadı** — P3019 problemi yaranmadı.
+- ➕ SQLite qərarı ([QD-002](#qd-002--baza-sqlite-postgresql-deyil)) müdafiədə
+  **olduğu kimi qalır**; oflayn demo arqumenti (`scripts/copy-swagger.mjs`
+  başlığı) korlanmadı.
+- ➖ **TƏK İNSTANSİYA.** Fly volume-u tək maşına bağlıdır və SQLite çoxlu
+  yazıcı dəstəkləmir. İkinci maşın açılsa **öz ayrıca boş bazasını** görər və
+  bu, xəta vermədən baş verər. `fly.toml`-da `auto_stop_machines = "off"` +
+  `min_machines_running = 1` + tək region bunu qıfıllayır.
+- ➖ Fly.io pulsuz volume üçün **kredit kartı** tələb edir.
+
+### Deploy zamanı çıxan dörd tələ — və həlləri
+
+Bunlar qərarın bir hissəsidir, çünki hər biri **build təmiz keçdiyi halda
+yalnız canlıda** görünürdü.
+
+**1. `output: "standalone"` `public/` və `.next/static`-i kopyalamır.**
+Səhifə 200 qaytarır, bütün CSS/JS 404 verir. `Dockerfile` runner mərhələsində
+üç `COPY` sətri bunu bağlayır — sıra vacibdir, `standalone` özü ilə
+`node_modules` gətirir, ona görə `.prisma` **ondan sonra** yazılır.
+
+**2. Prisma engine host OS-ə bağlıdır.**
+`binaryTargets = ["native", "debian-openssl-3.0.x"]`. Dəyər base image-dən
+asılıdır: `node:22-alpine` seçilsəydi `linux-musl-openssl-3.0.x` olardı.
+`node:22-slim` seçildi, çünki `sharp` Alpine-də `libvips`-i musl üçün yenidən
+qurmalı olur — 40 MB qazanc üçün iki əlavə uğursuzluq nöqtəsi.
+
+**3. `public/uploads` image-in içindədir → hər deploy-da silinir.**
+Entrypoint qovluğu silib `/data/uploads`-a simvolik keçid qoyur.
+`storage.ts` **dəyişmir**: kod yenə `process.cwd()/public/uploads`-a yazır,
+yalnız yolun arxasındakı disk volume-dur.
+
+**4. 🔴 Next.js `public/` siyahısını yalnız SERVER BAŞLAYANDA oxuyur.**
+Bu, tələ siyahısında **yox idi** — deploy hazırlığı zamanı ölçmə ilə tapıldı.
+`next/dist/server/lib/router-utils/filesystem.js` → `publicFolderItems`
+dəsti `recursiveReadDir` ilə **bir dəfə** doldurulur (`!opts.dev` bloku), sonrakı
+sorğularda diskə baxılmır. `next start` altında ölçülmüş nəticə:
+
+| Fayl | Nəticə |
+|---|---|
+| serverdən ƏVVƏL mövcud | `GET /uploads/…` → **200** |
+| serverdən SONRA yaradılmış | `GET /uploads/…` → **404** |
+| eyni fayl `next/image` ilə | `GET /_next/image?url=…` → **400** |
+
+Yəni volume və simvolik keçid düzgün qurulsa belə, **istifadəçinin indicə
+yüklədiyi şəkil server yenidən başlayana qədər açılmırdı**. `dev` rejimində
+görünmür: orada hər sorğuda diskə baxılır (`if (!matchedItem && opts.dev)`).
+
+Həll: [`src/app/uploads/[...path]/route.ts`](../src/app/uploads/%5B...path%5D/route.ts)
++ [`src/services/uploads-serve.ts`](../src/services/uploads-serve.ts).
+Statik sürətli yol İTMİR — Next-in `getItem()` sıralaması `publicFolder`-i
+`appFile`-dan əvvəl yoxlayır, yəni route yalnız start-dan sonra yaranmış
+fayllara düşür. `storage.ts` yenə toxunulmadı: oxuma tərəfi eyni
+`src/services/` qatında **ayrı** modula yazıldı.
+
+### Demo datası — niyə şərti və niyə şablonla
+
+Seed **destruktivdir** (`prisma/seed.ts:306-333` → 25 cədvəldə `deleteMany()`).
+Hər restartda işləsəydi istifadəçi datası məhv olardı; heç işləməsəydi demo boş
+qalardı. Entrypoint `User` cədvəlini **sayır** — fayl mövcudluğuna baxmır,
+çünki `/data/qu.db` `migrate deploy`-dan sonra həmişə mövcuddur və fayl testi
+ilk deploy-dan sonra heç vaxt işləməzdi.
+
+Seed-in ÖZÜ runtime-da işlədilmir: `tsx` (dev-asılılıq), bütün `src/lib` qrafı
+və `tsconfig` alias-ları tələb olunardı — bu, `standalone`-un bütün mənasını
+itirərdi. Əvəzinə `Dockerfile` builder mərhələsində seed **bir dəfə** işlədilir
+və nəticə hazır SQLite şablonu (1.4 MB) kimi image-ə qoyulur.
+
+**Determinizm buna icazə verir — ölçülüb.** `seed.ts:107` sabit `NOW`
+(`2026-07-29T09:00:00Z`), `seed.ts:470` sabit bcrypt duzu. İki müstəqil işlətmə
+müqayisə edildi:
+
+| Ölçü | 1-ci işlətmə | 2-ci işlətmə |
+|---|---|---|
+| `User` / `Post` / `Event` sayı | 125 / 300 / 25 | 125 / 300 / 25 |
+| `User` sətirlərinin sha256-sı | `c940475657c3bbc3…` | `c940475657c3bbc3…` |
+| **SQLite faylının sha256-sı** | `f4d165a1…` | `cdfe4991…` **← fərqli** |
+
+⚠️ Yəni determinizm **məzmun səviyyəsindədir, bayt səviyyəsində deyil**: SQLite
+səhifə yerləşdirmə sırası işlətmədən-işlətməyə dəyişir. Şablonu `sha256sum` ilə
+müqayisə etmək yanlış nəticə verər — məzmunla müqayisə edilməlidir.

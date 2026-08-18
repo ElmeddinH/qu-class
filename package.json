@@ -25,6 +25,8 @@
     "git:log": "node scripts/git.mjs log",
     "git:audit": "node scripts/git-audit.mjs",
     "git:push": "node scripts/git-push.mjs",
+    "deploy": "node scripts/deploy.mjs",
+    "deploy:plan": "node scripts/deploy.mjs --dry-run",
     "audit:lighthouse": "tsx scripts/lighthouse-audit.ts",
     "audit:queries": "tsx scripts/query-profile.ts",
     "audit:responsive": "tsx scripts/responsive-shots.ts",

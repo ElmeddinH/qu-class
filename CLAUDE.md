@@ -185,6 +185,9 @@ src/
                    privacy/ guide/ notifications/ admin/
   hooks/
   services/        BÜTÜN Prisma sorğuları burada
+                   ⚠️ `node:fs`-ə İCAZƏLİ İKİ fayl: storage.ts (yazma) və
+                   uploads-serve.ts (oxuma — Next `public/` siyahısını yalnız
+                   start-da oxuyur, bax QD-018 §tələ 4). Başqa faylda YOX.
   lib/             db.ts auth.ts (barrel) viewer.ts visibility.ts enums.ts
                    stage.ts constants.ts routes.ts
   types/           next-auth.d.ts (sessiya/JWT tip genişlənməsi)
@@ -331,6 +334,22 @@ npm run build
 npm run test          # vitest
 npm run test:e2e      # playwright
 ```
+
+Push: `node scripts/git.mjs push`
+
+**Deploy** (Fly.io + volume — `docs/DECISIONS.md` QD-018):
+
+```bash
+read -rsp "FLY_API_TOKEN: " FLY_API_TOKEN && export FLY_API_TOKEN \
+  && npm run deploy; unset FLY_API_TOKEN
+npm run deploy:plan   # heç nə dəyişdirmir, yalnız planı yazır
+```
+
+⚠️ **Deploy artefaktları birlikdə dəyişir.** `Dockerfile` base image-i
+dəyişsə `prisma/schema.prisma` → `binaryTargets` də dəyişməlidir
+(`node:22-slim` → `debian-openssl-3.0.x`, `node:22-alpine` →
+`linux-musl-openssl-3.0.x`). `fly.toml`-da `min_machines_running` **1**
+qalmalıdır: volume tək maşına bağlıdır, ikinci maşın öz **boş** bazasını görər.
 
 ---
 

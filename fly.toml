@@ -1,0 +1,93 @@
+# ============================================================================
+# QU CLASS — Fly.io konfiqurasiyası
+# Qərar sənədi: docs/DECISIONS.md → QD-018
+# Deploy: FLY_API_TOKEN=<token> node scripts/deploy.mjs
+#
+# 🔴 BU KONFİQİN MƏRKƏZİ MƏHDUDİYYƏTİ: TƏK MAŞIN.
+#    Baza SQLite faylıdır və `/data` volume-unda yaşayır. Fly volume-u TƏK
+#    maşına bağlıdır — paylaşılan şəbəkə diski DEYİL. İkinci maşın açılsa o,
+#    ÖZ ayrıca volume-unu (öz boş bazasını) görər: iki istifadəçi eyni saytda
+#    iki fərqli baza ilə işləyərdi və heç bir xəta mesajı çıxmazdı. Yüklənən
+#    şəkillər də eyni şəkildə bölünərdi.
+#    → Buna görə aşağıda avtomatik miqyaslanma SÖNDÜRÜLÜB və region TƏKDİR.
+#    → `fly scale count 2` və ya ikinci region ƏLAVƏ ETMƏ.
+# ============================================================================
+
+app = "qu-class"
+
+# Tək region — yuxarıdakı səbəb. Frankfurt Bakıya ən yaxın sabit Fly regionudur.
+primary_region = "fra"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  # `docker-entrypoint.sh` bu qovluqda `qu.db` və `uploads/` gözləyir.
+  DATA_DIR = "/data"
+  # Auth.js v5-də `NEXTAUTH_URL` İŞLƏMİR (v4 adıdır). Proxy arxasında `Host`
+  # başlığına güvənmək üçün lazım olan dəyişən budur; qoyulmasa Auth.js
+  # `UntrustedHost` verir və giriş sonrası yönləndirmə sınır.
+  AUTH_TRUST_HOST = "true"
+
+# 🔴 SİRRLƏR BURADA DEYİL. `AUTH_SECRET`, `AUTH_URL`, `DATABASE_URL`
+#    `fly secrets set` ilə verilir (`scripts/deploy.mjs` avtomatik qoyur).
+#    `fly.toml` repoya girir — bura yazılan hər dəyər tarixçəyə düşərdi.
+
+# --- Davamlı disk -----------------------------------------------------------
+# SQLite faylı + istifadəçi yükləmələri. Image hər deploy-da SIFIRDAN qurulur,
+# volume isə qalır — `docker-entrypoint.sh` `public/uploads`-ı buraya
+# simvolik keçidlə bağlayır.
+[[mounts]]
+  source = "qu_data"
+  destination = "/data"
+  # Demo üçün kifayətdir: seed bazası ~1.8 MB, şəkillər 1600px WebP.
+  initial_size = "1gb"
+
+[http_service]
+  internal_port = 3000
+
+  # HTTPS məcburidir. `AUTH_URL=https://…` ilə birlikdə sessiya kukisi
+  # `__Secure-` prefiksi + `secure` bayrağı ilə yazılır
+  # (`src/auth.config.ts:27,43`). HTTP-yə düşsə brauzer kukini rədd edər və
+  # giriş sonsuz döngəyə düşərdi.
+  force_https = true
+
+  auto_start_machines = true
+
+  # 🔴 "off" — maşın DAYANMIR.
+  #   1. SQLite + volume → tək maşın (yuxarıdakı izah).
+  #   2. Soyuq start Prisma miqrasiyası + Next boot deməkdir; demo/müdafiə
+  #      şəraitində ilk sorğunun gecikməsi qəbuledilməzdir.
+  auto_stop_machines = "off"
+
+  # 🔴 1 — NƏ AZ, NƏ ÇOX. 0 olsa maşın yatardı; 2+ olsa iki ayrı SQLite faylı
+  #    yaranardı (fayl başındakı izah).
+  min_machines_running = 1
+
+  processes = ["app"]
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 150
+    hard_limit = 200
+
+  # `/api/v1/health` mövcuddur (`src/app/api/v1/health/route.ts`) və QƏSDƏN
+  # bazaya toxunmur — hər 30 saniyədə bir SQLite faylını kilidləmək üçün
+  # səbəb yoxdur. `grace_period` miqrasiya + seed şablonu + Next boot üçündür.
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/v1/health"
+    protocol = "http"
+    timeout = "5s"
+
+[[vm]]
+  # ⚠️ `size = "shared-cpu-1x"` YAZILMIR: flyctl `size` presetini `cpus` /
+  # `memory` ilə birlikdə qəbul etmir. Açıq üçlük eyni maşını verir.
+  cpu_kind = "shared"
+  cpus = 1
+  # 512 MB Next-i qaldıra bilər, amma Prisma query engine + sharp (libvips)
+  # eyni prosesdə olanda dar gəlir; 1 GB OOM riskini aradan qaldırır.
+  memory = "1gb"
