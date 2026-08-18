@@ -1,12 +1,15 @@
 // ============================================================================
 // scripts/responsive-shots.ts
-// Blok 12C · C bəndi — 5 BREAKPOINT × 10 SƏHİFƏ EKRAN GÖRÜNTÜSÜ (KUDS §9).
+// 5 BREAKPOINT × 51 SƏHİFƏ EKRAN GÖRÜNTÜSÜ (KUDS §9).
+// Blok 12C-də 10 səhifə idi; Blok 12D-də `src/app` altındakı BÜTÜN səhifələrə
+// genişləndirildi (255 görüntü). Siyahı `tests/e2e/responsive.spec.ts`
+// matrisi ilə eynidir — bax `resolvePages()` başlığındakı qeyd.
 //
 // İstifadə:
 //   npm run build && npm start        # ayrı terminalda, port 3100
 //   npm run audit:responsive
 //
-// ⚠️ 13B-DƏ YENİDƏN İŞLƏDİLƏCƏK — ona görə heç nə sabit yazılmayıb:
+// ⚠️ Heç nə sabit yazılmayıb:
 //   · baza ünvan   → `SHOTS_BASE_URL`   (default 127.0.0.1:3100)
 //   · çıxış qovluğu → `SHOTS_OUT_DIR`    (default docs/responsive)
 //   · hesab         → `SHOTS_EMAIL` / `SHOTS_PASSWORD`
@@ -97,45 +100,111 @@ interface PageSpec {
 }
 
 async function resolvePages(): Promise<PageSpec[]> {
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { email: EMAIL },
-    select: {
-      memberships: {
-        where: { isPrimary: true },
-        select: { cohort: { select: { slug: true } } },
+  const [user, faculty, place, event] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { email: EMAIL },
+      select: {
+        id: true,
+        memberships: {
+          where: { isPrimary: true },
+          select: { cohort: { select: { slug: true } } },
+        },
       },
-    },
-  });
+    }),
+    // ⚠️ TƏLƏ D (Blok 12D): dinamik yolların açarları SEED-DƏN oxunur.
+    // Hardcode edilsəydi seed dəyişəndə skript səssizcə 404 ekranlarını
+    // çəkər və hesabat «sürüşmə yoxdur» deyərdi — 404 səhifəsi sürüşmür.
+    prisma.faculty.findFirstOrThrow({ select: { slug: true } }),
+    prisma.guidePlace.findFirstOrThrow({ select: { id: true } }),
+    prisma.event.findFirstOrThrow({ select: { id: true } }),
+  ]);
 
   const slug = user.memberships[0]?.cohort.slug;
   if (!slug) throw new Error(`${EMAIL} hesabının əsas sinfi yoxdur.`);
 
+  /** `(app)` və `(admin)` səhifələri — giriş etmiş kontekstdə çəkilir. */
+  const auth = (key: string, pathname: string, label = pathname): PageSpec => ({
+    key,
+    label,
+    pathname,
+    auth: true,
+  });
+
+  /** `(public)` səhifələri — anonim kontekstdə. */
+  const open = (key: string, pathname: string, label = pathname): PageSpec => ({
+    key,
+    label,
+    pathname,
+    auth: false,
+  });
+
+  // 🔴 SİYAHI `tests/e2e/responsive.spec.ts` MATRİSİ İLƏ EYNİDİR (51 səhifə).
+  // İkisi ayrı fayldır, çünki ikisi ayrı sual verir: test QAPI-dır (maşın
+  // şərtləri), skript SƏNƏD-dir (insan üçün görüntü + ölçü cədvəli). Siyahı
+  // ayrılsa sənəd testin ölçdüyündən başqa şeyi göstərər.
   const pages: PageSpec[] = [
-    { key: "landing", label: "/", pathname: "/", auth: false },
-    { key: "khankendi", label: "/khankendi", pathname: "/khankendi", auth: false },
-    { key: "login", label: "/login", pathname: "/login", auth: false },
-    { key: "class", label: "/class/[slug]", pathname: `/class/${slug}`, auth: true },
-    {
-      key: "feed",
-      label: "/class/[slug]/feed",
-      pathname: `/class/${slug}/feed`,
-      auth: true,
-    },
-    {
-      key: "directory",
-      label: "/class/[slug]/directory",
-      pathname: `/class/${slug}/directory`,
-      auth: true,
-    },
-    {
-      key: "timeline",
-      label: "/class/[slug]/timeline",
-      pathname: `/class/${slug}/timeline`,
-      auth: true,
-    },
-    { key: "map", label: "/class/[slug]/map", pathname: `/class/${slug}/map`, auth: true },
-    { key: "privacy", label: "/me/privacy", pathname: "/me/privacy", auth: true },
-    { key: "admin-users", label: "/admin/users", pathname: "/admin/users", auth: true },
+    // --- (public) · 19 ---
+    open("landing", "/"),
+    open("about", "/about"),
+    open("accessibility", "/accessibility"),
+    open("campus-life", "/campus-life"),
+    open("clubs", "/clubs"),
+    open("docs", "/docs"),
+    open("public-events", "/events"),
+    open("faculties", "/faculties"),
+    open("faculty-detail", `/faculties/${faculty.slug}`, "/faculties/[slug]"),
+    open("faq", "/faq"),
+    open("history", "/history"),
+    open("khankendi", "/khankendi"),
+    open("place-detail", `/khankendi/${place.id}`, "/khankendi/[id]"),
+    open("legal", "/legal/privacy", "/legal/[slug]"),
+    open("login", "/login"),
+    open("mission", "/mission"),
+    open("newcomers", "/newcomers"),
+    open("register", "/register"),
+    open("services", "/services"),
+
+    // --- (app) · 23 ---
+    auth("class", `/class/${slug}`, "/class/[slug]"),
+    auth("achievements", `/class/${slug}/achievements`, "/class/[slug]/achievements"),
+    auth(
+      "moderation",
+      `/class/${slug}/achievements/moderation`,
+      "/class/[slug]/achievements/moderation",
+    ),
+    auth("directory", `/class/${slug}/directory`, "/class/[slug]/directory"),
+    auth("class-events", `/class/${slug}/events`, "/class/[slug]/events"),
+    auth("feed", `/class/${slug}/feed`, "/class/[slug]/feed"),
+    auth("map", `/class/${slug}/map`, "/class/[slug]/map"),
+    auth("memories", `/class/${slug}/memories`, "/class/[slug]/memories"),
+    auth("support", `/class/${slug}/support`, "/class/[slug]/support"),
+    auth("timeline", `/class/${slug}/timeline`, "/class/[slug]/timeline"),
+    auth("yearbook", `/class/${slug}/yearbook`, "/class/[slug]/yearbook"),
+    auth("event-detail", `/events/${event.id}`, "/events/[id]"),
+    auth("event-manage", `/events/${event.id}/manage`, "/events/[id]/manage"),
+    auth("event-report", `/events/${event.id}/report`, "/events/[id]/report"),
+    // ⚠️ `/home` və `/me` YÖNLƏNDİRİR — çəkilən görüntü HƏDƏF səhifəsinindir
+    // (seed-də üzvlüyü olmayan istifadəçi yoxdur). Hesabatda açıq yazılıb.
+    auth("home", "/home"),
+    auth("kuds", "/kuds"),
+    auth("me", "/me"),
+    auth("career", "/me/career"),
+    auth("profile-edit", "/me/edit"),
+    auth("privacy", "/me/privacy"),
+    auth("notifications", "/notifications"),
+    auth("search", "/search"),
+    auth("profile", `/u/${user.id}`, "/u/[userId]"),
+
+    // --- (admin) · 9 ---
+    auth("admin", "/admin"),
+    auth("admin-achievements", "/admin/achievements"),
+    auth("admin-audit", "/admin/audit"),
+    auth("admin-cohorts", "/admin/cohorts"),
+    auth("admin-content", "/admin/content"),
+    auth("admin-import", "/admin/import"),
+    auth("admin-moderation", "/admin/moderation"),
+    auth("admin-stats", "/admin/stats"),
+    auth("admin-users", "/admin/users"),
   ];
 
   return ONLY ? pages.filter((entry) => entry.key === ONLY) : pages;
@@ -340,11 +409,24 @@ function reportMarkdown(findings: Finding[]): string {
     0,
   );
 
+  const pageCount = new Set(findings.map((entry) => entry.page)).size;
+
   return [
-    "# Responsive audit — Blok 12C",
+    "# Responsive audit — `docs/responsive/report.md`",
+    "",
+    "> ⚠️ **BU FAYL AVTOMATİK YARADILIR** — `npm run audit:responsive`.",
+    "> Əl ilə redaktə etmə: növbəti işlətmə üzərinə yazır. Mətn dəyişikliyi",
+    "> `scripts/responsive-shots.ts` → `reportMarkdown()`-dadır.",
     "",
     `Baza: \`${BASE_URL}\` · Breakpoint-lər: ${BREAKPOINTS.map((b) => b.width).join(" / ")} px`,
+    `Əhatə: **${pageCount} səhifə × ${BREAKPOINTS.length} breakpoint = ${findings.length} ölçmə**`,
     `Toxunma hədəfi: QAPI ${HARD_TOUCH_TARGET}px (WCAG 2.2 AA) · MƏSLƏHƏT ${KUDS_TOUCH_TARGET}px (KUDS)`,
+    "",
+    "🔴 **BU HESABAT QAPI DEYİL, SƏNƏDDİR.** Reqressiya qapısı",
+    "`tests/e2e/responsive.spec.ts`-dir: eyni 51 səhifəni eyni beş breakpoint-də",
+    "gəzir və dörd şərti ölçür (üfüqi sürüşmə · header 72px · sidebar 280px/çəkməcə",
+    "· məzmun kəsilmir). Səbəb: 255 PNG-yə baxıb «yaxşıdır» demək təkrarlana",
+    "bilməyən sübutdur — növbəti dəyişiklikdə heç nə xəbərdarlıq etmir.",
     "",
     "## 1. Üfüqi sürüşmə",
     "",
@@ -374,6 +456,120 @@ function reportMarkdown(findings: Finding[]): string {
     "qapı deyil, siyahıdır.",
     "",
     `Ekran görüntüləri: \`<səhifə>__<en>.png\` (${findings.length} ədəd).`,
+    "⚠️ PNG-lər `.gitignore`-dadır (~34 MB+) və bu, QƏSDƏNDİR — repoda yalnız",
+    "bu xülasə qalır. Yenidən yaratmaq: `npm run audit:responsive`.",
+    "",
+    "## 4. Blok 12D — tapılan və düzəldilən qırıqlar",
+    "",
+    "| Səhifə | Breakpoint | Qırıq | Düzəliş |",
+    "| --- | --- | --- | --- |",
+    "| `/admin/cohorts` | 375px | **157px üfüqi sürüşmə** — «Yeni sinif» " +
+      "formasındakı native `<select>`-in iç minimum eni ən uzun opsiyanın " +
+      "enidir (≈491px); grid xanası `min-width: auto` daşıdığı üçün ondan " +
+      "aşağı sıxıla bilmir | `min-w-0` + `w-full` " +
+      "(`features/admin/CohortCreateForm.tsx`). Eyni düzəliş Blok 12C-də " +
+      "`AdminUserFilters.tsx`-ə verilmişdi, bu forma unudulmuşdu |",
+    "| `/events/[id]/manage` | hamısı | **Çeşidləmə düyməsi 73×21px** — WCAG " +
+      "2.2 AA 24px qapısından aşağı. `text-small` sətir hündürlüyü 21px verir, " +
+      "düymədə dolğu yoxdur; «Inline» istisnası cədvəl başlığında keçmir | " +
+      "`min-h-6` (`features/events/manage/AttendeeTable.tsx`) |",
+    "",
+    "Üfüqi sürüşmə, kəsilmiş məzmun və sıfır enli landmark üzrə qalan **50",
+    "səhifədə** heç bir breakpoint-də tapıntı yoxdur (§1).",
+    "",
+    "## 5. Düzəldilməyənlər və niyə",
+    "",
+    "🔴 **DÜZƏLİŞ: §2-dəki 24px QAPISI ARTIQ TAM ÖDƏNMİR.** Blok 12C bu qapını",
+    "«ödənilib» kimi yazmışdı, amma həmin ölçmə **10 səhifədə** aparılmışdı.",
+    "51 səhifəyə genişlənəndə iki shadcn primitivi qapının altında qaldı:",
+    "",
+    "| Element | Ölçü | Harada | Niyə toxunulmadı |",
+    "| --- | --- | --- | --- |",
+    "| `Checkbox` | **16×16** | `/me/career`, `/admin/moderation`, `/events/[id]/manage`, `/class/[slug]/memories`, `/kuds` | `src/components/ui/checkbox.tsx` → `h-4 w-4`. CLAUDE.md §1: `ui/` toxunulmazdır. Çağırış yerində `className` ilə böyütmək mümkündür, amma bu, bütün sistemdə checkbox ölçüsünü dəyişən DİZAYN qərarıdır — responsive qırığı deyil və bu blokun səlahiyyətindən kənardır |",
+    "| `Switch` | **36×20** | `/me/career`, `/kuds` | `src/components/ui/switch.tsx` → `h-5 w-9`. Eyni səbəb |",
+    "",
+    "⚠️ Radix hər ikisinin arxasında gizli `<input>` render edir (13×13 / 16×16 /",
+    "36×20) — §2-dəki `input` sətirləri ayrı tapıntı deyil, EYNİ primitivdir.",
+    "",
+    "Qərar sənədləşdirilib: README «Bilinən məhdudiyyətlər» №9.",
+    "",
+    "| Digər hal | Niyə toxunulmadı |",
+    "| --- | --- |",
+    "| KUDS 44px tövsiyəsi (§3-dəki say) | shadcn primitivlərinin öz ölçüsüdür (`h-9` = 36px); §3 qapı deyil, siyahıdır |",
+    "| Kuki bannerinin CLS 0.035-i | «Yaxşı» zolağın içindədir (< 0.1). Banner `fixed`-dir, şrift `swap` ilə gələndə hündürlüyü dəyişir — README №11 |",
+    "| `/home` mobil Performance 87 | Yönləndirmə xərcidir; hədəf səhifə birbaşa ölçüləndə 91 — README №7 |",
+    "",
+    "## 6. Nə ÖLÇÜLMÜR (dürüst hədd)",
+    "",
+    "· `/home` və `/me` **yönləndirmə səhifələridir**. Seed-də üzvlüyü olmayan",
+    "istifadəçi yoxdur, ona görə `/home`-un «sinif təyin olunmayıb» ekranı nə",
+    "testdə, nə də burada açıla bilmir — ölçülən səth yönləndirmənin HƏDƏFİdir.",
+    "",
+    "· Dörd hüquqi sənəd eyni `page.tsx`-dən gəlir və matrisdə **bir** sətir kimi",
+    "sayılır; dördünün də 200 verdiyi `tests/e2e/public.spec.ts`-də ölçülür.",
+    "",
+    "· Ölçmə yalnız Chromium-dadır (`playwright.config.ts` → tək layihə).",
+    "",
+    "## 7. Yüklənmə vəziyyəti — A/B bölgüsü (Blok 12D · Sprint 3 F4)",
+    "",
+    "🔴 **NİYƏ BÖLGÜ LAZIMDIR.** `loading.tsx` seqmenti `<Suspense>`-ə bükür,",
+    "yəni cavab AXINLA gedir. Axın başlayan kimi HTTP başlıqları — o cümlədən",
+    "STATUS — göndərilib: seqment sonradan `notFound()` çağırsa status **200**",
+    "olur, 404 yox. Səhifədə «tapılmadı» yazır, protokol isə «tapıldı» deyir.",
+    "Bu, SEO, monitorinq və `/api` müqaviləsi üçün real regresdir və üç mövcud",
+    "e2e testi məhz statusu ölçür.",
+    "",
+    "Ona görə 51 səhifə status qapısına görə bölünüb:",
+    "",
+    "| Qrup | Say | Mexanizm |",
+    "| --- | ---: | --- |",
+    "| **A** — status qapısı YOXDUR | **19** | Seqmentin ƏN DAR yerində `loading.tsx` |",
+    "| **B** — status qapısı VAR | **20** | Qapı `await` edilir, YALNIZ ondan sonrakı alt-ağac `<Suspense>`-ə bükülür |",
+    "| **—** — uyğun deyil | **12** | Aşağıdakı üç səbəbdən biri |",
+    "",
+    "### A qrupu — `loading.tsx` (19 səhifə)",
+    "",
+    "`(admin)/loading.tsx` doqquz admin səhifəsini örtür (qrupda `notFound()`",
+    "yoxdur; `requireAdmin()` → 403 LAYOUT-dadır, yəni sərhəddən kənarda).",
+    "Cədvəl formalı iki səhifə (`/admin/users`, `/admin/audit`) öz dar",
+    "seqmentində onu üstələyir — kart qridi skeletonu cədvəl üçün səhv",
+    "hündürlük verir (CLS).",
+    "",
+    "Qalan on: `/notifications`, `/search`, `/me/privacy`, `/accessibility`,",
+    "`/events`, `/faq`, `/register`, `/`, `/faculties`, `/khankendi`.",
+    "",
+    "⚠️ **Son üçü ROUTE QRUPU ilə daraldılıb** (`(landing)`, `faculties/(index)`,",
+    "`khankendi/(index)`). Səbəb: `loading.tsx` BÜTÜN ALT AĞACA şamil olunur.",
+    "`faculties/loading.tsx` yazılsaydı qonşu `faculties/[slug]`-a da düşərdi və",
+    "naməlum fakültə slug-ı 404 əvəzinə 200 verərdi. Route qrupu URL-i DƏYİŞMİR",
+    "(`/faculties` yenə `/faculties`-dır), amma seqment ağacında ayrıca səviyyə",
+    "yaradır.",
+    "",
+    "### B qrupu — səhifə daxili `<Suspense>` (20 səhifə)",
+    "",
+    "11 sinif səhifəsi + `/khankendi/[id]`, `/me/edit` və yeddi redaksiya",
+    "səhifəsi (`/about`, `/history`, `/mission`, `/campus-life`, `/clubs`,",
+    "`/services`, `/newcomers`).",
+    "",
+    "⚠️ **Sərhəd YALNIZ İÇİNDƏ `await` edən komponenti bükəndə işləyir.**",
+    "Valideyndə `await` edib nəticəni prop kimi vermək boundary-ni boşa çıxarır:",
+    "data artıq gözlənilib, skeleton HEÇ VAXT görünmür, amma kod «edilmiş» kimi",
+    "görünür. Ona görə üç yeni server qabığı yazıldı — `ClassFeedSection`,",
+    "`ProfileEditSection`, `WhereAreWeNowBody`/`SupportBody`/`ModerationBody` —",
+    "sorğular səhifədən onların İÇİNƏ köçürüldü.",
+    "",
+    "### Uyğun olmayan 12 səhifə — səbəb",
+    "",
+    "| Səbəb | Səhifələr |",
+    "| --- | --- |",
+    "| Gözləyəcək server sorğusu yoxdur — skeleton heç vaxt görünməzdi | `/kuds`, `/docs`, `/login` |",
+    "| Səhifə yönləndirir; `loading.tsx` statusu 200-ə çevirib yönləndirməni müştəri tərəfinə keçirərdi | `/home`, `/me` |",
+    "| Yeganə sorğu 404/403 qərarının ÖZÜDÜR — sərhədin arxasına salmaq statusu sındırardı | `/events/[id]`, `/events/[id]/manage`, `/events/[id]/report`, `/me/career`, `/u/[userId]`, `/faculties/[slug]`, `/legal/[slug]` |",
+    "",
+    "Sonuncu sətir bu blokun ƏSAS nəticəsidir: **status düzgünlüyü ilə skeleton",
+    "arasında seçim var** və seçim statusun xeyrinədir. Alternativ — yalnız",
+    "dekorativ skeleton üçün İKİNCİ, mövcudluq yoxlayan sorğu əlavə etmək —",
+    "sorğu sayını artırır və heç nəyi sürətləndirmir.",
     "",
   ].join("\n");
 }

@@ -13,10 +13,12 @@
 // bu komponent artıq icazəli kontekstdə render olunur.
 // ============================================================================
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
+import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { MemberIdentity } from "@/components/shared/MemberIdentity";
 import { VisibilityBadge } from "@/components/shared/VisibilityBadge";
 import { Badge } from "@/components/ui/badge";
@@ -33,18 +35,27 @@ interface ModerationQueueProps {
   cohort: CohortHeader;
 }
 
-export async function ModerationQueue({ cohort }: ModerationQueueProps) {
-  const viewer = await getViewer();
-  const items = await listModerationQueue(viewer, cohort.id);
-
+/**
+ * 🔴 BAŞLIQ SORĞUNU GÖZLƏMİR (Blok 12D · S3-F4).
+ *
+ * Səhifədə İKİ status qapısı var (`notFound()` + `requireCohortRole()` → 403),
+ * yəni seqmentə `loading.tsx` QOYULA BİLMƏZ: axın başlayan kimi status 200
+ * kilidlənər və 403 «yumşaq» olardı. Skeleton hər iki qapıdan SONRA verilir.
+ *
+ * ⚠️ TƏLƏ C: `listModerationQueue` sərhədin İÇİNDƏ (`ModerationBody`) çağırılır.
+ *
+ * ⚠️ Növbə sayı («təsdiq gözləyən N nailiyyət») sərhədin İÇİNƏ köçdü — dataya
+ * bağlıdır və başlıqda qalsaydı başlıq da gözləməli olardı.
+ */
+export function ModerationQueue({ cohort }: ModerationQueueProps) {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-2">
           <h1 className="text-h1 font-bold text-text-primary">Nailiyyət təsdiqi</h1>
           <p className="text-body text-text-secondary">
-            {cohort.displayName} · təsdiq gözləyən {items.length} nailiyyət. Hər qərar
-            audit jurnalına yazılır və sahibinə bildiriş göndərilir.
+            {cohort.displayName} · hər qərar audit jurnalına yazılır və sahibinə
+            bildiriş göndərilir.
           </p>
         </div>
 
@@ -52,6 +63,25 @@ export async function ModerationQueue({ cohort }: ModerationQueueProps) {
           <Link href={`/class/${cohort.slug}/achievements`}>Nailiyyətlərə qayıt</Link>
         </Button>
       </header>
+
+      {/* Fallback: növbə tam enli sətir siyahısıdır (avatar + mətn + qərar
+          düymələri), kart qridi deyil — `list` variantı real hündürlüyü verir. */}
+      <Suspense fallback={<PageSkeleton variant="list" count={3} header={false} announce={false} />}>
+        <ModerationBody cohort={cohort} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function ModerationBody({ cohort }: ModerationQueueProps) {
+  const viewer = await getViewer();
+  const items = await listModerationQueue(viewer, cohort.id);
+
+  return (
+    <>
+      <p className="text-small text-text-secondary">
+        Təsdiq gözləyən {items.length} nailiyyət.
+      </p>
 
       {items.length === 0 ? (
         <EmptyState
@@ -118,6 +148,6 @@ export async function ModerationQueue({ cohort }: ModerationQueueProps) {
           })}
         </ul>
       )}
-    </div>
+    </>
   );
 }

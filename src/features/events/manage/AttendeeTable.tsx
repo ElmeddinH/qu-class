@@ -493,7 +493,13 @@ function SortableHead({
         // `TableHead` propları ötürdüyü üçün onu birbaşa `TableHead`-ə vermək
         // olardı. Sadəlik üçün düymədə `aria-label` işlədilir.
         aria-label={`${label} sütununa görə çeşidlə`}
-        className="flex items-center gap-1 text-small font-medium text-text-primary hover:text-ku-green"
+        // 🔴 `min-h-6` (24px) — WCAG 2.2 AA SC 2.5.8 «Target Size (Minimum)».
+        // Blok 12D-də ölçüldü: düymə 73×**21**px idi, yəni QAPI pozuntusu.
+        // `text-small` sətir hündürlüyü 21px verir və düymədə dolğu yoxdur;
+        // «Inline» istisnası da işləmir — cədvəl başlığında hədəf olmayan
+        // qonşu mətn yoxdur. Ölçü `src/components/ui/` -də deyil, BURADA
+        // düzəlir (primitiv toxunulmazdır, bu düymə bizimdir).
+        className="flex min-h-6 items-center gap-1 text-small font-medium text-text-primary hover:text-ku-green"
       >
         {label}
         <Icon className="h-3 w-3" aria-hidden />

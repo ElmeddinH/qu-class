@@ -19,6 +19,7 @@ import { PrismaClient } from "@prisma/client";
 import { LANDING_SECTIONS, PUBLIC_NAV } from "../../src/layouts/nav";
 
 import { classOnlyPostText } from "./class-only-text";
+import { settleHeadings } from "./settle";
 
 const prisma = new PrismaClient();
 
@@ -105,6 +106,17 @@ test("hər bölmə `aria-labelledby` ilə başlığına bağlanıb", async ({ pa
 
 test("başlıq iyerarxiyası pozulmur: h1-dən sonra h3 yoxdur", async ({ page }) => {
   await page.goto("/");
+
+  // 🔴 AXIN GÖZLƏNİLİR (Blok 12D). Açılış səhifəsi artıq `loading.tsx` ilə
+  // STREAM olunur: `goto()` `load` hadisəsində qayıdır və həmin anda karkas
+  // (footer başlıqları daxil) hazırdır, `<main>`-in `<h1>`-i isə hələ yolda.
+  // `evaluateAll` təkrar cəhd ETMİR, ona görə ölçmə səhifənin YARIMÇIQ
+  // vəziyyətini oxuyurdu: siyahının başında footer-in `<h2>`-si dururdu.
+  //
+  // ⚠️ ŞƏRT ZƏİFLƏMƏDİ — hələ də «ilk başlıq h1-dir» tələb olunur; dəyişən
+  // yalnız ÖLÇMƏ ANIdır. Mexanizm və «skeleton sayı = 0» şərtinin niyə
+  // işləmədiyi: `./settle.ts`.
+  await settleHeadings(page);
 
   const levels = await page
     .locator("h1, h2, h3, h4")

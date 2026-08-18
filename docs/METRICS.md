@@ -64,7 +64,7 @@ find . -type f \
 |---|---|---|
 | `.tsx` | 292 | React komponentləri və səhifələr |
 | `.ts` | 269 | Servis, lib, tip, konfiq, test, seed |
-| `.png` | 67 | Ekran görüntüləri (`docs/screenshots/`, `docs/responsive/`) |
+| `.png` | 272 | Ekran görüntüləri (`docs/screenshots/` 17 · `docs/responsive/` 255) |
 | `.md` | 20 | Sənədlər |
 | `.json` | 16 | Konfiq + Lighthouse hesabatları |
 | `.html` | 10 | Lighthouse HTML hesabatları |
@@ -274,8 +274,8 @@ altındadır (290 `.tsx` faylının böyük hissəsi).
 ## 5. Testlər
 
 ```bash
-npm run test                       # Vitest — 1759 test / 65 fayl (≈46 san)
-npx playwright test --list | tail -1                                   # → 212 / 20
+npm run test                       # Vitest — 1773 test / 66 fayl (≈47 san)
+npx playwright test --list | tail -1                                   # → 216 / 22
 npx playwright test --config playwright.dev.config.ts --list | tail -1 # → 1 / 1
 find src tests \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' \) | wc -l
 ls tests/integration/*.ts | wc -l  # → 16
@@ -283,8 +283,8 @@ ls tests/integration/*.ts | wc -l  # → 16
 
 | Dəst | Test | Fayl | Əmr |
 |---|---|---|---|
-| Vahid + inteqrasiya (Vitest) | **1759** | **65** | `npm run test` |
-| E2E — istehsal build-i (Playwright) | **212** | **20** | `npm run build && npm run test:e2e` |
+| Vahid + inteqrasiya (Vitest) | **1773** | **66** | `npm run test` |
+| E2E — istehsal build-i (Playwright) | **216** | **22** | `npm run build && npm run test:e2e` |
 | E2E — dev smoke («F5 işləyirmi?») | **1** | **1** | `npm run test:e2e:dev` |
 | **E2E cəmi** | **213** | **21** | |
 | Test faylı — hamısı | | **86** | |

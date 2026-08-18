@@ -20,10 +20,12 @@
 // obyektidir, istifadəçi məkanı DEYİL (`KhankendiMap` başlığındaki fərq).
 // ============================================================================
 
+import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Clock, ExternalLink, MapPin, Phone, TriangleAlert } from "lucide-react";
 
+import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { PageHeader } from "@/features/content/PageHeader";
 import { PlaceMemories } from "@/features/memories/PlaceMemories";
 import { guideHref, guidePlaceHref } from "@/lib/guide-filters";
@@ -84,8 +86,16 @@ export function GuidePlaceDetail({ place, related }: GuidePlaceDetailProps) {
             </p>
           </div>
 
-          {/* 🔴 M9 ↔ M3 KÖRPÜSÜ — Blok 10A komponenti (başlıqdaki qeyd). */}
-          <PlaceMemories placeId={place.id} placeTitle={place.title} />
+          {/* 🔴 M9 ↔ M3 KÖRPÜSÜ — Blok 10A komponenti (başlıqdaki qeyd).
+              Blok 12D · S3-F4: sərhəd BURADADIR, seqmentdə `loading.tsx` kimi
+              YOX — səhifə `notFound()` çağırır (naməlum `id` 404 verməlidir) və
+              axın statusu 200-ə kilidləyərdi. Məkan təsviri (mövcudluq qapısının
+              özü) dərhal görünür, viewer-dən asılı xatirələr axınla gəlir. */}
+          <Suspense
+            fallback={<PageSkeleton variant="list" count={2} header={false} announce={false} />}
+          >
+            <PlaceMemories placeId={place.id} placeTitle={place.title} />
+          </Suspense>
         </article>
 
         <aside className="flex flex-col gap-6">

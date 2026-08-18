@@ -21,6 +21,7 @@
 // başlığındadır.
 // ============================================================================
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import Image from "next/image";
@@ -28,12 +29,14 @@ import { ArrowRight, FileText } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Markdown } from "@/components/shared/Markdown";
+import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import {
   contentRouteOf,
   excludeLegal,
   siblingRoutes,
   type ContentRoute,
 } from "@/lib/content-routes";
+import type { ContentSection } from "@/lib/enums";
 import { contentSectionLabel } from "@/lib/labels";
 import {
   getContentPage,
@@ -68,11 +71,18 @@ export async function ContentRouteView({ path }: ContentRouteViewProps) {
 // Bir yazı
 // ---------------------------------------------------------------------------
 
+/**
+ * 🔴 STATUS QAPISI AXINDAN ƏVVƏLDİR (Blok 12D · TƏLƏ A).
+ *
+ * `getContentPage` həm MƏZMUNDUR, həm də 404 QƏRARIDIR (dərc olunmamış
+ * qaralama heç kimə görünmür). Ona görə o, `<Suspense>`-dən KƏNARDA gözlənilir
+ * — sərhədin arxasına salınsaydı cavab başlığı artıq getmiş olar və silinmiş
+ * səhifə 404 əvəzinə 200 qaytarardı.
+ *
+ * Sərhədə YALNIZ statusa təsir etməyən sorğu düşür: bölmə yoldaşlarının sayı.
+ */
 async function SinglePage({ route }: { route: Extract<ContentRoute, { kind: "page" }> }) {
-  const [page, sectionPages] = await Promise.all([
-    getContentPage(route.slug),
-    listSectionPages(route.section),
-  ]);
+  const page = await getContentPage(route.slug);
 
   if (!page) notFound();
 
@@ -119,10 +129,12 @@ async function SinglePage({ route }: { route: Extract<ContentRoute, { kind: "pag
           Onlar `page` marşrutuna bağlı deyil, yəni ayrıca ünvanları yoxdur —
           buna görə sadəcə başlıq siyahısı kimi göstərilmir, bölmə səhifəsində
           görünürlər. Hüquqi sənədlər isə `excludeLegal` ilə kənarlaşdırılır. */}
-      <SectionFootnote
-        sectionLabel={contentSectionLabel(route.section)}
-        count={excludeLegal(sectionPages).length}
-      />
+      <Suspense fallback={null}>
+        <SectionFootnote
+          section={route.section}
+          sectionLabel={contentSectionLabel(route.section)}
+        />
+      </Suspense>
     </article>
   );
 }
@@ -131,13 +143,19 @@ async function SinglePage({ route }: { route: Extract<ContentRoute, { kind: "pag
 // Bölmə (anchor-lu yazılar)
 // ---------------------------------------------------------------------------
 
-async function SectionPage({
-  route,
-}: {
-  route: Extract<ContentRoute, { kind: "section" }>;
-}) {
-  const pages = excludeLegal(await listSectionPages(route.section));
-
+/**
+ * 🔴 BÖLMƏ SƏHİFƏSİNDƏ `notFound()` YOXDUR — bu, onu digər məzmun
+ * səhifələrindən ayıran haldır (Blok 12D · A/B bölgüsü).
+ *
+ * `listSectionPages` boş qayıtsa səhifə 404 vermir, «məzmun hazırlanır»
+ * vəziyyətini göstərir. Yəni sorğu STATUSA TƏSİR ETMİR və bütöv gövdə
+ * `<Suspense>` arxasına salına bilər: başlıq və çörək qırıntıları DƏRHAL
+ * görünür, siyahı axınla gəlir.
+ *
+ * ⚠️ Marşrutun özünün mövcudluğu (`contentRouteOf`) `ContentRouteView`-də,
+ * sərhəddən ƏVVƏL və SİNXRON yoxlanılır — o qapı toxunulmazdır.
+ */
+function SectionPage({ route }: { route: Extract<ContentRoute, { kind: "section" }> }) {
   return (
     <div className="flex flex-col gap-8 py-8">
       <PageHeader
@@ -150,6 +168,20 @@ async function SectionPage({
         ]}
       />
 
+      {/* Fallback: məzmun cədvəli + iki uzun məqalə bloku ≈ real hündürlük. */}
+      <Suspense fallback={<PageSkeleton variant="article" count={4} header={false} announce={false} />}>
+        <SectionBody route={route} />
+      </Suspense>
+    </div>
+  );
+}
+
+/** ⚠️ TƏLƏ C: sorğu sərhədin İÇİNDƏ — valideyn onu gözləmir. */
+async function SectionBody({ route }: { route: Extract<ContentRoute, { kind: "section" }> }) {
+  const pages = excludeLegal(await listSectionPages(route.section));
+
+  return (
+    <>
       {pages.length === 0 ? (
         <EmptyState
           icon={FileText}
@@ -184,7 +216,7 @@ async function SectionPage({
           </div>
         </>
       )}
-    </div>
+    </>
   );
 }
 
@@ -254,13 +286,24 @@ function RelatedRoutes({
   );
 }
 
-function SectionFootnote({
+/**
+ * ⚠️ TƏLƏ C: sorğu MƏHZ BURADA edilir. Valideyndə `await` edilib `count` prop
+ * kimi ötürülsəydi yuxarıdakı `<Suspense>` heç nə etməzdi — data artıq
+ * gözlənilmiş olardı və məqalə yenə də onu gözləyərdi.
+ *
+ * `fallback={null}` — qeyd bir sətirlik əlavə məlumatdır və çox vaxt
+ * ümumiyyətlə göstərilmir (`count <= 1`). Boş yer saxlamaq real məzmun
+ * gəlməyəndə DAİMİ boşluq qoyardı.
+ */
+async function SectionFootnote({
+  section,
   sectionLabel,
-  count,
 }: {
+  section: ContentSection;
   sectionLabel: string;
-  count: number;
 }) {
+  const count = excludeLegal(await listSectionPages(section)).length;
+
   if (count <= 1) return null;
 
   return (

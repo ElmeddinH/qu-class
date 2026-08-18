@@ -1718,3 +1718,116 @@ Push **qəsdən işlədilməyib** — PAT istifadəçidədir, token bu terminald
 interaktiv oxuna bilməz (bax `scripts/git.mjs` başlığı). `npm run git:push`
 hazırdır: işə düşməzdən əvvəl auditi AYRI PROSES kimi çağırır, tapıntı varsa
 şəbəkəyə çıxmadan dayanır.
+
+---
+
+## Sprint 3/4 — Blok 12D — bitdi (yüklənmə vəziyyəti + responsive matrisi)
+
+Blok Sprint 3 F4 (loading state «bütün uyğun səhifələrdə»), Sprint 3 F3 + meyar 6
+və Sprint 4 F3 + meyar 7 (responsive «bütün səhifələr») meyarlarını bağlayır.
+Deploy artefaktlarına toxunulmayıb.
+
+```
+npx tsc --noEmit  ✓    npm run lint  ✓    npm run build  ✓
+vitest      1773 passed   (66 fayl)
+playwright   216 passed   (22 fayl, əvvəl 212 / 21)  ← +4 test: responsive matrisi
+```
+
+### 🔴 Blokun ƏSAS tələsi: axın statusu 200-ə kilidləyir
+
+`loading.tsx` seqmenti `<Suspense>`-ə bükür, yəni cavab AXINLA gedir. Axın
+başlayan kimi HTTP başlıqları — **o cümlədən status** — göndərilib: seqment
+sonradan `notFound()` çağırsa status **200** olur. Səhifədə «tapılmadı» yazır,
+protokol isə «tapıldı» deyir.
+
+Ona görə 51 səhifə **A/B** bölünüb (tam siyahı: `docs/responsive/report.md` §7):
+
+| Qrup | Say | Mexanizm |
+|---|---:|---|
+| **A** — status qapısı yoxdur | 19 | seqmentin ƏN DAR yerində `loading.tsx` |
+| **B** — status qapısı var | 20 | qapı `await` edilir, YALNIZ ondan sonrakı alt-ağac `<Suspense>`-ə bükülür |
+| **—** — uyğun deyil | 12 | gözləyəcək sorğu yoxdur (3) · səhifə yönləndirir (2) · yeganə sorğu 404 qərarının ÖZÜDÜR (7) |
+
+### Yol boyu tapılan üç tələ
+
+1. **`loading.tsx` bütün alt ağaca şamil olunur.** `/`, `/faculties`,
+   `/khankendi` üçün fayl valideyn seqmentə qoyulsaydı qonşu dinamik
+   seqmentlərə (`faculties/[slug]`, `khankendi/[id]`, `legal/[slug]`…) da
+   düşərdi. Həll: **route qrupu** — `(public)/(landing)/`,
+   `faculties/(index)/`, `khankendi/(index)/`. URL DƏYİŞMİR, seqment ağacında
+   isə ayrıca səviyyə yaranır.
+
+2. **`<Suspense>` yalnız İÇİNDƏ `await` edən komponenti bükəndə işləyir.**
+   Valideyndə `await` edib nəticəni prop kimi vermək sərhədi boşa çıxarır —
+   skeleton HEÇ VAXT görünmür, amma kod «edilmiş» kimi görünür. Ona görə
+   sorğular səhifədən komponentlərin İÇİNƏ köçürüldü.
+
+3. **Skeleton öz testini sındıra bilər.** `/` axınla getməyə başlayan kimi
+   `landing.spec.ts:106` qırıldı: `evaluateAll` təkrar cəhd etmir və `goto()`
+   qayıdanda ekranda karkas (footer `<h2>`-ləri) hazır, `<main>`-in `<h1>`-i
+   isə hələ yolda idi. Şərt DEYİL, ölçmə ANI düzəldildi — mövcud
+   `tests/e2e/settle.ts` → `settleHeadings()` əlavə olundu.
+
+### Yeni / dəyişən modullar
+
+- `src/components/shared/PageSkeleton.tsx` — **genişləndirildi** (yeni ailə
+  YARADILMADI): `variant` (`cards` · `list` · `table` · `rows` · `article` ·
+  `form`), `count`, `header`, `announce`. `announce={false}` səhifə daxili
+  sərhədlər üçündür — bir səhifədə çoxlu `role="status"` ekran oxuyucuda
+  səs-küydür, ona görə orada yalnız `aria-busy` qalır.
+- `src/features/feed/ClassFeedSection.tsx` — **yeni**: lentin server qabığı
+  (`listFeed` + `listEvents` səhifədən bura köçdü, tələ 2).
+- `src/features/profile/ProfileEditSection.tsx` — **yeni**: teq/klub
+  kataloqları qapıdan sonra axınla gəlir; `getProfileDraft` (404 qərarı)
+  səhifədə, sərhəddən kənarda qaldı.
+- `src/features/yearbook/ClassYearbook.tsx` → `YearbookSkeleton` ixrac edir
+  (albom başlığı ~220px kartdır, `PageSkeleton`-un 60px başlığı CLS verərdi).
+- `ContentRouteView`: `SectionPage` tam `<Suspense>` arxasına keçdi (bölmə
+  səhifəsində `notFound()` YOXDUR — boş nəticə «məzmun hazırlanır» deməkdir);
+  `SinglePage`-də isə yalnız `listSectionPages` sərhədə düşdü, `getContentPage`
+  (404 qərarı) qapıda qaldı.
+- `WhereAreWeNowPanel` / `ClassSupport` / `ModerationQueue` — başlıq statik,
+  gövdə sərhəd arxasında (mövcud `ClassDirectory` / `ClassAchievements`
+  idiomu ilə eyni). Dataya bağlı sayğaclar başlıqdan gövdəyə köçdü.
+
+### Responsive — 51 səhifə × 5 breakpoint
+
+- `tests/e2e/responsive.spec.ts` — **yeni QAPI**. Cədvəl-idarəli: hər cüt üçün
+  dörd şərt (üfüqi sürüşmə · header 72px · sidebar 280px/çəkməcə · `#main`
+  kəsilmir). Səhifəyə BİR dəfə naviqasiya, `setViewportSize` ilə beş en
+  (255 yoxlama, `workers: 1`). Dördüncü test siyahının tamlığını `src/app`
+  altındakı `page.tsx` SAYI ilə tutuşdurur — yeni səhifə əlavə olunanda
+  matris səssizcə geri qalmır.
+- `scripts/responsive-shots.ts` — siyahı 10 → **51** səhifəyə genişləndi
+  (255 PNG). Siyahı testin matrisi ilə eynidir; dinamik açarlar SEED-dən
+  oxunur. Hesabat `docs/responsive/report.md` — **avtomatik yaradılır**,
+  əl ilə redaktə etmə.
+- `.gitignore` DƏYİŞMƏYİB — PNG-lər qəsdən xaricdədir.
+
+### Tapılan və düzəldilən qırıqlar
+
+| Səhifə | Qırıq | Düzəliş |
+|---|---|---|
+| `/admin/cohorts` | 375px-də **157px üfüqi sürüşmə** — native `<select>`-in iç minimum eni 491px, grid xanası `min-width: auto` daşıdığı üçün sıxılmır | `min-w-0` + `w-full` (`CohortCreateForm.tsx`). Eyni düzəliş 12C-də `AdminUserFilters.tsx`-ə verilmişdi, bu forma unudulmuşdu |
+| `/events/[id]/manage` | çeşidləmə düyməsi **73×21px** — WCAG 2.2 AA 24px qapısından aşağı | `min-h-6` (`AttendeeTable.tsx`) |
+
+Üfüqi sürüşmə yekun ölçmədə **0/255**.
+
+### 🔴 Köhnə iddianın DÜZƏLİŞİ — 24px qapısı
+
+Blok 12C README №9-da «WCAG 2.2 AA-nın 24px qapısı ödənilib» yazmışdı, amma
+həmin ölçmə **10 səhifədə** idi. 51 səhifəyə genişlənəndə iki shadcn primitivi
+qapının altında qaldı: `Checkbox` **16×16** (`ui/checkbox.tsx` → `h-4 w-4`) və
+`Switch` **36×20** (`ui/switch.tsx` → `h-5 w-9`) — beş səhifədə görünür
+(`/me/career`, `/admin/moderation`, `/events/[id]/manage`,
+`/class/[slug]/memories`, `/kuds`).
+
+İkisi də `src/components/ui/`-dədir və CLAUDE.md §1-ə görə toxunulmazdır;
+çağırış yerində `className` ilə böyütmək bütün sistemdə checkbox/switch ölçüsünü
+dəyişən **dizayn qərarıdır**, responsive qırığı deyil. Ona görə DÜZƏLDİLMƏDİ,
+amma README №9 artıq doğru rəqəmi yazır. Bu, kod borcu deyil, **açıq qərar
+gözləyən dizayn sualıdır**.
+
+### Dayanma nöqtəsi
+
+Deploy hələ də `FLY_API_TOKEN` gözləyir (Blok 12A) — bu blok ona toxunmayıb.

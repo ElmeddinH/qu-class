@@ -10,22 +10,17 @@
 // çalışır və bir istifadəçinin lenti keşlənib başqasına verilə bilər.
 // ============================================================================
 
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { ClassFeed } from "@/features/feed/ClassFeed";
-import { serializeFeedPage } from "@/features/feed/types";
+import { PageSkeleton } from "@/components/shared/PageSkeleton";
+import { ClassFeedSection } from "@/features/feed/ClassFeedSection";
 import { requireUser } from "@/lib/auth";
 import { PostCategorySchema } from "@/lib/enums";
 import { getCohortHeader } from "@/services/cohort.service";
-import { listEvents } from "@/services/event.service";
-import { listFeed } from "@/services/post.service";
 
 export const dynamic = "force-dynamic";
-
-const FIRST_PAGE_SIZE = 20;
-/** Kompozitorun tədbir seçicisi — bütün siyahı lazım deyil. */
-const EVENT_OPTION_LIMIT = 50;
 
 interface FeedPageProps {
   params: Promise<{ slug: string }>;
@@ -44,6 +39,9 @@ export default async function ClassFeedPage({ params, searchParams }: FeedPagePr
   const viewer = await requireUser();
   const [{ slug }, query] = await Promise.all([params, searchParams]);
 
+  // 🔴 SIRA VACİBDİR (Blok 12D · TƏLƏ A): mövcudluq qapısı AXINDAN ƏVVƏL.
+  // Seqmentə `loading.tsx` qoyulsaydı status hələ bura çatmamış 200 kimi
+  // göndərilər və naməlum sinif slug-ı «yumşaq 404» verərdi.
   const cohort = await getCohortHeader(viewer, slug);
   if (!cohort) notFound();
 
@@ -52,15 +50,6 @@ export default async function ClassFeedPage({ params, searchParams }: FeedPagePr
   const rawCategory = Array.isArray(query.category) ? query.category[0] : query.category;
   const parsedCategory = rawCategory ? PostCategorySchema.safeParse(rawCategory) : null;
   const category = parsedCategory?.success ? parsedCategory.data : null;
-
-  const [firstPage, events] = await Promise.all([
-    listFeed(viewer, {
-      cohortId: cohort.id,
-      category: category ?? undefined,
-      take: FIRST_PAGE_SIZE,
-    }),
-    listEvents(viewer, { cohortId: cohort.id, take: EVENT_OPTION_LIMIT }),
-  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -71,18 +60,21 @@ export default async function ClassFeedPage({ params, searchParams }: FeedPagePr
         </p>
       </header>
 
-      <ClassFeed
-        cohortId={cohort.id}
-        cohortSlug={cohort.slug}
-        canPost={cohort.isMember}
-        category={category}
-        initialPage={serializeFeedPage(firstPage)}
-        events={events.map((event) => ({
-          id: event.id,
-          title: event.title,
-          startsAt: event.startsAt.toISOString(),
-        }))}
-      />
+      {/* 🔴 TƏLƏ C: lent sorğuları BURADA DEYİL, `ClassFeedSection`-un içindədir
+          — səbəb həmin faylın başlığındadır. `key` filtri dəyişəndə sərhədi
+          yenidən qurur, yoxsa köhnə kateqoriyanın yazıları qalır. */}
+      <Suspense
+        key={category ?? "all"}
+        fallback={<PageSkeleton variant="list" count={3} header={false} announce={false} />}
+      >
+        <ClassFeedSection
+          viewer={viewer}
+          cohortId={cohort.id}
+          cohortSlug={cohort.slug}
+          canPost={cohort.isMember}
+          category={category}
+        />
+      </Suspense>
     </div>
   );
 }

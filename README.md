@@ -112,7 +112,11 @@ ekran `alumni@qu.edu.az` (sinfi `maliyye-2022`) hesabı ilə — yəni **həmin
 sinfin üzvü kimi** — çəkilib.
 
 Beş breakpoint üzrə **ölçülmüş** responsive görüntülər ayrıdır:
-`npm run audit:responsive` → [`docs/responsive/`](docs/responsive/report.md).
+`npm run audit:responsive` → [`docs/responsive/`](docs/responsive/report.md)
+(**51 səhifə × 5 breakpoint = 255 ölçmə**). Görüntülər SƏNƏDDİR; reqressiya
+QAPISI [`tests/e2e/responsive.spec.ts`](tests/e2e/responsive.spec.ts)-dir —
+eyni matrisi maşınla yoxlayır (üfüqi sürüşmə · header 72px · sidebar
+280px/çəkməcə · məzmun kəsilmir).
 
 ---
 
@@ -691,7 +695,7 @@ npx tsc --noEmit      # tip yoxlaması
 
 ```bash
 npm run audit:lighthouse   # Lighthouse · 5 səhifə (auth kukisi ilə) → docs/lighthouse/
-npm run audit:responsive   # 5 breakpoint × 10 səhifə → docs/responsive/
+npm run audit:responsive   # 5 breakpoint × 51 səhifə → docs/responsive/
 npm run audit:queries      # N+1 sorğu profili
 npm run git:audit          # push öncəsi sızma auditi → docs/git-audit-report.md
 ```
@@ -788,8 +792,8 @@ qalır.
 |---|---|---|
 | 6 | **ISR ictimai səhifələrdə yoxdur** | `ConsentGate` → `cookies()` bütün `(public)` route-larını dinamik edir; PPR experimental, stack kilidlidir. Ölçü itki göstərmir |
 | 7 | **`/home` mobil Performance 87** | Yönləndirmə 600 ms alır; hədəf səhifə birbaşa ölçüləndə **91** |
-| 8 | **`loading.tsx` yalnız `(admin)`-də** | Axınla render `notFound()` statusunu 200-ə çevirir |
-| 9 | **KUDS 44px toxunma hədəfi tam ödənmir** (351 element 24–43px) | shadcn primitivlərinin öz ölçüsüdür (`h-9` = 36px), `src/components/ui/` toxunulmazdır. WCAG 2.2 AA-nın 24px qapısı **ödənilib** |
+| 8 | **Yüklənmə vəziyyəti iki mexanizmlə verilir** — 19 səhifədə `loading.tsx`, 20 səhifədə səhifə daxili `<Suspense>`, 12 səhifədə heç biri | Axınla render cavab başlığını — yəni **statusu** — məzmundan əvvəl göndərir, ona görə `notFound()` / `forbidden()` çağıran seqmentə `loading.tsx` qoyula bilmir (404 səssizcə 200 olur). Səhifələr **A/B** bölünüb: **A** = status qapısı yoxdur → seqmentin ƏN DAR yerində `loading.tsx` (üç yerdə route qrupu ilə daraldılıb ki, qonşu dinamik seqmentə düşməsin); **B** = status qapısı var → qapı `await` edilir, YALNIZ ondan sonrakı alt-ağac `<Suspense>`-ə bükülür. Qalan 12 səhifədə ya gözləyəcək sorğu yoxdur (`/kuds`, `/docs`, `/login`), ya səhifə yönləndirir (`/home`, `/me`), ya da yeganə sorğu 404 qərarının ÖZÜDÜR — onu sərhədin arxasına salmaq statusu sındırardı. Bölgü və hər səhifənin səbəbi: [`docs/responsive/report.md`](docs/responsive/report.md) |
+| 9 | **Toxunma hədəfi: WCAG 2.2 AA-nın 24px qapısı iki primitivdə ödənmir**, KUDS-un 44px tövsiyəsi isə 1674 elementdə | ⚠️ Blok 12C bu qapını «ödənilib» kimi yazmışdı, amma ölçmə **10 səhifədə** idi. Blok 12D-də 51 səhifəyə genişlənəndə `Checkbox` (**16×16**, `ui/checkbox.tsx` → `h-4 w-4`) və `Switch` (**36×20**, `ui/switch.tsx` → `h-5 w-9`) qapının altında qaldı — beş səhifədə görünür (`/me/career`, `/admin/moderation`, `/events/[id]/manage`, `/class/[slug]/memories`, `/kuds`). İkisi də shadcn primitividir və `src/components/ui/` CLAUDE.md §1-ə görə toxunulmazdır; çağırış yerində `className` ilə böyütmək bütün sistemdə checkbox/switch ölçüsünü dəyişən **dizayn qərarıdır**, responsive qırığı deyil. Blok 12D-də tapılan ÜÇÜNCÜ pozuntu (`AttendeeTable` çeşidləmə düyməsi 73×21) düzəldildi — o, bizim kodumuzda idi. 44px isə qapı deyil, tövsiyədir |
 | 10 | Profil banneri xarici ünvanda `<img>` qalır | `next/image` hər hostu `remotePatterns`-də tələb edir; hamısını açmaq optimizatoru açıq proksiyə çevirər |
 | 11 | Kuki banneri mobil `/directory`-də CLS 0.035 | Banner `fixed`-dir, şrift `swap` ilə gələndə hündürlüyü dəyişir. «Yaxşı» zolağın içindədir (< 0.1) |
 

@@ -39,8 +39,8 @@
 |---|---|---|---|---|
 | F1. Əsas səhifə və axınların **min. 75%-i** | ✅ tam | PLAN.md §4.2-dəki **43 route-un 43-ü** var (42 birbaşa + 1 inline). Üstəlik planda olmayan 9 səhifə. Bax §4.1 | — | — |
 | F2. UI/UX təkmilləşdirilməli | ✅ tam | Blok 12C: axe `serious` 141 node → **0** (STATE.md:1600); `tests/e2e/a11y.spec.ts` 12 səhifə × 2 vəziyyət | — | — |
-| F3. Responsive dizayn bütün tamamlanmış səhifələr üçün | ⚠️ qismən | REAL ölçmə var: `docs/responsive/` — **11 səhifə × 5 breakpoint = 51 PNG** + `docs/responsive/report.md` (üfüqi sürüşmə 0, toxunma hədəfi <24px 0). Playwright: `tests/e2e/landing.spec.ts:331-334` (6 viewport), `tests/e2e/public.spec.ts:581-589` (360px × 6 route) | **51 səhifədən 11-i** ölçülüb. 40 səhifə heç bir breakpoint-də yoxlanmayıb. Bax §7 | 4 saat |
-| F4. **Loading / Empty / Error state-lər bütün uyğun səhifələrdə** | ⚠️ qismən | `error.tsx` **51/51** ✅ · `not-found.tsx` **51/51** ✅ · `global-error.tsx` ✅ · EmptyState 48 komponentdə. **`loading.tsx` isə yalnız 9/51** | **31 səhifə** server komponentdir, `await` edir, nə `loading.tsx`, nə `<Suspense>` var → istifadəçi boş ekran görür. Bax §8 | 6 saat |
+| F3. Responsive dizayn bütün tamamlanmış səhifələr üçün | ✅ tam *(Blok 12D)* | **51/51 səhifə × 5 breakpoint = 255 ölçmə**. QAPI: `tests/e2e/responsive.spec.ts` — hər cüt üçün dörd şərt (üfüqi sürüşmə · header 72px · sidebar 280px/çəkməcə · `#main` kəsilmir); siyahının tamlığı `src/app`-dakı `page.tsx` sayı ilə tutuşdurulur. SƏNƏD: `docs/responsive/report.md` + 255 PNG (`npm run audit:responsive`) | Üfüqi sürüşmə **0/255**. Tapılan qırıq: `/admin/cohorts` 375px-də 157px sürüşürdü (native `<select>` + `min-width: auto`) → düzəldildi | — |
+| F4. **Loading / Empty / Error state-lər bütün uyğun səhifələrdə** | ✅ tam *(Blok 12D)* | `error.tsx` **51/51** ✅ · `not-found.tsx` **51/51** ✅ · `global-error.tsx` ✅ · EmptyState 48 komponentdə. Yüklənmə vəziyyəti **39/51**: 19 səhifə `loading.tsx`, 20 səhifə səhifə daxili `<Suspense>` | Qalan 12 səhifə **UYĞUN DEYİL** və səbəb ölçülüb: 3-də gözləyəcək sorğu yoxdur (`/kuds`, `/docs`, `/login`), 2-si yönləndirir (`/home`, `/me`), 7-də yeganə sorğu 404/403 qərarının ÖZÜDÜR — onu axının arxasına salmaq statusu 200-ə çevirərdi. Bölgü: `docs/responsive/report.md` §7 və README №8 | — |
 | F5. Performans optimizasiyaları (lazy loading, image opt.) | ✅ tam | `next/image` 19 faylda, xam `<img>` **1 ədəd** və səbəbi yazılıb (`src/features/profile/StoryHeader.tsx:61,77` — xarici host). Recharts 4/4 lazy, xəritələr 2/2 lazy. Bax §9 | — | — |
 
 ### 2.3 Deployment Deliverables
@@ -61,7 +61,7 @@
 | 3. Frontend və Backend canlı mühitdə işləyir | ❌ yox | 2-nin nəticəsi |
 | 4. Əsas istifadəçi axınları problemsiz icra olunur | ⚠️ qismən | **Lokalda** sübut var: `vitest` 1759/1759, Playwright 212 test / 20 fayl. **Canlı mühitdə ölçülməyib** — mühit yoxdur |
 | 5. Swagger sənədləşməsi tam yenilənmişdir | ⚠️ qismən | 52/53 operation. 1 elan edilməmiş (B5) |
-| 6. Responsive dizayn bütün tamamlanmış səhifələrdə işləyir | ⚠️ qismən | 11/51 səhifə ölçülüb (F3) |
+| 6. Responsive dizayn bütün tamamlanmış səhifələrdə işləyir | ✅ tam *(Blok 12D)* | 51/51 səhifə × 5 breakpoint, maşın qapısı ilə (F3) |
 | 7. Layihə həm lokal, həm deploy olunmuş mühitdə problemsiz işləyir | ⚠️ qismən | Lokal: `tsc ✓ lint ✓ build ✓ vitest ✓`. Deploy tərəfi mövcud deyil |
 
 **Nəticə: 1 tam · 4 qismən · 2 yox.** Meyar 2 və 3 bloklayıcıdır — onlarsız sprint qəbul olunmur.
@@ -94,7 +94,7 @@
 |---|---|---|---|---|
 | F1. Bütün səhifələr və istifadəçi axınları tamamlanmalı | ✅ tam | 51 `page.tsx`; PLAN.md §4.2-nin 43/43-ü örtülüb (§4.1) | — | — |
 | F2. Sprint Review UI/UX problemləri aradan qaldırılmalı | ➖ aid deyil | Review qeydləri yoxdur | Qeydlərin özü | — |
-| F3. Responsive dizayn bütün səhifələrdə yoxlanılmalı və yekunlaşdırılmalı | ⚠️ qismən | 11/51 səhifə ölçülüb (§7) | 40 səhifə | 4 saat |
+| F3. Responsive dizayn bütün səhifələrdə yoxlanılmalı və yekunlaşdırılmalı | ✅ tam *(Blok 12D)* | 51/51 səhifə × 5 breakpoint = 255 ölçmə; reqressiya qapısı `tests/e2e/responsive.spec.ts` | — | — |
 | F4. Dizayn ardıcıllığı (Design System consistency) tam təmin edilməli | ✅ tam | KUDS kontrast qaydalarının mənbə skanı: `src/lib/kuds-contrast.test.ts` · canlı bələdçi `/kuds` (`src/app/(app)/kuds/page.tsx`) · `src/components/ui/` toxunulmazdır | — | — |
 | F5. İstifadəçi təcrübəsi son dəfə optimallaşdırılmalı | ⚠️ qismən | axe 0 `serious`; Lighthouse mobil ən aşağı 87 (`docs/lighthouse/mobile/home.report.json`) | Loading state boşluğu (§8) birbaşa UX borcudur | (F4/Sprint3 ilə eyni) |
 
@@ -118,7 +118,7 @@
 | 4. Frontend və Backend tam inteqrasiya olunmuşdur | ✅ tam | Vahid Next.js App Router monolit (`docs/DECISIONS.md` QD-004, sətir 148-161); CORS/ayrı deploy problemi yoxdur |
 | 5. Deploy edilmiş layihə problemsiz işləyir | ❌ yox | Deploy yoxdur |
 | 6. Swagger və layihə sənədləşməsi tam yenilənmişdir | ⚠️ qismən | Swagger 52/53; README-də deploy bölməsi yoxdur |
-| 7. Responsive dizayn bütün səhifələrdə düzgün işləyir | ⚠️ qismən | 11/51 səhifə ölçülüb |
+| 7. Responsive dizayn bütün səhifələrdə düzgün işləyir | ✅ tam *(Blok 12D)* | 51/51 səhifə × 5 breakpoint = 255 ölçmə (F3) |
 | 8. Layihə lokal və deploy olunmuş mühitdə problemsiz build olunur | ⚠️ qismən | Lokal build ✅ (94 route). Deploy mühiti yoxdur — bax §12 (build-in keçməsi deploy hazırlığı demək deyil) |
 
 **Nəticə: 1 tam · 5 qismən · 1 yox · 1 ölçülə bilməz.**
@@ -757,8 +757,8 @@ Vaxt: 5–8 saat.
 |---|---|---|---|
 | **1** | **Deploy edilmiş işlək versiya + link** | Sprint 3 meyar 2, 3, 7 və Sprint 4 meyar 5, 8 — beş meyarın qapısı. Variant seçilməli, sonra icra | **3–10** (variantdan asılı) |
 | **2** | **Deploy-a qədər DB provider qərarı** | §10.3 — deploy-dan sonra provider dəyişikliyi mümkün olmayacaq. Qərar 1-ci addımdan ƏVVƏL verilməlidir | 0.5 (qərar) |
-| **3** | **Loading state — 31 səhifə** | Sprint 3 F4 açıq şəkildə «bütün uyğun səhifələrdə» deyir. Səhifə daxili `<Suspense>` + mövcud `PageSkeleton` | **6** (ən ağır 10 səhifə üçün 2) |
-| **4** | **Responsive — 40 ölçülməmiş səhifə** | Sprint 3 F3 + Sprint 4 F3/meyar 7 «bütün səhifələr». `scripts/responsive-shots.ts` hazırdır, siyahı genişləndirilməlidir | **4** |
+| ~~**3**~~ | ~~**Loading state — 31 səhifə**~~ | ✅ **Blok 12D-də bağlandı** — 19 `loading.tsx` + 20 səhifə daxili `<Suspense>`; qalan 12 səhifənin «uyğun deyil» səbəbi sənədləşdi | ~~6~~ |
+| ~~**4**~~ | ~~**Responsive — 40 ölçülməmiş səhifə**~~ | ✅ **Blok 12D-də bağlandı** — 51/51 səhifə həm `tests/e2e/responsive.spec.ts` qapısında, həm `scripts/responsive-shots.ts` sənədində | ~~4~~ |
 | **5** | **OpenAPI kor nöqtəsi** (§5.3) | Sprint 3 B5 + Sprint 4 B5 «tam əhatə». Filtri götür + 1 ağ siyahı sətri | **1** |
 | **6** | **README deploy bölməsi + canlı link** | Sprint 4 Z4 | **2** |
 | **7** | **Canlı mühitdə E2E keçidi** | Sprint 4 Z2 «tam End-to-End yoxlanılmalı» — 212 test canlı URL-ə qarşı | **2** |

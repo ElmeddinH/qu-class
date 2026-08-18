@@ -1,8 +1,8 @@
 // ============================================================================
 // src/app/(admin)/loading.tsx
-// `(admin)` route qrupunun yüklənmə ekranı (Blok 12C · D bəndi).
+// `(admin)` route qrupunun yüklənmə ekranı.
 //
-// 🔴 NİYƏ `loading.tsx` YALNIZ BU QRUPDADIR — ÖLÇÜLMÜŞ SƏBƏB.
+// 🔴 BURADA `loading.tsx` NİYƏ TƏHLÜKƏSİZDİR — ÖLÇÜLMÜŞ SƏBƏB (Blok 12C/12D).
 //
 // `loading.tsx` route seqmentini AXINLA (streaming) render edir: cavabın
 // başlığı — o cümlədən HTTP STATUSU — məzmun hazır olmamışdan ƏVVƏL göndərilir.
@@ -10,25 +10,28 @@
 // istifadəçi «yumşaq 404» alır (səhifədə «tapılmadı» yazır, protokol isə
 // «tapıldı» deyir).
 //
-// Bu, layihə üçün REAL regresdir:
-//   · `(app)` və `(public)` qruplarında **25 səhifə** `notFound()` çağırır
-//     (sinif slug-ı, tədbir id-si, hüquqi səhifə slug-ı…);
-//   · «yoxdur» ilə «icazə yoxdur» QƏSDƏN ayırd edilmir (PLAN.md §4.3) — 200
-//     cavabı ünvanın MÖVCUDLUĞUNU təsdiqləyir və qapını bir qədər açır;
-//   · üç mövcud e2e testi məhz 404 statusunu ölçür (`public.spec.ts`,
-//     `events.spec.ts`, `public-nav.spec.ts`).
-//
 // ÖLÇÜ: `(app)/loading.tsx` ilə `/class/<mövcud-olmayan>` **200** qaytarırdı;
-// fayl silinəndən sonra **404**. Ona görə həmin iki qrupda skeleton
-// SƏHİFƏ SƏVİYYƏSİNDƏKİ `Suspense` sərhədləri ilə verilir (onlar statusu
-// dəyişmir, çünki `notFound()` onlardan ƏVVƏL, səhifənin öz gövdəsində işləyir).
+// fayl silinəndən sonra **404**. Üç mövcud e2e testi məhz statusu ölçür
+// (`public.spec.ts`, `events.spec.ts`, `public-nav.spec.ts`).
 //
-// `(admin)` qrupunda isə HEÇ BİR səhifə `notFound()` çağırmır — yəni burada
-// axınla render heç nəyi pozmur və skeleton sərbəst işlədilə bilər.
+// `(admin)` qrupunda isə HEÇ BİR səhifə `notFound()` çağırmır:
+//   · doqquz admin səhifəsinin heç birində mövcudluq qapısı yoxdur — hamısı
+//     siyahı/panel səhifəsidir;
+//   · yeganə status qapısı `(admin)/layout.tsx` → `requireAdmin()` → 403-dür,
+//     o isə bu sərhəddən KƏNARDA, LAYOUT-da işləyir. Next `loading.tsx`-i
+//     layout-un ÖVLADLARININ ətrafına qoyur, yəni `forbidden()` axın
+//     başlamamışdan əvvəl atılır və status 403 qalır.
+//
+// Blokun tam A/B bölgüsü: `docs/responsive/report.md` §1.
+//
+// ⚠️ Bu, QRUP KÖKÜDÜR və bütün alt ağaca şamil olunur — burada saxlanılmasının
+// şərti yuxarıdakı ikinci bənddir (alt ağacda `notFound()` YOXDUR). Cədvəl
+// formalı iki səhifə (`/admin/users`, `/admin/audit`) öz DAR seqmentində bunu
+// üstələyir, çünki kart qridi skeletonu cədvəl üçün səhv hündürlük verir.
 // ============================================================================
 
 import { PageSkeleton } from "@/components/shared/PageSkeleton";
 
 export default function AdminLoading() {
-  return <PageSkeleton cards={4} label="İdarəetmə ekranı yüklənir" />;
+  return <PageSkeleton variant="cards" count={4} label="İdarəetmə ekranı yüklənir" />;
 }

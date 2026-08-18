@@ -96,13 +96,19 @@ export function CohortCreateForm({ programs }: { programs: ProgramOption[] }) {
           className="flex flex-col gap-4"
         >
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex flex-col gap-2">
+            {/* 🔴 `min-w-0` + `w-full` (Blok 12D · 375px üfüqi sürüşməsi — 157px).
+                Native `<select>`-in İÇ MİNİMUM ENİ ən uzun opsiyanın enidir
+                («Mühəndislik — Kompüter elmləri» ≈ 491px). Grid xanası default
+                `min-width: auto` daşıyır, yəni bu minimumdan AŞAĞI SIXILA
+                BİLMİR və mobil ekranda bütün səhifə yana sürüşür. Eyni düzəliş
+                `AdminUserFilters.tsx`-dədir (Blok 12C) — burada unudulmuşdu. */}
+            <div className="flex min-w-0 flex-col gap-2">
               <Label htmlFor="cohort-program">İxtisas</Label>
               <select
                 id="cohort-program"
                 value={programId}
                 onChange={(event) => setProgramId(event.target.value)}
-                className="h-10 rounded-input border border-border bg-surface px-3 text-small text-text-primary"
+                className="h-10 w-full min-w-0 rounded-input border border-border bg-surface px-3 text-small text-text-primary"
               >
                 {programs.map((option) => (
                   <option key={option.id} value={option.id}>

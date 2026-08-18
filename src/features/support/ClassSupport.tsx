@@ -18,10 +18,12 @@
 // + üzvlük), JS yalnız ARTIQ SÜZÜLMÜŞ siyahını növlərə paylayır.
 // ============================================================================
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { Briefcase, HandHeart, Lock, UserRound } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
+import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,17 +48,20 @@ const SUPPORT_HINTS: Record<string, string> = {
   EVENT_PARTICIPATION: "Universitet tədbirlərində iştirak.",
 };
 
-export async function ClassSupport({ cohort }: { cohort: CohortHeader }) {
-  const viewer = await getViewer();
-  const offers = await listCohortSupportOffers(viewer, cohort.id);
-
-  const byType = new Map<string, SupportOfferEntry[]>(
-    SUPPORT_OFFER_TYPE_VALUES.map((type) => [type, []]),
-  );
-  for (const offer of offers) byType.get(offer.type)?.push(offer);
-
-  const contributorCount = new Set(offers.map((offer) => offer.user.id)).size;
-
+/**
+ * 🔴 BAŞLIQ SORĞUNU GÖZLƏMİR (Blok 12D · S3-F4).
+ *
+ * Səhifə status qapısındandır (`support/page.tsx` → `notFound()`), yəni
+ * seqmentə `loading.tsx` QOYULA BİLMİR (axın 404-ü 200-ə çevirər). Skeleton
+ * qapıdan SONRA, burada verilir.
+ *
+ * ⚠️ TƏLƏ C: `listCohortSupportOffers` sərhədin İÇİNDƏ (`SupportBody`)
+ * çağırılır. Burada `await` edilsəydi boundary boşa işləyərdi.
+ *
+ * ⚠️ Sayğac («N təklif · M nəfər») sərhədin İÇİNƏ köçdü — dataya bağlıdır və
+ * başlıqda qalsaydı başlıq da gözləməli olardı.
+ */
+export function ClassSupport({ cohort }: { cohort: CohortHeader }) {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-3">
@@ -70,11 +75,33 @@ export async function ClassSupport({ cohort }: { cohort: CohortHeader }) {
           <Button asChild variant="outline">
             <Link href="/me/career">Öz təklifimi redaktə et</Link>
           </Button>
-          <span className="text-small text-text-secondary">
-            {offers.length} təklif · {contributorCount} nəfər
-          </span>
         </div>
       </header>
+
+      {/* Fallback: iki sütunlu təklif kartları — real qridlə eyni forma. */}
+      <Suspense fallback={<PageSkeleton variant="cards" count={4} header={false} announce={false} />}>
+        <SupportBody cohort={cohort} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function SupportBody({ cohort }: { cohort: CohortHeader }) {
+  const viewer = await getViewer();
+  const offers = await listCohortSupportOffers(viewer, cohort.id);
+
+  const byType = new Map<string, SupportOfferEntry[]>(
+    SUPPORT_OFFER_TYPE_VALUES.map((type) => [type, []]),
+  );
+  for (const offer of offers) byType.get(offer.type)?.push(offer);
+
+  const contributorCount = new Set(offers.map((offer) => offer.user.id)).size;
+
+  return (
+    <>
+      <p className="text-small text-text-secondary">
+        {offers.length} təklif · {contributorCount} nəfər
+      </p>
 
       {!cohort.isMember ? (
         <EmptyState
@@ -130,7 +157,7 @@ export async function ClassSupport({ cohort }: { cohort: CohortHeader }) {
           })}
         </div>
       )}
-    </div>
+    </>
   );
 }
 

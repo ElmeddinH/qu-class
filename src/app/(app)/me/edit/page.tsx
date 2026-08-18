@@ -1,17 +1,15 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Eye, ShieldCheck } from "lucide-react";
 
+import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { Button } from "@/components/ui/button";
-import { ProfileEditForm } from "@/features/profile/ProfileEditForm";
+import { ProfileEditSection } from "@/features/profile/ProfileEditSection";
 import { getSessionUser, requireUser } from "@/lib/auth";
 import { CONTROLLED_PROFILE_FIELDS } from "@/lib/visibility";
-import {
-  getProfileDraft,
-  listClubCatalog,
-  listTagCatalog,
-} from "@/services/user.service";
+import { getProfileDraft } from "@/services/user.service";
 
 export const metadata: Metadata = {
   title: "Profili redaktə et",
@@ -30,11 +28,12 @@ export const metadata: Metadata = {
 export default async function ProfileEditPage() {
   const viewer = await requireUser();
 
-  const [draft, sessionUser, tagCatalog, clubCatalog] = await Promise.all([
+  // 🔴 YALNIZ STATUS QAPISI AXINDAN ƏVVƏL GÖZLƏNİLİR (Blok 12D · TƏLƏ A).
+  // Teq və klub kataloqları buradan ÇIXARILDI — onlar 404 qərarına təsir
+  // etmir və `ProfileEditSection` sərhədinin arxasında axınla gəlir.
+  const [draft, sessionUser] = await Promise.all([
     getProfileDraft(viewer),
     getSessionUser(),
-    listTagCatalog(viewer),
-    listClubCatalog(viewer),
   ]);
 
   // Sessiya var, istifadəçi sətri yoxdur (silinmiş hesab) — 404 daha doğrudur
@@ -69,14 +68,16 @@ export default async function ProfileEditPage() {
         </div>
       </div>
 
-      <ProfileEditForm
-        userId={viewer.userId}
-        firstName={sessionUser.firstName}
-        lastName={sessionUser.lastName}
-        draft={draft}
-        tagCatalog={tagCatalog}
-        clubCatalog={clubCatalog}
-      />
+      {/* ⚠️ TƏLƏ C: kataloq sorğuları `ProfileEditSection`-un İÇİNDƏDİR. */}
+      <Suspense fallback={<PageSkeleton variant="form" count={9} header={false} announce={false} />}>
+        <ProfileEditSection
+          viewer={viewer}
+          userId={viewer.userId}
+          firstName={sessionUser.firstName}
+          lastName={sessionUser.lastName}
+          draft={draft}
+        />
+      </Suspense>
     </div>
   );
 }

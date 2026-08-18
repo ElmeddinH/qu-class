@@ -32,6 +32,7 @@ import { PrintButton } from "@/components/shared/PrintButton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getViewer } from "@/lib/auth";
 import { memoryTypeLabel } from "@/lib/labels";
 import { cn } from "@/lib/utils";
@@ -156,6 +157,69 @@ export async function ClassYearbook({ cohort }: { cohort: CohortHeader }) {
           ),
         )
       )}
+    </div>
+  );
+}
+
+/**
+ * Albomun yüklənmə skeletonu — səhifə DAXİLİ `<Suspense fallback>` üçün.
+ *
+ * 🔴 NİYƏ AYRICA SKELETON, `PageSkeleton` DEYİL. Albomun başlığı adi `<h1>`
+ * deyil, ~220px hündürlüyündə KART-dır (sinif kimliyi + metadata zolağı).
+ * `PageSkeleton`-un başlıq bloku ~60px-dir; fərq məzmun gələndə gözlə görünən
+ * sıçrayışdır (CLS). Ölçülər real komponentdən götürülüb: `p-8` kart, `text-display`
+ * başlıq, `<dl>` zolağı, sonra iki sütunlu `gap-6` kart qridi.
+ *
+ * ⚠️ `role="status"` YOXDUR — səhifədə bir dənə canlı bölgə kifayətdir;
+ * `aria-busy` sərhədin gözlədiyini bildirir, boz qutular isə `aria-hidden`-dir.
+ */
+export function YearbookSkeleton() {
+  return (
+    <div className="flex flex-col gap-8" aria-busy>
+      <div
+        className="flex flex-col gap-4 rounded-card border border-border bg-surface p-8 shadow-sm-kuds"
+        aria-hidden
+      >
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-3 w-56" />
+            <Skeleton className="h-12 w-72" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-9 w-48" />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-6">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-40" />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-6" aria-hidden>
+        <Skeleton className="h-6 w-64" />
+        <div className="grid gap-6 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div
+              key={index}
+              className="flex flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-sm-kuds"
+            >
+              <div className="flex items-start gap-3">
+                <Skeleton className="h-12 w-12 rounded-avatar" />
+                <div className="flex flex-1 flex-col gap-2">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </div>
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-3/5" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

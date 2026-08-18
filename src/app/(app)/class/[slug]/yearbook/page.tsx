@@ -13,10 +13,11 @@
 // başqasına verilə bilərdi.
 // ============================================================================
 
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { ClassYearbook } from "@/features/yearbook/ClassYearbook";
+import { ClassYearbook, YearbookSkeleton } from "@/features/yearbook/ClassYearbook";
 import { requireUser } from "@/lib/auth";
 import { getCohortHeader } from "@/services/cohort.service";
 
@@ -38,8 +39,18 @@ export default async function YearbookPage({ params }: YearbookPageProps) {
   const viewer = await requireUser();
   const { slug } = await params;
 
+  // 🔴 SIRA VACİBDİR (Blok 12D · TƏLƏ A): mövcudluq qapısı AXINDAN ƏVVƏL.
+  // `loading.tsx` bu seqmentə qoyulsaydı cavab başlığı — yəni STATUS — burada
+  // hələ heç nə yoxlanmamış göndərilər və naməlum slug 404 əvəzinə 200 verərdi.
   const cohort = await getCohortHeader(viewer, slug);
   if (!cohort) notFound();
 
-  return <ClassYearbook cohort={cohort} />;
+  // Qapıdan SONRA ağır alt-ağac axınla gəlir. ⚠️ TƏLƏ C: `listYearbook`
+  // `ClassYearbook`-un İÇİNDƏDİR — burada `await` edib prop versək sərhəd
+  // heç nə etməzdi.
+  return (
+    <Suspense fallback={<YearbookSkeleton />}>
+      <ClassYearbook cohort={cohort} />
+    </Suspense>
+  );
 }

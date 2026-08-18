@@ -14,9 +14,11 @@
 // (funksiya / Date yoxdur), server → client sərhədindən keçir.
 // ============================================================================
 
+import { Suspense } from "react";
 import { MapPinned, Users } from "lucide-react";
 
 import { EmptyState } from "@/components/shared/EmptyState";
+import { PageSkeleton } from "@/components/shared/PageSkeleton";
 import { StatCard } from "@/components/shared/StatCard";
 import { getViewer } from "@/lib/auth";
 import { UserStage } from "@/lib/enums";
@@ -33,16 +35,18 @@ interface WhereAreWeNowPanelProps {
   filters: MapFilterState;
 }
 
-export async function WhereAreWeNowPanel({ cohort, filters }: WhereAreWeNowPanelProps) {
-  const viewer = await getViewer();
-
-  const stats = await getCareerOutcomeStats(viewer, {
-    cohortId: cohort.id,
-    viewerId: viewer.kind === "USER" ? viewer.userId : undefined,
-  });
-
-  const hasAnything = stats.respondentCount > 0;
-
+/**
+ * 🔴 BAŞLIQ SORĞUNU GÖZLƏMİR (Blok 12D · S3-F4).
+ *
+ * Səhifə status qapısındandır (`map/page.tsx` → `notFound()`), yəni seqmentə
+ * `loading.tsx` QOYULA BİLMİR — axın 404-ü 200-ə çevirərdi. Onun əvəzinə
+ * skeleton BURADA, qapıdan SONRAKI `<Suspense>` sərhədindədir.
+ *
+ * ⚠️ TƏLƏ C: `getCareerOutcomeStats` sərhədin İÇİNDƏKİ komponentdə çağırılır.
+ * Burada `await` edib nəticəni prop kimi versək boundary heç nə etməzdi —
+ * data artıq gözlənilmiş olardı və skeleton HEÇ VAXT görünməzdi.
+ */
+export function WhereAreWeNowPanel({ cohort, filters }: WhereAreWeNowPanelProps) {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-3">
@@ -53,6 +57,27 @@ export async function WhereAreWeNowPanel({ cohort, filters }: WhereAreWeNowPanel
         </p>
       </header>
 
+      {/* Fallback: üç xülasə kartı + tab paneli ≈ real hündürlük. `header={false}`
+          — başlıq yuxarıda ARTIQ real mətnlə render olunub. */}
+      <Suspense fallback={<PageSkeleton variant="cards" count={3} header={false} announce={false} />}>
+        <WhereAreWeNowBody cohort={cohort} filters={filters} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function WhereAreWeNowBody({ cohort, filters }: WhereAreWeNowPanelProps) {
+  const viewer = await getViewer();
+
+  const stats = await getCareerOutcomeStats(viewer, {
+    cohortId: cohort.id,
+    viewerId: viewer.kind === "USER" ? viewer.userId : undefined,
+  });
+
+  const hasAnything = stats.respondentCount > 0;
+
+  return (
+    <>
       <ConsentNotice stats={stats} />
 
       {!hasAnything ? (
@@ -93,6 +118,6 @@ export async function WhereAreWeNowPanel({ cohort, filters }: WhereAreWeNowPanel
           <MapTabs stats={stats} initialTab={filters.tab} />
         </>
       )}
-    </div>
+    </>
   );
 }
