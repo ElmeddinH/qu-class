@@ -2,16 +2,16 @@
 
 `npm run git:audit` (`scripts/git-audit.mjs`) tərəfindən yaradılır. Şəbəkəsiz, yalnız oxu. Tapılan hər dəyər **maskalanır** (ilk 4 simvol + `****`) — hesabatın özü sızma mənbəyinə çevrilməməlidir.
 
-Son işlədilmə: `2026-08-18T18:19:43.556Z`
+Son işlədilmə: `2026-08-18T18:43:33.297Z`
 
 ## Xülasə
 
 | Ölçü | Dəyər |
 | --- | --- |
-| Gəzilən commit | 50 (HEAD-dən kökə, `depth: Infinity`) |
-| Tarixçədəki unikal yol | 671 |
-| Tarixçədəki unikal blob | 1036 |
-| İndeksdə izlənən fayl | 665 |
+| Gəzilən commit | 51 (HEAD-dən kökə, `depth: Infinity`) |
+| Tarixçədəki unikal yol | 675 |
+| Tarixçədəki unikal blob | 1057 |
+| İndeksdə izlənən fayl | 669 |
 | 🔴 Bloklayan tapıntı | 0 |
 | ⚠️ Xəbərdarlıq | 0 |
 
@@ -25,16 +25,16 @@ GitHub həddləri: **50 MB** xəbərdarlıq · **100 MB** hard blok.
 
 | # | Ölçü | Yol |
 | --- | --- | --- |
-| 1 | 567.2 KB | `docs/screenshots/01-welcome.png` |
-| 2 | 422.7 KB | `package-lock.json` |
-| 3 | 422.1 KB | `package-lock.json` |
-| 4 | 421.8 KB | `package-lock.json` |
-| 5 | 419.7 KB | `package-lock.json` |
-| 6 | 308.9 KB | `docs/openapi.json` |
-| 7 | 304.9 KB | `docs/openapi.json` |
-| 8 | 297.1 KB | `docs/openapi.json` |
-| 9 | 263.8 KB | `docs/screenshots/11-events.png` |
-| 10 | 221.8 KB | `docs/openapi.json` |
+| 1 | 7.15 MB | `docs/media/demo.gif` |
+| 2 | 567.2 KB | `docs/screenshots/01-welcome.png` |
+| 3 | 422.7 KB | `package-lock.json` |
+| 4 | 422.1 KB | `package-lock.json` |
+| 5 | 421.8 KB | `package-lock.json` |
+| 6 | 419.7 KB | `package-lock.json` |
+| 7 | 308.9 KB | `docs/openapi.json` |
+| 8 | 304.9 KB | `docs/openapi.json` |
+| 9 | 297.1 KB | `docs/openapi.json` |
+| 10 | 263.8 KB | `docs/screenshots/11-events.png` |
 
 ## `.gitignore` uyğunluğu
 
@@ -49,8 +49,8 @@ Tərsinə təsdiq (bunlar İZLƏNMƏLİDİR):
 
 | Rol | Ad | E-poçt | Commit sayı |
 | --- | --- | --- | --- |
-| author | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 50 |
-| committer | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 50 |
+| author | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 51 |
+| committer | Elmeddin Heydarov | `heydarovelmeddin2@gmail.com` | 51 |
 
 ⚠️ **T33** — GitHub commit-i töhfə qrafikinə yalnız e-poçt hesaba bağlı olduqda yazır. Uyğunsuzluq push-DAN ƏVVƏL düzəldilməlidir: sonrakı düzəliş bütün commit SHA-larını dəyişir.
 

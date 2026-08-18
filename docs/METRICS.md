@@ -35,7 +35,7 @@
 | Servis faylı (`src/services/*`) | **24** |
 | Vahid + inteqrasiya testi | **1833** (67 fayl) |
 | E2E testi | **220** (22 fayl) |
-| Commit | **50** |
+| Commit | **51** |
 | Seed sətri (28 cədvəl) | **6323** |
 
 ---
@@ -365,7 +365,7 @@ npm run git:log            # son sətir: "N commit."
 npm run git:log | tail -1
 ```
 
-**Nəticə: 50 commit.**
+**Nəticə: 51 commit.**
 
 ⚠️ Layihə mühitində **`git` binarı yoxdur** — commit-lər `isomorphic-git` ilə
 yazılır (`scripts/git.mjs`), amma nəticə standart `.git` qovluğudur və
@@ -380,10 +380,11 @@ git rev-list --count HEAD
 
 | Ölçü | Rəqəm |
 |---|---|
-| Gəzilən commit | 50 |
-| Unikal yol | 671 |
-| Unikal blob | 1036 |
-| İndeksdə izlənən fayl | 665 |
+| Gəzilən commit | 51 |
+| Unikal yol | 675 |
+| Unikal blob | 1057 |
+| İndeksdə izlənən fayl | 669 |
+| Ən böyük blob | 7.15 MB (`docs/media/demo.gif`) |
 | Bloklayan tapıntı | **0** |
 | Xəbərdarlıq | **0** |
 

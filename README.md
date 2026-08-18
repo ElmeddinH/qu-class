@@ -826,7 +826,7 @@ qalır.
 | Toxunma hədəfi — 24px qapısı (SC 2.5.8) | iki shadcn primitivi istisna — bax №9 | §3.2 |
 | Üfüqi sürüşmə — **51 səhifə × 5 breakpoint = 255 yoxlama** | sıfır | `tests/e2e/responsive.spec.ts` |
 | Donut — bitişik dilim kontrastı | 2·4·6 dilimdə **≥ 3:1**; tək sayda riyazi hədd | `docs/quality-report-12c.md` §6 |
-| Git tarixçəsi — sızma auditi (50 commit, 1036 blob) | 0 bloklayan, 0 xəbərdarlıq | `docs/git-audit-report.md` |
+| Git tarixçəsi — sızma auditi (51 commit, 1057 blob) | 0 bloklayan, 0 xəbərdarlıq | `docs/git-audit-report.md` |
 
 ---
 
